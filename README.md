@@ -73,10 +73,7 @@ If you see "ATTESTATION SUCCESSFUL" you're done. Congratz :-D
 
 2. Send TPM startup command:
 
-        /usr/bin/env TPM2TOOLS_TCTI_NAME=socket \
-                TPM2TOOLS_SOCKET_ADDRESS=127.0.0.1 \
-                TPM2TOOLS_SOCKET_PORT=2321 \
-                /usr/local/bin/tpm2_startup --clear
+                /usr/local/bin/tpm2_startup -Tmssim --clear
 
 3. Run Attester and Verifier:
 
