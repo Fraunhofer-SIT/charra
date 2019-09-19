@@ -6,10 +6,11 @@ obj/*
 core
 
 # keep core folder
-!core/*
+!src/core/*
 
 # keep folders
 !.gitkeep
 
 # VSCode
 .vscode/
+
