@@ -1,0 +1,28 @@
+Standard: Cpp11
+BasedOnStyle: LLVM
+IndentWidth: 4
+TabWidth: 4
+UseTab: true
+ContinuationIndentWidth: 4
+ColumnLimit: 80
+AccessModifierOffset: -4
+NamespaceIndentation: All
+BraceWrapping:
+  AfterEnum: false
+  AfterStruct: false
+  AfterClass: false
+  AfterControlStatement: false
+  AfterNamespace: false
+  AfterFunction: false
+  AfterUnion: false
+  AfterExternBlock: false
+  BeforeCatch: false
+  BeforeElse: false
+  SplitEmptyFunction: false
+  SplitEmptyNamespace: false
+  SplitEmptyRecord: false
+AlignAfterOpenBracket: DontAlign
+PointerAlignment: Left
+ReflowComments: true
+BreakStringLiterals: true
+

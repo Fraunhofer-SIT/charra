@@ -1,0 +1,15 @@
+# build artifacts
+bin/*
+obj/*
+
+# core dumps
+core
+
+# keep core folder
+!core/*
+
+# keep folders
+!.gitkeep
+
+# VSCode
+.vscode/

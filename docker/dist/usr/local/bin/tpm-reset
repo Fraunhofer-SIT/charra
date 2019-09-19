@@ -1,0 +1,25 @@
+#!/bin/sh
+cd /tmp
+
+## kill TPM simulator
+/usr/bin/pkill tpm_server
+
+## remove state file of TPM simulator
+/bin/rm -f NVChip
+
+## start TPM simulator in background
+(/usr/local/bin/tpm_server > /dev/null &)
+
+## wait for TPM simulator to start
+while ! pidof tpm_server >> /dev/null ; do
+    sleep 1
+done
+## additional sleep to compensate for the starting time of the TPM simulator
+sleep 1 
+
+## execute TPM startup
+/usr/bin/env TPM2TOOLS_TCTI_NAME=socket \
+    TPM2TOOLS_SOCKET_ADDRESS=127.0.0.1 \
+    TPM2TOOLS_SOCKET_PORT=2321 \
+    /usr/local/bin/tpm2_startup --clear
+

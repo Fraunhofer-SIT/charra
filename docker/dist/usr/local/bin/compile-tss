@@ -1,0 +1,12 @@
+#!/bin/bash
+
+until [ -z "$1" ]; do
+	gcc -std=c99 -pedantic -Wall -fdata-sections -ffunction-sections \
+		-I/usr/local/include/ "$1" -L=/usr/local/lib \
+		-ltss2-esys -ltss2-sys -ltss2-mu \
+		-ltss2-tcti-device -ltss2-tcti-mssim \
+		-o "${1%.c}"
+shift
+done
+
+
