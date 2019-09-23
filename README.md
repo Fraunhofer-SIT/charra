@@ -15,20 +15,20 @@ Next steps:
 
 2. Build Docker image:
 
-        ./docker/build.sh
+       ./docker/build.sh
 
 3. Run Docker image:
 
-        ./docker/run.sh
+       ./docker/run.sh
 
 4. Compile CHARRA (inside container):
 
-        cd charra/
-        make -j
+       cd charra/
+       make -j
 
 5. Run CHARRA (inside container):
 
-        (bin/attester &); sleep .2 ; bin/verifier ; sleep 1 ; pkill bin/attester
+       (bin/attester &); sleep .2 ; bin/verifier ; sleep 1 ; pkill bin/attester
 
 If you see "ATTESTATION SUCCESSFUL" you're done. Congratz :-D
 
@@ -42,17 +42,17 @@ If you see "ATTESTATION SUCCESSFUL" you're done. Congratz :-D
 
    Either dynamically linked (default):
 
-        make -j libs
+       make -j libs
 
 3. Install libraries:
 
-        sudo make libs.install
+       sudo make libs.install
 
 4. Compile programs:
 
     Either dynamically linked (default):
 
-        make -j
+       make -j
 
 
 
@@ -68,35 +68,35 @@ If you see "ATTESTATION SUCCESSFUL" you're done. Congratz :-D
 
 1. Start the TPM Simulator (and remove the state file `NVChip`):
 
-        cd /tmp ; pkill tpm_server ; rm -f NVChip
-        (/usr/local/bin/tpm_server > /dev/null &)
+       cd /tmp ; pkill tpm_server ; rm -f NVChip
+       (/usr/local/bin/tpm_server > /dev/null &)
 
 2. Send TPM startup command:
 
-                /usr/local/bin/tpm2_startup -Tmssim --clear
+       /usr/local/bin/tpm2_startup -Tmssim --clear
 
 3. Run Attester and Verifier:
 
-         (bin/attester &); sleep .2 ; bin/verifier ; sleep 1 ; pkill bin/attester
+       (bin/attester &); sleep .2 ; bin/verifier ; sleep 1 ; pkill bin/attester
 
 ## Debug
 
 * Clang `scan-build`:
 
-        make clean ; scan-build make
+      make clean ; scan-build make
 
 * Valgrind:
 
-        (valgrind --leak-check=full \
-            --show-leak-kinds=all -v \
-            bin/attester \
-            2> attester-valgrind-stderr.log &); \
-        sleep .2 ; \
-        (valgrind --leak-check=full \
-            --show-leak-kinds=all -v \
-            bin/verifier\
-            2> verifier-valgrind-stderr.log) ;\
-        sleep 1 ; \
-        pkill bin/attester
+      (valgrind --leak-check=full \
+          --show-leak-kinds=all -v \
+          bin/attester \
+          2> attester-valgrind-stderr.log &); \
+      sleep .2 ; \
+      (valgrind --leak-check=full \
+          --show-leak-kinds=all -v \
+          bin/verifier\
+          2> verifier-valgrind-stderr.log) ;\
+      sleep 1 ; \
+      pkill bin/attester
 
 
