@@ -96,8 +96,10 @@ int main(void) {
 	/* enter main loop */
 	charra_log_debug("[" LOG_NAME "] Entering main loop.");
 	while (TRUE) {
+                int timing;
 		charra_log_info("[" LOG_NAME "] Waiting for connections.");
-		coap_run_once(ctx, 0);
+                timing = coap_io_process(ctx, 0);
+                if(timing < 0) break;
 	}
 
 	result = EXIT_SUCCESS;
