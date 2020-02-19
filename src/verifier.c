@@ -33,6 +33,8 @@
 #include "util/coap_util.h"
 #include "util/tpm2_util.h"
 
+#define UNUSED __attribute__ ((unused))
+
 /* --- config ------------------------------------------------------------- */
 
 /* logging */
@@ -151,9 +153,10 @@ int main(void) {
 	charra_log_info("[" LOG_NAME "] Sending CoAP message.");
 	coap_send(session, pdu);
 
-	coap_run_once(ctx, 0);
-
 	result = EXIT_SUCCESS;
+
+        if(coap_io_process(ctx, 0) < 0)
+          result = 10;  /* FAIL */
 
 finish:
 	/* free memory */
@@ -244,9 +247,9 @@ static CHARRA_RC create_attestation_request(
 
 /* --- resource handler definitions --------------------------------------- */
 
-static void coap_attest_handler(struct coap_context_t* context,
-	coap_session_t* session, coap_pdu_t* sent, coap_pdu_t* in,
-	const coap_tid_t id) {
+static void coap_attest_handler(struct coap_context_t* context UNUSED,
+	coap_session_t* session UNUSED, coap_pdu_t* sent UNUSED, coap_pdu_t* in,
+	const coap_tid_t id UNUSED) {
 	CHARRA_RC charra_r = CHARRA_RC_SUCCESS;
 	int coap_r = 0;
 	CborError cbor_r = CborNoError;
