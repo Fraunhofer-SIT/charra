@@ -8,6 +8,7 @@ Next steps:
 
 * Block-wise CoAP data transfers
 * Extended verification of claims with known-good values
+* Move from TinyCBOR to QCBOR.
 
 ## Build and Run in Docker
 
@@ -36,19 +37,27 @@ If you see "ATTESTATION SUCCESSFUL" you're done. Congratz :-D
 
 ## Build
 
-1. Install all dependencies that are needed for the [TPM2-TSS](https://github.com/tpm2-software/tpm2-tss/blob/master/INSTALL.md).
+The Dockerfile provides details on installing all dependancies and should be
+considered authoritative over this.
 
-2. Compile libraries:
+1. Install all dependencies that are needed for the
+[TPM2-TSS](https://github.com/tpm2-software/tpm2-tss/blob/master/INSTALL.md).
 
-   Either dynamically linked (default):
+2. Install: https://github.com/intel/tinycbor.git
+   Just use "make && sudo make install"
 
-       make -j libs
+3. Install: https://github.com/obgm/libcoap.git
+   ./autogen.sh
+   ./configure --disable-tests --disable-documentation --disable-manpages --disable-dtls --disable-shared --enable-fast-install
 
-3. Install libraries:
+  Make sure that you do not have libcoap-1-0-dev installed, as the headers
+might conflict.
 
-       sudo make libs.install
+4. Install compilers:
+   apt-get install --no-install-recommends -y clang valgrind
+   apt-get install --no-install-recommends -y gosu sudo
 
-4. Compile programs:
+5. Compile programs:
 
     Either dynamically linked (default):
 
