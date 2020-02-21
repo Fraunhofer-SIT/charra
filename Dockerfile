@@ -57,7 +57,7 @@ RUN make -j"$(nproc)" \
 RUN rm -rfv /tmp/tinycbor
 
 ## libCoAP
-RUN git clone --depth=1 --recursive -b 'v4.2.0' \
+RUN git clone --depth=1 --recursive -b 'develop \
 	'https://github.com/obgm/libcoap.git' /tmp/libcoap
 WORKDIR /tmp/libcoap
 RUN ./autogen.sh \
