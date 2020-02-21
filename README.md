@@ -49,6 +49,7 @@ considered authoritative over this.
 3. Install: https://github.com/obgm/libcoap.git
    ./autogen.sh
    ./configure --disable-tests --disable-documentation --disable-manpages --disable-dtls --disable-shared --enable-fast-install
+   make && sudo make install
 
   Make sure that you do not have libcoap-1-0-dev installed, as the headers
 might conflict.
@@ -58,8 +59,6 @@ might conflict.
    apt-get install --no-install-recommends -y gosu sudo
 
 5. Compile programs:
-
-    Either dynamically linked (default):
 
        make -j
 
@@ -77,8 +76,7 @@ might conflict.
 
 1. Start the TPM Simulator (and remove the state file `NVChip`):
 
-       cd /tmp ; pkill tpm_server ; rm -f NVChip
-       (/usr/local/bin/tpm_server > /dev/null &)
+       (cd /tmp ; pkill tpm_server ; rm -f NVChip; /usr/local/bin/tpm_server > /dev/null &)
 
 2. Send TPM startup command:
 
