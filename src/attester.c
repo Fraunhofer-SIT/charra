@@ -115,7 +115,6 @@ static void coap_attestation_handler(struct coap_context_t* ctx,
 	struct coap_string_t* query, struct coap_pdu_t* out) {
 	CHARRA_RC charra_r = CHARRA_RC_SUCCESS;
 	int coap_r = 0;
-	CborError cbor_r = CborNoError;
 	TSS2_RC tss_r = 0;
 	ESYS_TR sig_key_handle = ESYS_TR_NONE;
 
@@ -139,8 +138,8 @@ static void coap_attestation_handler(struct coap_context_t* ctx,
 	/* unmarshal data */
 	charra_log_info("[" LOG_NAME "] Parsing received CBOR data.");
 	msg_attestation_request_dto req;
-	if ((cbor_r = unmarshal_attestation_request(data_len, data, &req)) !=
-		CborNoError) {
+	if ((charra_r = unmarshal_attestation_request(data_len, data, &req)) !=
+		CHARRA_RC_SUCCESS) {
 		charra_log_error("[" LOG_NAME "] Could not parse CBOR data.");
 		goto error;
 	}

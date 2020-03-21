@@ -21,10 +21,11 @@
 #ifndef MARSHALING_UTIL_H
 #define MARSHALING_UTIL_H
 
-#include <tinycbor/cbor.h>
+#include <qcbor.h>
 #include <tss2/tss2_esys.h>
 
 #include "../core/charra_dto.h"
+#include "../common/charra_error.h"
 
 /**
  * @brief Marshals an attestation request DTO.
@@ -32,9 +33,10 @@
  * @param attestation_request[in] The attestation request DTO.
  * @param marshaled_data_len[out] The length of the marshaled data.
  * @param marshaled_data[out] The marshaled data.
- * @return CborError In case a parse error occurs.
+ * @return CHARRA_RC_SUCCESS on success.
+ * @return CHARRA_RC_ERROR on error.
  */
-CborError marshal_attestation_request(
+CHARRA_RC marshal_attestation_request(
 	const msg_attestation_request_dto* attestation_request,
 	uint32_t* marshaled_data_len, uint8_t** marshaled_data);
 
@@ -44,9 +46,10 @@ CborError marshal_attestation_request(
  * @param marshaled_data_len[in] The length of the marshaled data.
  * @param marshaled_data[in] The marshaled data.
  * @param attestation_request[out] The attestation request DTO.
- * @return CborError In case a parse error occurs.
+ * @return CHARRA_RC_SUCCESS on success.
+ * @return CHARRA_RC_ERROR on error.
  */
-CborError unmarshal_attestation_request(uint32_t marshaled_data_len,
+CHARRA_RC unmarshal_attestation_request(uint32_t marshaled_data_len,
 	uint8_t* marshaled_data, msg_attestation_request_dto* attestation_request);
 
 /**
@@ -55,9 +58,10 @@ CborError unmarshal_attestation_request(uint32_t marshaled_data_len,
  * @param attestation_response[in] The attestation response DTO.
  * @param marshaled_data_len[out] The length of the marshaled data.
  * @param marshaled_data[out] The marshaled data.
- * @return CborError In case a parse error occurs.
+ * @return CHARRA_RC_SUCCESS on success.
+ * @return CHARRA_RC_ERROR on error.
  */
-CborError marshal_attestation_response(
+CHARRA_RC marshal_attestation_response(
 	const msg_attestation_response_dto* attestation_response,
 	uint32_t* marshaled_data_len, uint8_t** marshaled_data);
 
@@ -67,9 +71,10 @@ CborError marshal_attestation_response(
  * @param marshaled_data_len[in] The length of the marshaled data.
  * @param marshaled_data[in] The marshaled data.
  * @param attestation_response[out] The attestation response DTO.
- * @return CborError In case a parse error occurs.
+ * @return CHARRA_RC_SUCCESS on success.
+ * @return CHARRA_RC_ERROR on error.
  */
-CborError unmarshal_attestation_response(uint32_t marshaled_data_len,
+CHARRA_RC unmarshal_attestation_response(uint32_t marshaled_data_len,
 	uint8_t* marshaled_data,
 	msg_attestation_response_dto* attestation_response);
 
