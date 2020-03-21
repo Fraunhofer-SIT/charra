@@ -131,10 +131,10 @@ int main(void) {
 	charra_log_info("[" LOG_NAME "] Marshaling attestation request data.");
 	uint32_t req_buf_len = 0;
 	uint8_t* req_buf = NULL;
-	CborError cbor_err = CborNoError;
+	CHARRA_RC charra_err = CHARRA_RC_SUCCESS;
 	int coap_err = 0;
-	if ((cbor_err = marshal_attestation_request(req, &req_buf_len, &req_buf)) !=
-		CborNoError) {
+	if ((charra_err = marshal_attestation_request(req, &req_buf_len, &req_buf)) !=
+		CHARRA_RC_SUCCESS) {
 		charra_log_error(
 			"[" LOG_NAME "] Marshaling attestation request data failed.");
 		goto finish;
@@ -252,7 +252,7 @@ static void coap_attest_handler(struct coap_context_t* context UNUSED,
 	const coap_tid_t id UNUSED) {
 	CHARRA_RC charra_r = CHARRA_RC_SUCCESS;
 	int coap_r = 0;
-	CborError cbor_r = CborNoError;
+	CHARRA_RC charra_err = CHARRA_RC_SUCCESS;
 	TSS2_RC tss_r = 0;
 
 	ESYS_TR sig_key_handle = ESYS_TR_NONE;
@@ -278,8 +278,8 @@ static void coap_attest_handler(struct coap_context_t* context UNUSED,
 	/* unmarshal data */
 	charra_log_info("[" LOG_NAME "] Parsing received CBOR data.");
 	msg_attestation_response_dto res;
-	if ((cbor_r = unmarshal_attestation_response(data_len, data, &res)) !=
-		CborNoError) {
+	if ((charra_err = unmarshal_attestation_response(data_len, data, &res)) !=
+		CHARRA_RC_SUCCESS) {
 		charra_log_error("[" LOG_NAME "] Could not parse CBOR data.");
 		goto error;
 	}

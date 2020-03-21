@@ -25,7 +25,8 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include <tinycbor/cbor.h>
+#include <qcbor.h>
+#include <UsefulBuf.h>
 #include <tss2/tss2_tpm2_types.h>
 
 #include "../common/charra_log.h"
@@ -35,7 +36,7 @@
 
 static const uint32_t CBOR_ENCODER_BUFFER_LENGTH = 20480;
 
-CborError marshal_attestation_request(
+CHARRA_RC marshal_attestation_request(
 	const msg_attestation_request_dto* attestation_request,
 	uint32_t* marshaled_data_len, uint8_t** marshaled_data) {
 	charra_log_trace("<ENTER> %s()", __func__);
@@ -49,316 +50,169 @@ CborError marshal_attestation_request(
 	assert(attestation_request->nonce_len <= sizeof(TPMU_HA));
 	assert(attestation_request->nonce != NULL);
 
-	uint8_t buf[CBOR_ENCODER_BUFFER_LENGTH];
-	CborError err = CborNoError;
-	CborEncoder encoder;
+	UsefulBuf_MAKE_STACK_UB(buf, CBOR_ENCODER_BUFFER_LENGTH);
+	QCBOREncodeContext EC;
 
-	cbor_encoder_init(&encoder, (uint8_t*)buf, sizeof(buf), 0);
-	charra_log_debug("CBOR buf len: %i",
-		cbor_encoder_get_buffer_size(&encoder, (const uint8_t*)buf));
+	QCBOREncode_Init(&EC, buf);
 
 	/* root array */
-	CborEncoder root_array_encoder;
-	if ((err = cbor_encoder_create_array(&encoder, &root_array_encoder, 4))) {
-		charra_log_error(
-			"CBOR encoder: %s (line %d)", cbor_error_string(err), __LINE__);
-		goto cbor_encode_error;
-	}
+	QCBOREncode_OpenArray(&EC);
 
 	/* encode "hello" */
-	if ((err = cbor_encode_boolean(
-			 &root_array_encoder, attestation_request->hello))) {
-		charra_log_error(
-			"CBOR encoder: %s (line %d)", cbor_error_string(err), __LINE__);
-		goto cbor_encode_error;
-	}
+	QCBOREncode_AddBool(&EC, attestation_request->hello);
 
 	/* encode "key_id" */
-	if ((err = cbor_encode_byte_string(&root_array_encoder,
-			 attestation_request->sig_key_id,
-			 attestation_request->sig_key_id_len))) {
-		goto cbor_encode_error;
-	}
+	UsefulBufC KeyID = {attestation_request->sig_key_id, attestation_request->sig_key_id_len};
+	QCBOREncode_AddBytes(&EC, KeyID);
 
 	/* encode "nonce" */
-	if ((err = cbor_encode_byte_string(&root_array_encoder,
-			 attestation_request->nonce, attestation_request->nonce_len))) {
-		goto cbor_encode_error;
-	}
+	UsefulBufC Nonce = {attestation_request->nonce, attestation_request->nonce_len};
+	QCBOREncode_AddBytes(&EC, Nonce);
 
 	{
-		/* encode PCR selections array */
-		CborEncoder pcr_selections_array_encoder;
-		if ((err = cbor_encoder_create_array(&root_array_encoder,
-				 &pcr_selections_array_encoder,
-				 attestation_request->pcr_selections_len))) {
-			charra_log_error(
-				"CBOR encoder: %s (line %d)", cbor_error_string(err), __LINE__);
-			goto cbor_encode_error;
-		}
+		QCBOREncode_OpenArray(&EC);
 
 		for (uint32_t i = 0; i < attestation_request->pcr_selections_len; ++i) {
 			{
-				/* encode PCR selection array */
-				CborEncoder pcr_selection_array_encoder;
-				if ((err = cbor_encoder_create_array(
-						 &pcr_selections_array_encoder,
-						 &pcr_selection_array_encoder, 2))) {
-					charra_log_error("CBOR encoder: %s (line %d)",
-						cbor_error_string(err), __LINE__);
-					goto cbor_encode_error;
-				}
+				QCBOREncode_OpenArray(&EC);
 
-				/* encode "tcg-hash-alg-id" */
-				if ((err = cbor_encode_int(&pcr_selection_array_encoder,
-						 attestation_request->pcr_selections[i]
-							 .tcg_hash_alg_id))) {
-					charra_log_error("CBOR encoder: %s (line %d)",
-						cbor_error_string(err), __LINE__);
-					goto cbor_encode_error;
-				}
+				QCBOREncode_AddInt64(&EC, attestation_request->pcr_selections[i].tcg_hash_alg_id);
 
 				{
-					/* encode PCRs array */
-					CborEncoder pcrs_array_encoder;
-					if ((err = cbor_encoder_create_array(
-							 &pcr_selection_array_encoder, &pcrs_array_encoder,
-							 attestation_request->pcr_selections[i]
-								 .pcrs_len))) {
-						charra_log_error("CBOR encoder: %s (line %d)",
-							cbor_error_string(err), __LINE__);
-						goto cbor_encode_error;
-					}
+					QCBOREncode_OpenArray(&EC);
 
 					for (uint32_t j = 0;
 						 j < attestation_request->pcr_selections[i].pcrs_len;
 						 ++j) {
-						if ((err = cbor_encode_int(&pcrs_array_encoder,
-								 attestation_request->pcr_selections[i]
-									 .pcrs[j]))) {
-							charra_log_error("CBOR encoder: %s (line %d)",
-								cbor_error_string(err), __LINE__);
-							goto cbor_encode_error;
-						}
+
+						 QCBOREncode_AddUInt64(&EC, attestation_request->pcr_selections[i].pcrs[j]);
 					}
 
 					/* close array: pcrs_array_encoder */
-					if ((err = cbor_encoder_close_container(
-							 &pcr_selection_array_encoder,
-							 &pcrs_array_encoder))) {
-						charra_log_error("CBOR encoder: %s (line %d)",
-							cbor_error_string(err), __LINE__);
-						goto cbor_encode_error;
-					}
+					QCBOREncode_CloseArray(&EC);
 				}
 
 				/* close array: pcr_selection_array_encoder */
-				if ((err = cbor_encoder_close_container(
-						 &pcr_selections_array_encoder,
-						 &pcr_selection_array_encoder))) {
-					charra_log_error("CBOR encoder: %s (line %d)",
-						cbor_error_string(err), __LINE__);
-					goto cbor_encode_error;
-				}
+				QCBOREncode_CloseArray(&EC);
 			}
 		}
 
 		/* close array: pcr_selections_array_encoder */
-		if ((err = cbor_encoder_close_container(
-				 &root_array_encoder, &pcr_selections_array_encoder))) {
-			charra_log_error(
-				"CBOR encoder: %s (line %d)", cbor_error_string(err), __LINE__);
-			goto cbor_encode_error;
-		}
+		QCBOREncode_CloseArray(&EC);
 	}
 
 	/* close array: root_array_encoder */
-	if ((err = cbor_encoder_close_container(&encoder, &root_array_encoder))) {
-		charra_log_error(
-			"CBOR encoder: %s (line %d)", cbor_error_string(err), __LINE__);
-		goto cbor_encode_error;
-	}
+	QCBOREncode_CloseArray(&EC);
 
 	/* set out params */
-	*marshaled_data_len =
-		(uint32_t)cbor_encoder_get_buffer_size(&encoder, (const uint8_t*)buf);
-	*marshaled_data = (uint8_t*)buf;
+	UsefulBufC Encoded;
 
-	return CborNoError;
+	if(QCBOREncode_Finish(&EC, &Encoded))
+		return CHARRA_RC_MARSHALING_ERROR;
 
-cbor_encode_error:
-	charra_log_error("CBOR encoder: %s", cbor_error_string(err));
-	charra_log_error("CBOR encoder: Skipping encoding.");
-	return err;
+	*marshaled_data_len = Encoded.len;
+	*marshaled_data = (uint8_t*)Encoded.ptr;
+
+	return CHARRA_RC_SUCCESS;
 }
 
-CborError unmarshal_attestation_request(uint32_t marshaled_data_len,
+CHARRA_RC unmarshal_attestation_request(uint32_t marshaled_data_len,
 	uint8_t* marshaled_data, msg_attestation_request_dto* attestation_request) {
-	CborParser parser;
-	CborValue it;
-	CborError err = CborNoError;
 
-	/* init CBOR parser */
-	if ((err = cbor_parser_init(
-			 marshaled_data, marshaled_data_len, 0, &parser, &it))) {
+	QCBORError cborerr = QCBOR_SUCCESS;
+	UsefulBufC marshaled_data_buf = {marshaled_data, marshaled_data_len};
+	QCBORDecodeContext DC;
+	QCBORItem item;
+
+	QCBORDecode_Init(&DC, marshaled_data_buf, QCBOR_DECODE_MODE_NORMAL);
+	attestation_request->pcr_selections = NULL;
+
+	if(charra_cbor_getnext(&DC, &item, QCBOR_TYPE_ARRAY))
 		goto cbor_parse_error;
-	} else {
-		charra_log_debug("CBOR parser; initialized successfully.");
-	}
 
-	/* parse root array */
-	CborValue root_array;
-	if ((err = charra_cbor_parse_enter_array(&it, &root_array))) {
+	/* parse "hello" (bool) */
+	if((cborerr = charra_cbor_getnext(&DC, &item, CHARRA_CBOR_TYPE_BOOLEAN)))
 		goto cbor_parse_error;
-	} else {
-		/* parse "hello" (bool) */
-		if ((err = charra_cbor_parse_boolean(
-				 &root_array, &(attestation_request->hello)))) {
-			goto cbor_parse_error;
-		}
-		if ((err = cbor_value_advance_fixed(&root_array))) {
-			goto cbor_parse_error;
-		}
+	attestation_request->hello = charra_cbor_getbool_val(&item);
 
-		/* parse "key-id" (bytes) */
-		if ((err = charra_cbor_parse_byte_string(&root_array,
-				 &(attestation_request->sig_key_id_len),
-				 &(attestation_request->sig_key_id)))) {
-			goto cbor_parse_error;
-		}
-
-		/* parse "nonce" (bytes) */
-		if ((err = charra_cbor_parse_byte_string(&root_array,
-				 &(attestation_request->nonce_len),
-				 &(attestation_request->nonce)))) {
-			goto cbor_parse_error;
-		}
-
-		/* parse array "pcr-selections" */
-		CborValue pcr_selections_array;
-		if ((err = charra_cbor_parse_enter_array(
-				 &root_array, &pcr_selections_array))) {
-			goto cbor_parse_error;
-		} else {
-			/* initialize array and array length */
-			attestation_request->pcr_selections_len =
-				pcr_selections_array.remaining;
-			attestation_request->pcr_selections = (pcr_selection_dto*)calloc(
-				attestation_request->pcr_selections_len,
-				sizeof(pcr_selection_dto));
-
-			/* go through all elements */
-			for (uint32_t i = 0; i < attestation_request->pcr_selections_len;
-				 ++i) {
-
-				/* parse array "pcr-selection" */
-				CborValue pcr_selection_array;
-				if ((err = charra_cbor_parse_enter_array(
-						 &pcr_selections_array, &pcr_selection_array))) {
-					goto cbor_parse_error;
-				} else {
-					/* parse "tcg-hash-alg-id" (UINT16) */
-					if ((err = charra_cbor_parse_uint16(&pcr_selection_array,
-							 &(attestation_request->pcr_selections[i]
-									 .tcg_hash_alg_id)))) {
-						goto cbor_parse_error;
-					}
-					if ((err = cbor_value_advance_fixed(
-							 &pcr_selection_array))) {
-						goto cbor_parse_error;
-					}
-
-					/* parse array "pcrs" */
-					CborValue pcrs_array;
-					if ((err = charra_cbor_parse_enter_array(
-							 &pcr_selection_array, &pcrs_array))) {
-						goto cbor_parse_error;
-					} else {
-						/* initialize array and array length */
-						attestation_request->pcr_selections[i].pcrs_len =
-							pcrs_array.remaining;
-						attestation_request->pcr_selections[i].pcrs =
-							(uint8_t*)calloc(
-								attestation_request->pcr_selections[i].pcrs_len,
-								sizeof(uint8_t));
-						/* go through all elements */
-						for (uint32_t j = 0;
-							 j <
-							 attestation_request->pcr_selections[i].pcrs_len;
-							 ++j) {
-
-							/* parse "pcr" (UINT8) */
-							if ((err = charra_cbor_parse_uint8(&pcrs_array,
-									 &(attestation_request->pcr_selections[i]
-											 .pcrs[j])))) {
-								goto cbor_parse_error;
-							}
-							if ((err = cbor_value_advance_fixed(&pcrs_array))) {
-								goto cbor_parse_error;
-							}
-						}
-					}
-
-					/* leave array "pcrs" */
-					if ((err = cbor_value_leave_container(
-							 &pcr_selection_array, &pcrs_array))) {
-						goto cbor_parse_error;
-					} else {
-						charra_log_debug("CBOR parser: leaving array.");
-					}
-				}
-
-				/* leave array "pcr-selection" */
-				if ((err = cbor_value_leave_container(
-						 &pcr_selections_array, &pcr_selection_array))) {
-					goto cbor_parse_error;
-				} else {
-					charra_log_debug("CBOR parser: leaving array.");
-				}
-			}
-		}
-
-		/* leave array "pcr-selections" */
-		if ((err = cbor_value_leave_container(
-				 &root_array, &pcr_selections_array))) {
-			goto cbor_parse_error;
-		} else {
-			charra_log_debug("CBOR parser: leaving array.");
-		}
-	}
-
-	/* leave root array */
-	if ((err = cbor_value_leave_container(&it, &root_array))) {
+	/* parse "key-id" (bytes) */
+	if((cborerr = charra_cbor_getnext(&DC, &item, QCBOR_TYPE_BYTE_STRING)))
 		goto cbor_parse_error;
-	} else {
-		charra_log_debug("CBOR parser: leaving array.");
+	attestation_request->sig_key_id_len = item.val.string.len;
+	attestation_request->sig_key_id = (uint8_t*)item.val.string.ptr;
+
+	/* parse "nonce" (bytes) */
+	if((cborerr = charra_cbor_getnext(&DC, &item, QCBOR_TYPE_BYTE_STRING)))
+		goto cbor_parse_error;
+	attestation_request->nonce_len = item.val.string.len;
+	attestation_request->nonce = (uint8_t*)item.val.string.ptr;
+
+	/* parse array "pcr-selections" */
+	if((cborerr = charra_cbor_getnext(&DC, &item, QCBOR_TYPE_ARRAY)))
+		goto cbor_parse_error;
+
+	/* initialize array and array length */
+	attestation_request->pcr_selections_len = item.val.uCount;
+	attestation_request->pcr_selections = (pcr_selection_dto*)calloc(
+		item.val.uCount, sizeof(pcr_selection_dto));
+
+	/* go through all elements */
+	for (uint32_t i = 0; i < attestation_request->pcr_selections_len; i++) {
+		/* parse array "pcr-selection" */
+		if((cborerr = charra_cbor_getnext(&DC, &item, QCBOR_TYPE_ARRAY)))
+			goto cbor_parse_error;
+
+		/* parse "tcg-hash-alg-id" (UINT16) */
+		if((cborerr = charra_cbor_getnext(&DC, &item, QCBOR_TYPE_INT64)))
+			goto cbor_parse_error;
+		attestation_request->pcr_selections[i].tcg_hash_alg_id = item.val.uint64;
+
+		/* parse array "pcrs" */
+		if((cborerr = charra_cbor_getnext(&DC, &item, QCBOR_TYPE_ARRAY)))
+			goto cbor_parse_error;
+
+		/* initialize array and array length */
+		attestation_request->pcr_selections[i].pcrs_len = item.val.uCount;
+		attestation_request->pcr_selections[i].pcrs = (uint8_t*)calloc(
+			item.val.uCount, sizeof(uint8_t));
+
+
+		/* go through all elements */
+		for (uint32_t j = 0; j < attestation_request->pcr_selections[i].pcrs_len; ++j) {
+			if((cborerr = charra_cbor_getnext(&DC, &item, QCBOR_TYPE_INT64)))
+				goto cbor_parse_error;
+			attestation_request->pcr_selections[i].pcrs[j] = item.val.uint64;
+		}
 	}
 
 	/* expect end of CBOR data */
-	if (!cbor_value_at_end(&it)) {
+	if((cborerr = QCBORDecode_Finish(&DC))) {
 		charra_log_error("CBOR parser: expected end of input, but could not "
 						 "find it. Continuing.");
+		goto cbor_parse_error;
 	}
 
-	goto cbor_parse_success;
+	return CHARRA_RC_SUCCESS;
 
 cbor_parse_error:
-	charra_log_error("CBOR parser: %s", cbor_error_string(err));
+	charra_log_error("CBOR parser: %s", qcbor_err_to_str(cborerr));
 	charra_log_info("CBOR parser: skipping parsing.");
-	goto end;
-
-cbor_parse_success:
-	charra_log_info("CBOR parser: parsing successful.");
-
-	goto end;
-
-end:
-	return CborNoError;
+	// TODO: Free attestation_request->pcr_selections
+	/*if(attestation_request->pcr_selections != NULL) {
+		for(uint32_t j = 0; j < attestation_request->pcr_selections_len; j++) {
+			if(attestation_request->pcr_selections[j] != NULL) {
+				free(attestation_request->pcr_selections[j]);
+			}
+		}
+		free(attestation_request->pcr_selections);
+	}*/
+	return CHARRA_RC_MARSHALING_ERROR;
 }
 
-CborError marshal_attestation_response(
+CHARRA_RC marshal_attestation_response(
 	const msg_attestation_response_dto* attestation_response,
 	uint32_t* marshaled_data_len, uint8_t** marshaled_data) {
+
 	charra_log_trace("<ENTER> %s()", __func__);
 
 	/* verify input */
@@ -366,116 +220,76 @@ CborError marshal_attestation_response(
 	assert(attestation_response->attestation_data != NULL);
 	assert(attestation_response->tpm2_signature != NULL);
 
-	uint8_t buf[CBOR_ENCODER_BUFFER_LENGTH];
-	CborError err = CborNoError;
-	CborEncoder encoder;
+	UsefulBuf_MAKE_STACK_UB(buf, CBOR_ENCODER_BUFFER_LENGTH);
+	QCBOREncodeContext EC;
 
-	cbor_encoder_init(&encoder, (uint8_t*)buf, sizeof(buf), 0);
-	charra_log_debug("CBOR buf len: %i",
-		cbor_encoder_get_buffer_size(&encoder, (const uint8_t*)buf));
+	QCBOREncode_Init(&EC, buf);
 
 	/* root array */
-	CborEncoder root_array_encoder;
-	if ((err = cbor_encoder_create_array(&encoder, &root_array_encoder, 2))) {
-		charra_log_error(
-			"CBOR encoder: %s (line %d)", cbor_error_string(err), __LINE__);
-		goto cbor_encode_error;
-	}
+	QCBOREncode_OpenArray(&EC);
 
 	/* encode "attestation-data" */
-	if ((err = cbor_encode_byte_string(&root_array_encoder,
-			 attestation_response->attestation_data,
-			 attestation_response->attestation_data_len))) {
-		goto cbor_encode_error;
-	}
+	UsefulBufC AttestationData = {attestation_response->attestation_data, attestation_response->attestation_data_len};
+	QCBOREncode_AddBytes(&EC, AttestationData);
 
 	/* encode "tpm2-signature" */
-	if ((err = cbor_encode_byte_string(&root_array_encoder,
-			 attestation_response->tpm2_signature,
-			 attestation_response->tpm2_signature_len))) {
-		goto cbor_encode_error;
-	}
+	UsefulBufC Tpm2Signature = {attestation_response->tpm2_signature, attestation_response->tpm2_signature_len};
+	QCBOREncode_AddBytes(&EC, Tpm2Signature);
 
 	/* close array: root_array_encoder */
-	if ((err = cbor_encoder_close_container(&encoder, &root_array_encoder))) {
-		charra_log_error(
-			"CBOR encoder: %s (line %d)", cbor_error_string(err), __LINE__);
-		goto cbor_encode_error;
-	}
+	QCBOREncode_CloseArray(&EC);
 
 	/* set out params */
-	*marshaled_data_len =
-		(uint32_t)cbor_encoder_get_buffer_size(&encoder, (const uint8_t*)buf);
-	*marshaled_data = (uint8_t*)buf;
+	UsefulBufC Encoded;
 
-	return CborNoError;
+	if(QCBOREncode_Finish(&EC, &Encoded))
+		return CHARRA_RC_MARSHALING_ERROR;
 
-cbor_encode_error:
-	charra_log_error("CBOR encoder: %s", cbor_error_string(err));
-	charra_log_error("CBOR encoder: Skipping encoding.");
-	return err;
+	*marshaled_data_len = Encoded.len;
+	*marshaled_data = (uint8_t*)Encoded.ptr;
+
+	return CHARRA_RC_SUCCESS;
 }
 
-CborError unmarshal_attestation_response(uint32_t marshaled_data_len,
+CHARRA_RC unmarshal_attestation_response(uint32_t marshaled_data_len,
 	uint8_t* marshaled_data,
 	msg_attestation_response_dto* attestation_response) {
-	CborParser parser;
-	CborValue it;
-	CborError err = CborNoError;
 
-	/* init CBOR parser */
-	if ((err = cbor_parser_init(
-			 marshaled_data, marshaled_data_len, 0, &parser, &it))) {
-		goto cbor_parse_error;
-	} else {
-		charra_log_debug("CBOR parser; initialized successfully.");
-	}
+	QCBORError cborerr = QCBOR_SUCCESS;
+	UsefulBufC marshaled_data_buf = {marshaled_data, marshaled_data_len};
+	QCBORDecodeContext DC;
+	QCBORItem item;
+
+	QCBORDecode_Init(&DC, marshaled_data_buf, QCBOR_DECODE_MODE_NORMAL);
 
 	/* parse root array */
-	CborValue root_array;
-	if ((err = charra_cbor_parse_enter_array(&it, &root_array))) {
+	if((cborerr = charra_cbor_getnext(&DC, &item, QCBOR_TYPE_ARRAY)))
 		goto cbor_parse_error;
-	} else {
-		/* parse "attestation-data" (bytes) */
-		if ((err = charra_cbor_parse_byte_string(&root_array,
-				 (size_t*)&(attestation_response->attestation_data_len),
-				 &(attestation_response->attestation_data)))) {
-			goto cbor_parse_error;
-		}
 
-		/* parse "tpm2-signature" (bytes) */
-		if ((err = charra_cbor_parse_byte_string(&root_array,
-				 (size_t*)&(attestation_response->tpm2_signature_len),
-				 &(attestation_response->tpm2_signature)))) {
-			goto cbor_parse_error;
-		}
-	}
 
-	/* leave root array */
-	if ((err = cbor_value_leave_container(&it, &root_array))) {
+	/* parse "attestation-data" (bytes) */
+	if((cborerr = charra_cbor_getnext(&DC, &item, QCBOR_TYPE_BYTE_STRING)))
 		goto cbor_parse_error;
-	} else {
-		charra_log_debug("CBOR parser: leaving array.");
-	}
+	attestation_response->attestation_data_len = item.val.string.len;
+	attestation_response->attestation_data = (uint8_t*)item.val.string.ptr;
 
-	/* expect end of CBOR data */
-	if (!cbor_value_at_end(&it)) {
+	/* parse "tpm2-signature" (bytes) */
+	if((cborerr = charra_cbor_getnext(&DC, &item, QCBOR_TYPE_BYTE_STRING)))
+		goto cbor_parse_error;
+	attestation_response->tpm2_signature_len = item.val.string.len;
+	attestation_response->tpm2_signature = (uint8_t*)item.val.string.ptr;
+
+	if((cborerr = QCBORDecode_Finish(&DC))) {
 		charra_log_error("CBOR parser: expected end of input, but could not "
-						 "find it. Continuing.");
+				 "find it. Continuing.");
+		goto cbor_parse_error;
 	}
 
-	goto cbor_parse_success;
+	return CHARRA_RC_SUCCESS;
 
 cbor_parse_error:
-	charra_log_error("CBOR parser: %s", cbor_error_string(err));
+	charra_log_error("CBOR parser: %s", qcbor_err_to_str(cborerr));
 	charra_log_info("CBOR parser: skipping parsing.");
-	goto end;
+	return CHARRA_RC_MARSHALING_ERROR;
 
-cbor_parse_success:
-	charra_log_info("CBOR parser: parsing successful.");
-
-	goto end;
-
-end:
-	return CborNoError;
 }
