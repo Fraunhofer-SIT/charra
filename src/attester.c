@@ -33,6 +33,8 @@
 #include "util/coap_util.h"
 #include "util/tpm2_util.h"
 
+#define UNUSED __attribute__ ((unused))
+
 /* --- config ------------------------------------------------------------- */
 
 /* logging */
@@ -94,8 +96,10 @@ int main(void) {
 	/* enter main loop */
 	charra_log_debug("[" LOG_NAME "] Entering main loop.");
 	while (TRUE) {
+                int timing;
 		charra_log_info("[" LOG_NAME "] Waiting for connections.");
-		coap_run_once(ctx, 0);
+                timing = coap_io_process(ctx, 0);
+                if(timing < 0) break;
 	}
 
 	result = EXIT_SUCCESS;
@@ -109,10 +113,10 @@ finish:
 
 /* --- resource handler definitions --------------------------------------- */
 
-static void coap_attestation_handler(struct coap_context_t* ctx,
-	struct coap_resource_t* resource, struct coap_session_t* session,
-	struct coap_pdu_t* in, struct coap_binary_t* token,
-	struct coap_string_t* query, struct coap_pdu_t* out) {
+static void coap_attestation_handler(struct coap_context_t* ctx UNUSED,
+	struct coap_resource_t* resource UNUSED, struct coap_session_t* session UNUSED,
+	struct coap_pdu_t* in, struct coap_binary_t* token UNUSED,
+	struct coap_string_t* query UNUSED, struct coap_pdu_t* out) {
 	CHARRA_RC charra_r = CHARRA_RC_SUCCESS;
 	int coap_r = 0;
 	TSS2_RC tss_r = 0;
