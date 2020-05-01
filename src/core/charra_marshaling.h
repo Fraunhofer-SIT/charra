@@ -21,7 +21,7 @@
 #ifndef MARSHALING_UTIL_H
 #define MARSHALING_UTIL_H
 
-#include <qcbor.h>
+#include <qcbor/qcbor.h>
 #include <tss2/tss2_esys.h>
 
 #include "../core/charra_dto.h"
