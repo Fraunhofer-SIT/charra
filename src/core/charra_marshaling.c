@@ -25,8 +25,8 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include <qcbor.h>
-#include <UsefulBuf.h>
+#include <qcbor/qcbor.h>
+#include <qcbor/UsefulBuf.h>
 #include <tss2/tss2_tpm2_types.h>
 
 #include "../common/charra_log.h"

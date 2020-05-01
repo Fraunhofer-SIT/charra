@@ -19,7 +19,7 @@ LDPATH =     -L/usr/local/lib/ \
              -L/usr/lib/x86_64-linux-gnu
 
 LIBS =       coap-2 \
-             tinycbor \
+             qcbor \
              crypto ssl \
              util tss2-esys tss2-sys tss2-mu tss2-tcti-mssim
             #  tss2-tcti-device

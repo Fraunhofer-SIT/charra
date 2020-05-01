@@ -25,7 +25,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <qcbor.h>
+#include <qcbor/qcbor.h>
 
 #include "../common/charra_log.h"
 

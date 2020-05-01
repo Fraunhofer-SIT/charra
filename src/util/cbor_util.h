@@ -22,7 +22,7 @@
 #define CBOR_UTIL_H
 
 #include <stdlib.h>
-#include <qcbor.h>
+#include <qcbor/qcbor.h>
 
 #include "../common/charra_error.h"
 
