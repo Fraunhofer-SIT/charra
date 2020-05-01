@@ -13,13 +13,13 @@ read -r -d '' tool_reqs <<- EOM
 /usr/bin/dirname
 /usr/bin/docker
 EOM
-echo "$tool_reqs" | while read tool; do
+while read tool; do
 	if [ ! -x "$tool" ]; then
 		## print error using the shell builtin echo command
 		echo "Required tool '${tool}' not found or not executable!" >&2
 		exit 2
 	fi
-done
+done < <(echo "$tool_reqs")
 
 
 # ---------------------------------------------------------------------------#
