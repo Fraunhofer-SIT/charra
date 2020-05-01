@@ -22,18 +22,12 @@ RUN git reset --hard \
 	&& ./bootstrap \
 	&& ./configure --enable-integration --disable-doxygen-doc \
 	&& make clean \
-	&& make -j"$(nproc)" \
+	&& make -j \
 	&& make install \
 	&& ldconfig
 
 ## make TPM Simulator the default for TCTI
 RUN ln -sf 'libtss2-tcti-mssim.so' '/usr/local/lib/libtss2-tcti-default.so'
-
-## compile and install TPM startup code
-#WORKDIR /tmp/tpm2-tss
-#RUN ./configure --enable-integration \
-#	&& make -j"$(nproc)" test/helper/tpm_startup \
-#	&& cp -v /tmp/tpm2-tss/test/helper/tpm_startup /usr/bin/tpm_startup
 
 ## remove TPM2-TSS source files
 RUN rm -rf /tmp/tpm2-tss
@@ -44,17 +38,9 @@ RUN git clone --depth=1 -b '3.2.0' \
 WORKDIR /tmp/tpm2-tools
 RUN ./bootstrap \
 	&& ./configure \
-	&& make -j"$(nproc)" \
+	&& make -j \
 	&& make install
 RUN rm -rfv /tmp/tpm2-tools
-
-## TinyCBOR
-RUN git clone --depth=1 --recursive -b 'v0.5.2' \
-	'https://github.com/intel/tinycbor.git' /tmp/tinycbor
-WORKDIR /tmp/tinycbor
-RUN make -j"$(nproc)" \
-	&& make install
-RUN rm -rfv /tmp/tinycbor
 
 ## libCoAP
 RUN git clone --depth=1 --recursive -b 'develop' \
@@ -62,9 +48,33 @@ RUN git clone --depth=1 --recursive -b 'develop' \
 WORKDIR /tmp/libcoap
 RUN ./autogen.sh \
 	&& ./configure --disable-tests --disable-documentation --disable-manpages --disable-dtls --disable-shared --enable-fast-install \
-	&& make -j"$(nproc)" \
+	&& make -j \
 	&& make install
 RUN rm -rfv /tmp/libcoap
+
+## mbed-crypto
+RUN git clone --depth=1 --recursive -b 'development' \
+	'https://github.com/ARMmbed/mbed-crypto.git' /tmp/mbed-crypto
+WORKDIR /tmp/mbed-crypto
+RUN make -j lib SHARED=true \
+	&& make install
+RUN rm -rfv /tmp/mbed-crypto
+
+## QCBOR
+RUN git clone --depth=1 --recursive -b 'master' \
+	'https://github.com/laurencelundblade/QCBOR.git' /tmp/qcbor
+WORKDIR /tmp/qcbor
+RUN make -j all so \
+	&& make install install_so
+RUN rm -rfv /tmp/qcbor
+
+## t_cose
+RUN git clone --depth=1 --recursive -b 'master' \
+	'https://github.com/laurencelundblade/t_cose.git' /tmp/t_cose
+WORKDIR /tmp/t_cose
+RUN make -j -f Makefile.psa libt_cose.a libt_cose.so \
+	&&  make -f Makefile.psa install install_so
+RUN rm -rfv /tmp/t_cose
 
 ## install debugging tools
 RUN apt-get update \
