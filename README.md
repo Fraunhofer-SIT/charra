@@ -8,7 +8,8 @@ Next steps:
 
 * Block-wise CoAP data transfers
 * Extended verification of claims with known-good values
-* Move from TinyCBOR to QCBOR.
+
+
 
 ## Build and Run in Docker
 
@@ -35,30 +36,51 @@ If you see "ATTESTATION SUCCESSFUL" you're done. Congratz :-D
 
 
 
+
 ## Build
 
-The Dockerfile provides details on installing all dependancies and should be
-considered authoritative over this.
+The Dockerfile provides details on installing all dependencies and should be considered authoritative over this.
 
 1. Install all dependencies that are needed for the
 [TPM2-TSS](https://github.com/tpm2-software/tpm2-tss/blob/master/INSTALL.md).
 
-2. Install: https://github.com/intel/tinycbor.git
-   Just use "make && sudo make install"
+2. Install libCoAP:
 
-3. Install: https://github.com/obgm/libcoap.git
-   ./autogen.sh
-   ./configure --disable-tests --disable-documentation --disable-manpages --disable-dtls --disable-shared --enable-fast-install
-   make && sudo make install
+       git clone --depth=1 --recursive -b 'develop' \
+           'https://github.com/obgm/libcoap.git' /tmp/libcoap
+       cd /tmp/libcoap
+       ./autogen.sh
+       ./configure --disable-tests --disable-documentation --disable-manpages --disable-dtls --disable-shared --enable-fast-install
+       make -j
+       make install
 
-  Make sure that you do not have libcoap-1-0-dev installed, as the headers
-might conflict.
+  Make sure that you do not have `libcoap-1-0-dev` installed, as the headers might conflict.
 
-4. Install compilers:
-   apt-get install --no-install-recommends -y clang valgrind
-   apt-get install --no-install-recommends -y gosu sudo
+3. Install mbed-crypto:
 
-5. Compile programs:
+       git clone --depth=1 --recursive -b 'development' \
+           'https://github.com/ARMmbed/mbed-crypto.git' /tmp/mbed-crypto
+       cd /tmp/mbed-crypto
+       make -j lib SHARED=true
+       make install
+
+4. Install QCBOR:
+
+       git clone --depth=1 --recursive -b 'master' \
+           'https://github.com/laurencelundblade/QCBOR.git' /tmp/qcbor
+       cd /tmp/qcbor
+       make -j all so
+       make install install_so
+
+5. Install t_cose:
+
+       git clone --depth=1 --recursive -b 'master' \
+           'https://github.com/laurencelundblade/t_cose.git' /tmp/t_cose
+       cd /tmp/t_cose
+       make -j -f Makefile.psa libt_cose.a libt_cose.so
+       make -f Makefile.psa install install_so
+
+6. Compile programs:
 
        make -j
 
@@ -85,6 +107,8 @@ might conflict.
 3. Run Attester and Verifier:
 
        (bin/attester &); sleep .2 ; bin/verifier ; sleep 1 ; pkill bin/attester
+
+
 
 ## Debug
 
