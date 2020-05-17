@@ -7,13 +7,13 @@
 # Hint: Check your Dockerfile at https://www.fromlatest.io/                  #
 ##############################################################################
 
-FROM tpm2software/tpm2-tss:latest AS base
+FROM tpm2software/tpm2-tss:ubuntu-18.04 AS base
 
 ## copy configs
 COPY "./docker/dist/etc/default/keyboard" "/etc/default/keyboard"
 
 ## TPM2 TSS
-RUN git clone --depth=1 -b '2.2.3' \
+RUN git clone --depth=1 -b '2.4.1' \
 	'https://github.com/tpm2-software/tpm2-tss.git' /tmp/tpm2-tss
 WORKDIR /tmp/tpm2-tss
 ENV LD_LIBRARY_PATH /usr/local/lib
@@ -33,7 +33,7 @@ RUN ln -sf 'libtss2-tcti-mssim.so' '/usr/local/lib/libtss2-tcti-default.so'
 RUN rm -rf /tmp/tpm2-tss
 
 ## TPM2 tools
-RUN git clone --depth=1 -b '3.2.0' \
+RUN git clone --depth=1 -b '4.2' \
 	'https://github.com/tpm2-software/tpm2-tools.git' /tmp/tpm2-tools
 WORKDIR /tmp/tpm2-tools
 RUN ./bootstrap \
