@@ -41,6 +41,7 @@ CHARRA_RC charra_load_tpm2_key(ESYS_CONTEXT* ctx, const uint32_t key_len,
 		}
 	} else {
 		charra_log_error("TPM key not found.");
+		return CHARRA_RC_ERROR;
 	}
 
 	return CHARRA_RC_SUCCESS;

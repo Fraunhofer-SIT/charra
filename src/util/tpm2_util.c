@@ -47,9 +47,8 @@ TSS2_RC tpm2_create_primary_key_rsa2048(
 
 	/* authenticate at user/storage hierarchy */
 	TPM2B_AUTH authValueSH = {.size = 0, .buffer = {0}};
-	r = Esys_TR_SetAuth(ctx, ESYS_TR_RH_OWNER, &authValueSH);
-	/*ERROR CHECK*/
-	if (r != TSS2_RC_SUCCESS) {
+	if ((r = Esys_TR_SetAuth(ctx, ESYS_TR_RH_OWNER, &authValueSH)) !=
+		TSS2_RC_SUCCESS) {
 		error_msg = "Esys_TR_SetAuth.";
 		goto error;
 	}
@@ -68,7 +67,7 @@ TSS2_RC tpm2_create_primary_key_rsa2048(
 		.publicArea =
 			{
 				.type = TPM2_ALG_RSA,
-				.nameAlg = TPM2_ALG_SHA1,
+				.nameAlg = TPM2_ALG_SHA256,
 				.objectAttributes =
 					(TPMA_OBJECT_USERWITHAUTH | TPMA_OBJECT_RESTRICTED |
 						TPMA_OBJECT_SIGN_ENCRYPT | TPMA_OBJECT_FIXEDTPM |
@@ -88,9 +87,9 @@ TSS2_RC tpm2_create_primary_key_rsa2048(
 							},
 						.scheme =
 							{
-								.scheme = TPM2_ALG_RSASSA,
+								.scheme = TPM2_ALG_RSAPSS,
 								.details = {.rsassa = {.hashAlg =
-														   TPM2_ALG_SHA1}},
+														   TPM2_ALG_SHA256}},
 
 							},
 						.keyBits = 2048,
@@ -107,21 +106,11 @@ TSS2_RC tpm2_create_primary_key_rsa2048(
 	/* declare/define all needed in and out parameters */
 	TPM2B_DATA outsideInfo = {.size = 0, .buffer = {0}};
 	TPML_PCR_SELECTION creationPCR = {.count = 0};
-	// TPM2B_PUBLIC* outPublic;
-	// TPM2B_CREATION_DATA* creationData;
-	// TPM2B_DIGEST* creationHash;
-	// TPMT_TK_CREATION* creationTicket;
 
-	/* create primary key */
-	// r = Esys_CreatePrimary(ctx, ESYS_TR_RH_OWNER, ESYS_TR_PASSWORD,
-	// 	ESYS_TR_NONE, ESYS_TR_NONE, &inSensitivePrimary, &inPublic,
-	// 	&outsideInfo, &creationPCR, primary_handle, &outPublic, &creationData,
-	// 	&creationHash, &creationTicket);
-	r = Esys_CreatePrimary(ctx, ESYS_TR_RH_OWNER, ESYS_TR_PASSWORD,
-		ESYS_TR_NONE, ESYS_TR_NONE, &inSensitivePrimary, &inPublic,
-		&outsideInfo, &creationPCR, primary_handle, NULL, NULL, NULL, NULL);
-	/*ERROR CHECK*/
-	if (r != TSS2_RC_SUCCESS) {
+	if ((r = Esys_CreatePrimary(ctx, ESYS_TR_RH_OWNER, ESYS_TR_PASSWORD,
+			 ESYS_TR_NONE, ESYS_TR_NONE, &inSensitivePrimary, &inPublic,
+			 &outsideInfo, &creationPCR, primary_handle, NULL, NULL, NULL,
+			 NULL)) != TSS2_RC_SUCCESS) {
 		error_msg = "Esys_CreatePrimary";
 		goto error;
 	} else {
@@ -157,12 +146,9 @@ TSS2_RC tpm2_store_key_in_nvram(ESYS_CONTEXT* ctx, const ESYS_TR* key_handle) {
 	ESYS_TR primaryPersistentHandle = ESYS_TR_NONE;
 	// TPM2_HANDLE nvPersistentHandle = TPM2_PERSISTENT_FIRST;
 	TPMI_DH_PERSISTENT nvPersistentHandle = TPM2_PERSISTENT_FIRST;
-
-	r = Esys_EvictControl(ctx, ESYS_TR_RH_OWNER, *key_handle, ESYS_TR_PASSWORD,
-		ESYS_TR_NONE, ESYS_TR_NONE, nvPersistentHandle,
-		&primaryPersistentHandle);
-	/*ERROR CHECK*/
-	if (r != TSS2_RC_SUCCESS) {
+	if ((r = Esys_EvictControl(ctx, ESYS_TR_RH_OWNER, *key_handle,
+			 ESYS_TR_PASSWORD, ESYS_TR_NONE, ESYS_TR_NONE, nvPersistentHandle,
+			 &primaryPersistentHandle)) != TSS2_RC_SUCCESS) {
 		error_msg = "Esys_EvictControl";
 		goto error;
 	} else {
@@ -191,7 +177,7 @@ TSS2_RC tpm2_pcr_extend(ESYS_CONTEXT* ctx, const uint32_t pcr_idx,
 		goto error;
 	}
 
-	Esys_PCR_Extend(
+	r = Esys_PCR_Extend(
 		ctx, pcr_idx, ESYS_TR_PASSWORD, ESYS_TR_NONE, ESYS_TR_NONE, digests);
 
 	/*ERROR CHECK*/
@@ -248,7 +234,7 @@ error:
 
 TSS2_RC tpm2_quote(ESYS_CONTEXT* ctx, const ESYS_TR sign_key_handle,
 	const TPML_PCR_SELECTION* pcr_selection, const TPM2B_DATA* qualifying_data,
-	TPM2B_ATTEST** attest, TPMT_SIGNATURE** signature) {
+	TPM2B_ATTEST** attest_buf, TPMT_SIGNATURE** signature) {
 	TSS2_RC r = TSS2_RC_SUCCESS;
 	char* error_msg = NULL;
 
@@ -269,7 +255,7 @@ TSS2_RC tpm2_quote(ESYS_CONTEXT* ctx, const ESYS_TR sign_key_handle,
 	/* do the TPM quote*/
 	TPMT_SIG_SCHEME sig_scheme = {.scheme = TPM2_ALG_NULL};
 	r = Esys_Quote(ctx, sign_key_handle, ESYS_TR_PASSWORD, ESYS_TR_NONE,
-		ESYS_TR_NONE, qualifying_data, &sig_scheme, pcr_selection, attest,
+		ESYS_TR_NONE, qualifying_data, &sig_scheme, pcr_selection, attest_buf,
 		signature);
 	/* ERROR CHECK */
 	if (r != TSS2_RC_SUCCESS) {
@@ -282,54 +268,6 @@ TSS2_RC tpm2_quote(ESYS_CONTEXT* ctx, const ESYS_TR sign_key_handle,
 error:
 	if (error_msg != NULL) {
 		charra_log_error("%s", error_msg);
-	}
-
-	return r;
-}
-
-TSS2_RC tpm2_verify_quote_with_tpm(ESYS_CONTEXT* ctx,
-	const ESYS_TR sig_key_handle, const TPM2B_ATTEST* attest,
-	TPMT_SIGNATURE* signature, TPMT_TK_VERIFIED** validation) {
-	TSS2_RC r = TSS2_RC_SUCCESS;
-	char* error_msg = NULL;
-
-	/* prepare buffer */
-	TPM2B_MAX_BUFFER buffer = {.size = attest->size};
-	memcpy(
-		buffer.buffer, (const uint8_t*)&attest->attestationData, attest->size);
-
-	/* hash relevant attestation data for verification */
-	TPM2B_DIGEST* attestation_data_digest = NULL;
-	TPMT_TK_HASHCHECK* hash_validation;
-	r = Esys_Hash(ctx, ESYS_TR_NONE, ESYS_TR_NONE, ESYS_TR_NONE, &buffer,
-		TPM2_ALG_SHA1, TPM2_RH_OWNER, &attestation_data_digest,
-		&hash_validation);
-	/* ERROR CHECK */
-	if (r != TSS2_RC_SUCCESS) {
-		error_msg = "Esys_Hash";
-		goto error;
-	}
-
-	/* verify quote signature */
-	r = Esys_VerifySignature(ctx, sig_key_handle, ESYS_TR_NONE, ESYS_TR_NONE,
-		ESYS_TR_NONE, attestation_data_digest, signature, validation);
-	/* ERROR CHECK */
-	if (r != TSS2_RC_SUCCESS) {
-		error_msg = "Esys_VerifySignature";
-		goto error;
-	}
-
-error:
-	if (error_msg != NULL) {
-		charra_log_error("%s", error_msg);
-	}
-
-	/* free ESAPI objects */
-	if (hash_validation != NULL) {
-		Esys_Free(hash_validation);
-	}
-	if (attestation_data_digest != NULL) {
-		Esys_Free(attestation_data_digest);
 	}
 
 	return r;

@@ -83,19 +83,4 @@ TSS2_RC tpm2_quote(ESYS_CONTEXT* ctx, const ESYS_TR sign_key_handle,
 	const TPML_PCR_SELECTION* pcr_selection, const TPM2B_DATA* qualifyingData,
 	TPM2B_ATTEST** attest, TPMT_SIGNATURE** signature);
 
-/**
- * @brief Verifies a TPM 2.0 quote using the TPM.
- *
- * @param ctx[in,out] The ESAPI context.
- * @param sig_key_handle[in] The TPM2 handle of the signature key.
- * @param attest[in] The attestation data structure.
- * @param signature[in] The TPM2 signature over \a attest->attestationData.
- * @param validation[out] The validation data that holds the verification
- * result.
- * @return TSS2_RC The TSS return code.
- */
-TSS2_RC tpm2_verify_quote_with_tpm(ESYS_CONTEXT* ctx,
-	const ESYS_TR sig_key_handle, const TPM2B_ATTEST* attest,
-	TPMT_SIGNATURE* signature, TPMT_TK_VERIFIED** validation);
-
 #endif /* TPM2_UTIL_H */

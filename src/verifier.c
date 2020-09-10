@@ -29,11 +29,14 @@
 #include "core/charra_dto.h"
 #include "core/charra_key_mgr.h"
 #include "core/charra_marshaling.h"
+#include "core/charra_rim_mgr.h"
 #include "util/charra_util.h"
 #include "util/coap_util.h"
+#include "util/crypto_util.h"
+#include "util/io_util.h"
 #include "util/tpm2_util.h"
 
-#define UNUSED __attribute__ ((unused))
+#define UNUSED __attribute__((unused))
 
 /* --- config ------------------------------------------------------------- */
 
@@ -48,13 +51,16 @@
 static const char DST_HOST[] = "127.0.0.1";
 static const unsigned int DST_PORT = 5683; // default port
 #define CBOR_ENCODER_BUFFER_LENGTH 20480   // 20 KiB should be sufficient
-static const uint32_t TPM_SIG_KEY_NAME_LEN = 14;
-static const uint8_t* TPM_SIG_KEY_NAME = (uint8_t*)"PK.RSA.default";
+#define TPM_SIG_KEY_ID_LEN 14
+#define TPM_SIG_KEY_ID "PK.RSA.default"
+static const uint8_t TPM_PCR_SELECTION[TPM2_MAX_PCRS] = {
+	0, 1, 2, 3, 4, 5, 6, 7, 10};
+static const uint32_t TPM_PCR_SELECTION_LEN = 9;
 
 /* --- function forward declarations -------------------------------------- */
 
 static CHARRA_RC create_attestation_request(
-	msg_attestation_request_dto** attestation_request);
+	msg_attestation_request_dto* attestation_request);
 
 /* --- resource handler forward declarations ------------------------------ */
 
@@ -64,7 +70,8 @@ static void coap_attest_handler(struct coap_context_t* context,
 
 /* --- static variables */
 
-msg_attestation_request_dto* last_request = NULL;
+msg_attestation_request_dto last_request = {0};
+msg_attestation_response_dto last_response = {0};
 
 /* --- main --------------------------------------------------------------- */
 
@@ -117,24 +124,24 @@ int main(void) {
 	coap_add_option(pdu, COAP_OPTION_URI_PATH, 6, (const uint8_t*)"attest");
 
 	/* create attestation request */
-	msg_attestation_request_dto* req = NULL;
+	msg_attestation_request_dto req = {0};
 	if (create_attestation_request(&req) != CHARRA_RC_SUCCESS) {
 		charra_log_error("[" LOG_NAME "] Cannot create attestation request.");
 		goto finish;
 	}
 
 	/* store request data */
-	destroy_msg_attestation_request_dto(&last_request);
 	last_request = req;
 
 	/* marshal attestation request */
-	charra_log_info("[" LOG_NAME "] Marshaling attestation request data.");
+	charra_log_info(
+		"[" LOG_NAME "] Marshaling attestation request data to CBOR.");
 	uint32_t req_buf_len = 0;
 	uint8_t* req_buf = NULL;
 	CHARRA_RC charra_err = CHARRA_RC_SUCCESS;
 	int coap_err = 0;
-	if ((charra_err = marshal_attestation_request(req, &req_buf_len, &req_buf)) !=
-		CHARRA_RC_SUCCESS) {
+	if ((charra_err = marshal_attestation_request(
+			 &req, &req_buf_len, &req_buf)) != CHARRA_RC_SUCCESS) {
 		charra_log_error(
 			"[" LOG_NAME "] Marshaling attestation request data failed.");
 		goto finish;
@@ -155,14 +162,11 @@ int main(void) {
 
 	result = EXIT_SUCCESS;
 
-        if(coap_io_process(ctx, 0) < 0)
-          result = 10;  /* FAIL */
+	if (coap_io_process(ctx, 20000) < 0) {
+		result = EXIT_FAILURE;
+	}
 
 finish:
-	/* free memory */
-	destroy_msg_attestation_request_dto(&req);
-	// free(req_buf);
-
 	/* free CoAP memory */
 	coap_session_release(session);
 	coap_free_context(ctx);
@@ -174,69 +178,36 @@ finish:
 /* --- function definitions ----------------------------------------------- */
 
 static CHARRA_RC create_attestation_request(
-	msg_attestation_request_dto** attestation_request) {
+	msg_attestation_request_dto* attestation_request) {
 	CHARRA_RC err = CHARRA_RC_ERROR;
-
-	msg_attestation_request_dto* req = create_msg_attestation_request_dto();
 
 	/* generate nonce */
 	uint32_t nonce_len = 20;
-	uint8_t* nonce = NULL;
-	if ((err = charra_get_random_bytes(nonce_len, &nonce) !=
+	uint8_t nonce[nonce_len];
+	if ((err = charra_get_random_bytes_from_tpm(nonce_len, nonce) !=
 			   CHARRA_RC_SUCCESS)) {
 		charra_log_error("Could not get random bytes for nonce.");
 		return err;
 	}
+	charra_log_info("Generated nonce of length %d:", nonce_len);
+	charra_print_hex(
+		nonce_len, nonce, "                                   0x", "\n", false);
 
 	/* build attestation request */
-	req->hello = false;
-	req->sig_key_id_len = TPM_SIG_KEY_NAME_LEN;
-	req->sig_key_id = (uint8_t*)TPM_SIG_KEY_NAME;
-	req->nonce_len = nonce_len, req->nonce = nonce, req->pcr_selections_len = 3;
-	req->pcr_selections =
-		create_pcr_selection_dto_array(req->pcr_selections_len);
-
-	req->pcr_selections[0].tcg_hash_alg_id = (uint16_t)TPM2_ALG_SHA1;
-	req->pcr_selections[0].pcrs_len = 9;
-	req->pcr_selections[0].pcrs =
-		calloc(req->pcr_selections[0].pcrs_len, sizeof(uint8_t));
-	req->pcr_selections[0].pcrs[0] = 0;
-	req->pcr_selections[0].pcrs[1] = 1;
-	req->pcr_selections[0].pcrs[2] = 2;
-	req->pcr_selections[0].pcrs[3] = 3;
-	req->pcr_selections[0].pcrs[4] = 4;
-	req->pcr_selections[0].pcrs[5] = 5;
-	req->pcr_selections[0].pcrs[6] = 6;
-	req->pcr_selections[0].pcrs[7] = 7;
-	req->pcr_selections[0].pcrs[8] = 10;
-
-	req->pcr_selections[1].tcg_hash_alg_id = (uint16_t)TPM2_ALG_SHA256;
-	req->pcr_selections[1].pcrs_len = 9;
-	req->pcr_selections[1].pcrs =
-		calloc(req->pcr_selections[1].pcrs_len, sizeof(uint8_t));
-	req->pcr_selections[1].pcrs[0] = 0;
-	req->pcr_selections[1].pcrs[1] = 1;
-	req->pcr_selections[1].pcrs[2] = 2;
-	req->pcr_selections[1].pcrs[3] = 3;
-	req->pcr_selections[1].pcrs[4] = 4;
-	req->pcr_selections[1].pcrs[5] = 5;
-	req->pcr_selections[1].pcrs[6] = 6;
-	req->pcr_selections[1].pcrs[7] = 7;
-	req->pcr_selections[1].pcrs[8] = 10;
-
-	req->pcr_selections[2].tcg_hash_alg_id = (uint16_t)TPM2_ALG_SHA384;
-	req->pcr_selections[2].pcrs_len = 9;
-	req->pcr_selections[2].pcrs =
-		calloc(req->pcr_selections[2].pcrs_len, sizeof(uint8_t));
-	req->pcr_selections[2].pcrs[0] = 0;
-	req->pcr_selections[2].pcrs[1] = 1;
-	req->pcr_selections[2].pcrs[2] = 2;
-	req->pcr_selections[2].pcrs[3] = 3;
-	req->pcr_selections[2].pcrs[4] = 4;
-	req->pcr_selections[2].pcrs[5] = 5;
-	req->pcr_selections[2].pcrs[6] = 6;
-	req->pcr_selections[2].pcrs[7] = 7;
-	req->pcr_selections[2].pcrs[8] = 10;
+	msg_attestation_request_dto req = {.hello = false,
+		.sig_key_id_len = TPM_SIG_KEY_ID_LEN,
+		.sig_key_id = {0}, // must be memcpy'd, see below
+		.nonce_len = nonce_len,
+		.nonce = {0}, // must be memcpy'd, see below
+		.pcr_selections_len = 1,
+		.pcr_selections = {{
+			.tcg_hash_alg_id = TPM2_ALG_SHA256,
+			.pcrs_len = 9,
+			.pcrs = {0} // must be memcpy'd, see below
+		}}};
+	memcpy(req.sig_key_id, TPM_SIG_KEY_ID, TPM_SIG_KEY_ID_LEN);
+	memcpy(req.nonce, nonce, nonce_len);
+	memcpy(req.pcr_selections->pcrs, TPM_PCR_SELECTION, TPM_PCR_SELECTION_LEN);
 
 	/* set output param(s) */
 	*attestation_request = req;
@@ -277,12 +248,15 @@ static void coap_attest_handler(struct coap_context_t* context UNUSED,
 
 	/* unmarshal data */
 	charra_log_info("[" LOG_NAME "] Parsing received CBOR data.");
-	msg_attestation_response_dto res;
+	msg_attestation_response_dto res = {0};
 	if ((charra_err = unmarshal_attestation_response(data_len, data, &res)) !=
 		CHARRA_RC_SUCCESS) {
 		charra_log_error("[" LOG_NAME "] Could not parse CBOR data.");
 		goto error;
 	}
+
+	/* store last response */
+	last_response = res;
 
 	/* verify data */
 	if (res.attestation_data_len > sizeof(TPM2B_ATTEST)) {
@@ -297,8 +271,7 @@ static void coap_attest_handler(struct coap_context_t* context UNUSED,
 		goto error;
 	}
 
-	/* --- verify TPM quote --- */
-
+	/* --- verify TPM Quote --- */
 	charra_log_info("[" LOG_NAME "] Starting verification.");
 
 	/* initialize ESAPI */
@@ -310,8 +283,8 @@ static void coap_attest_handler(struct coap_context_t* context UNUSED,
 
 	/* load TPM key */
 	charra_log_info("[" LOG_NAME "] Loading TPM key.");
-	if ((charra_r = charra_load_tpm2_key(esys_ctx, TPM_SIG_KEY_NAME_LEN,
-			 TPM_SIG_KEY_NAME, &sig_key_handle)) != CHARRA_RC_SUCCESS) {
+	if ((charra_r = charra_load_tpm2_key(esys_ctx, TPM_SIG_KEY_ID_LEN,
+			 (uint8_t*)TPM_SIG_KEY_ID, &sig_key_handle)) != CHARRA_RC_SUCCESS) {
 		charra_log_error("[" LOG_NAME "] Could not load TPM key.");
 		goto error;
 	} else {
@@ -319,29 +292,101 @@ static void coap_attest_handler(struct coap_context_t* context UNUSED,
 	}
 
 	/* prepare verification */
-	charra_log_info("[" LOG_NAME "] Preparing TPM quote verification.");
-	TPM2B_ATTEST attest;
+	charra_log_info("[" LOG_NAME "] Preparing TPM Quote verification.");
+	TPM2B_ATTEST attest = {0};
 	attest.size = res.attestation_data_len;
 	memcpy(
 		attest.attestationData, res.attestation_data, res.attestation_data_len);
 	TPMT_SIGNATURE signature;
 	memcpy(&signature, res.tpm2_signature, res.tpm2_signature_len);
 
-	/* verify attestation signature */
-	charra_log_info("[" LOG_NAME "] Verifying TPM Quote signature.");
+	/* --- verify attestation signature --- */
 	bool attestation_result_signature = false;
-	tss_r = tpm2_verify_quote_with_tpm(
-		esys_ctx, sig_key_handle, &attest, &signature, &validation);
-	if (tss_r == TSS2_RC_SUCCESS) {
-		charra_log_info("[" LOG_NAME "] TPM Quote signature valid!");
-		attestation_result_signature = true;
+	{
+		charra_log_info("[" LOG_NAME "] Verifying TPM Quote signature ...");
+
+		if ((charra_r = charra_verify_tpm2_quote_signature_with_tpm(esys_ctx,
+				 sig_key_handle, TPM2_ALG_SHA256, &attest, &signature,
+				 &validation)) == CHARRA_RC_SUCCESS) {
+			charra_log_info(
+				"[" LOG_NAME "]     => TPM Quote signature is valid!");
+			attestation_result_signature = true;
+		} else {
+			charra_log_error(
+				"[" LOG_NAME "]     => TPM Quote signature is NOT valid!");
+		}
 	}
 
-	/* verify nonce [TO BE IMPLEMENTED] */
-	bool attestation_result_nonce = true;
+	/* unmarshal attestation data */
+	TPMS_ATTEST attest_struct = {0};
+	charra_r = charra_unmarshal_tpm2_quote(
+		res.attestation_data_len, res.attestation_data, &attest_struct);
 
-	/* verify PCRs [TO BE IMPLEMENTED] */
-	bool attestation_result_pcrs = true;
+	/* --- verify nonce --- */
+	bool attestation_result_nonce = false;
+	{
+		charra_log_info("[" LOG_NAME "] Verifying nonce ...");
+
+		attestation_result_nonce = charra_verify_tpm2_quote_qualifying_data(
+			last_request.nonce_len, last_request.nonce, &attest_struct);
+		if (attestation_result_nonce == true) {
+			charra_log_info(
+				"[" LOG_NAME
+				"]     => Nonce in TPM Quote is valid! (matches the one sent)");
+		} else {
+			charra_log_error(
+				"[" LOG_NAME "]     => Nonce in TPM Quote is NOT valid! (does "
+				"not match the one sent)");
+		}
+	}
+
+	/* --- verify PCRs --- */
+	bool attestation_result_pcrs = false;
+	{
+		charra_log_info("[" LOG_NAME "] Verifying PCRs ...");
+
+		/* get reference PCRs */
+		uint8_t* reference_pcrs[TPM2_MAX_PCRS] = {0};
+		if ((charra_r = charra_get_reference_pcrs_sha256(TPM_PCR_SELECTION,
+				 TPM_PCR_SELECTION_LEN, reference_pcrs)) != CHARRA_RC_SUCCESS) {
+			charra_log_error("[" LOG_NAME "] Error getting reference PCRs.");
+			goto error;
+		}
+
+		/* compute PCR composite digest from reference PCRs */
+		uint8_t pcr_composite_digest[TPM2_SHA256_DIGEST_SIZE] = {0};
+		/* TODO use crypto-agile (generic) version
+		 * charra_compute_pcr_composite_digest_from_ptr_array(), once
+		 * implemented, instead of hash_sha256_array() (then maybe remove
+		 * hash_sha256_array() function) */
+		charra_r = hash_sha256_array(
+			reference_pcrs, TPM_PCR_SELECTION_LEN, pcr_composite_digest);
+		charra_log_info(
+			"[" LOG_NAME
+			"] Computed PCR composite digest from reference PCRs is:");
+		charra_print_hex(sizeof(pcr_composite_digest), pcr_composite_digest,
+			"                                   0x", "\n", false);
+		charra_log_info(
+			"[" LOG_NAME "] Actual PCR composite digest from TPM Quote is:");
+		charra_print_hex(attest_struct.attested.quote.pcrDigest.size,
+			attest_struct.attested.quote.pcrDigest.buffer,
+			"                                   0x", "\n", false);
+
+		/* compare reference PCR composite with actual PCR composite */
+		attestation_result_pcrs = charra_verify_tpm2_quote_pcr_composite_digest(
+			&attest_struct, pcr_composite_digest, TPM2_SHA256_DIGEST_SIZE);
+		if (attestation_result_pcrs == true) {
+			charra_log_info(
+				"[" LOG_NAME
+				"]     => PCR composite digest is valid! (matches the "
+				"one from reference PCRs)");
+		} else {
+			charra_log_error(
+				"[" LOG_NAME
+				"]     => PCR composite digest is NOT valid! (does "
+				"not match the one from reference PCRs)");
+		}
+	}
 
 	/* --- output result --- */
 
@@ -350,15 +395,13 @@ static void coap_attest_handler(struct coap_context_t* context UNUSED,
 							  attestation_result_pcrs;
 
 	/* print attestation result */
+	charra_log_info("[" LOG_NAME "] +----------------------------+");
 	if (attestation_result) {
-		charra_log_info("[" LOG_NAME "] +----------------------------+");
 		charra_log_info("[" LOG_NAME "] |   ATTESTATION SUCCESSFUL   |");
-		charra_log_info("[" LOG_NAME "] +----------------------------+");
 	} else {
-		charra_log_info("[" LOG_NAME "] +----------------------------+");
 		charra_log_info("[" LOG_NAME "] |     ATTESTATION FAILED     |");
-		charra_log_info("[" LOG_NAME "] +----------------------------+");
 	}
+	charra_log_info("[" LOG_NAME "] +----------------------------+");
 
 error:
 	/* flush handles */
