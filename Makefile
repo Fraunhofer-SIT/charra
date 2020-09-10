@@ -19,10 +19,19 @@ LDPATH =     -L/usr/local/lib/ \
              -L/usr/lib/x86_64-linux-gnu
 
 LIBS =       coap-2 \
-             qcbor \
+             qcbor m \
              crypto ssl \
-             util tss2-esys tss2-sys tss2-mu tss2-tcti-mssim
-            #  tss2-tcti-device
+			 mbedcrypto \
+             util tss2-esys tss2-sys tss2-mu
+
+# TCTI module to use (default is 'mssim')
+TCTI_MODULE=tss2-tcti-mssim
+ifdef WITH_TCTI
+	TCTI_MODULE=tss2-tcti-$(WITH_TCTI)
+	#@echo "Using tss2-tcti-"$(WITH_TCTI)
+endif
+LIBS += $(TCTI_MODULE)
+
 
 LDFLAGS_DYNAMIC = $(addprefix -l, $(LIBS))
 
@@ -33,8 +42,8 @@ SOURCES = $(shell find $(SRCDIR) -name '*.c')
 INCLUDE = -I$(INCDIR)
 
 OBJECTS =  $(addsuffix .o, $(addprefix $(OBJDIR)/common/, charra_log))
-OBJECTS += $(addsuffix .o, $(addprefix $(OBJDIR)/core/, charra_dto charra_helper charra_key_mgr charra_marshaling))
-OBJECTS += $(addsuffix .o, $(addprefix $(OBJDIR)/util/, cbor_util charra_util coap_util tpm2_util))
+OBJECTS += $(addsuffix .o, $(addprefix $(OBJDIR)/core/, charra_helper charra_key_mgr charra_rim_mgr charra_marshaling))
+OBJECTS += $(addsuffix .o, $(addprefix $(OBJDIR)/util/, cbor_util charra_util coap_util crypto_util io_util tpm2_util))
 
 TARGETS = $(addprefix $(BINDIR)/, attester verifier)
 

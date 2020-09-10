@@ -26,50 +26,15 @@
 #ifndef CHARRA_DTO_H
 #define CHARRA_DTO_H
 
+#define SIG_KEY_ID_MAXLEN 256
+
 /* --- data transfer objects ---------------------------------------------- */
 
 typedef struct {
 	uint16_t tcg_hash_alg_id; // TPM2_ALG_ID
 	uint32_t pcrs_len;
-	uint8_t* pcrs; // max = TPM2_MAX_PCRS
+	uint8_t pcrs[TPM2_MAX_PCRS];
 } pcr_selection_dto;
-
-/**
- * @brief Frees used memory of a \p pcr_selection_dto object.
- *
- * @param obj[in,out] The \p pcr_selection_dto object.
- */
-void destroy_pcr_selection_dto(pcr_selection_dto** obj);
-
-/**
- * @brief Allocates memory for a pcr_selection_dto object.
- *
- * @return The pcr_selection_dto object.
- */
-pcr_selection_dto* create_pcr_selection_dto();
-
-/**
- * @brief Allocates memory for an array of pcr_selection_dto objects.
- *
- * @param[in] n Number of elements to allocate.
- * @return The pcr_selection_dto array.
- */
-pcr_selection_dto* create_pcr_selection_dto_array(const size_t n);
-
-/**
- * @brief Frees used memory of a \p pcr_selection_dto object.
- *
- * @param obj[in,out] The \p pcr_selection_dto object.
- */
-void destroy_pcr_selection_dto(pcr_selection_dto** obj);
-
-/**
- * @brief Frees used memory of a \p pcr_selection_dto array.
- *
- * @param obj[in,out] The \p pcr_selection_dto object.
- * @param[in] n Number of elements to free.
- */
-void destroy_pcr_selection_dto_array(pcr_selection_dto** obj, const size_t n);
 
 typedef struct {
 	uint64_t clock;
@@ -81,17 +46,17 @@ typedef struct {
 typedef struct {
 	uint16_t hash; // TPMI_ALG_HASH (TPM2_ALG_ID)
 	uint8_t sizeofSelect;
-	uint8_t* pcrSelect; // max = TPM2_PCR_SELECT_MAX
+	uint8_t pcrSelect[TPM2_PCR_SELECT_MAX];
 } tpms_pcr_selection_dto;
 
 typedef struct {
 	uint32_t count;
-	tpms_pcr_selection_dto* pcr_selections; // max = TPM2_NUM_PCR_BANKS
+	tpms_pcr_selection_dto pcr_selections[TPM2_NUM_PCR_BANKS];
 } tpml_pcr_selection_dto;
 
 typedef struct {
 	uint16_t size;
-	uint8_t* buffer; // max = sizeof(TPMU_HA)
+	uint8_t buffer[sizeof(TPMU_HA)];
 } tpm2b_digest_dto;
 
 typedef struct {
@@ -111,42 +76,19 @@ typedef struct {
 typedef struct {
 	bool hello;
 	size_t sig_key_id_len;
-	uint8_t* sig_key_id;
+	uint8_t sig_key_id[SIG_KEY_ID_MAXLEN];
 	size_t nonce_len;
-	uint8_t* nonce; // max = sizeof(TPMU_HA)
+	uint8_t nonce[sizeof(TPMU_HA)];
 	uint32_t pcr_selections_len;
-	pcr_selection_dto* pcr_selections; // max = TPM2_NUM_PCR_BANKS
+	pcr_selection_dto pcr_selections[TPM2_NUM_PCR_BANKS];
 } msg_attestation_request_dto;
 
-/**
- * @brief Allocates memory for a msg_attestation_request_dto object.
- *
- * @return The msg_attestation_request_dto object.
- */
-msg_attestation_request_dto* create_msg_attestation_request_dto();
-
-/**
- * @brief Allocates memory for an array of msg_attestation_request_dto objects.
- *
- * @param[in] n Number of elements to allocate.
- * @return The msg_attestation_request_dto array.
- */
-msg_attestation_request_dto* create_msg_attestation_request_dto_array(
-	const size_t n);
-
-/**
- * @brief Frees used memory of a \p msg_attestation_request_dto object.
- *
- * @param obj[in,out] The \p msg_attestation_request_dto object.
- */
-void destroy_msg_attestation_request_dto(msg_attestation_request_dto** obj);
-
 typedef struct {
-	// tpms_attest_dto attestation_data;
+	// TODO Use tpms_attest_dto attestation_data;
 	uint32_t attestation_data_len;
-	uint8_t* attestation_data; // TPM2B_ATTEST
+	uint8_t attestation_data[sizeof(TPMS_ATTEST)];
 	uint32_t tpm2_signature_len;
-	uint8_t* tpm2_signature;
+	uint8_t tpm2_signature[sizeof(TPMT_SIGNATURE)];
 } msg_attestation_response_dto;
 
 #endif /* CHARRA_DTO_H */

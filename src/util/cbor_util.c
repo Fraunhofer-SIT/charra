@@ -22,10 +22,10 @@
 
 #include "cbor_util.h"
 
+#include <qcbor/qcbor.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <qcbor/qcbor.h>
 
 #include "../common/charra_log.h"
 
@@ -81,32 +81,32 @@ const char* cbor_type_string(const uint8_t type) {
 		return "CborDoubleType";
 	case QCBOR_TYPE_MAP_AS_ARRAY:
 		return "CborMapAsArrayType";
-
 	case CHARRA_CBOR_TYPE_BOOLEAN:
 		return "CharraCborBooleanType";
-
 	default:
 		return "UNKNOWN";
 	}
 }
 
-CHARRA_RC charra_cbor_getnext(QCBORDecodeContext *pCtx, QCBORItem *pDecodedItem, uint8_t expected_type) {
-	uint8_t type;
-	bool is_expected_type;
+CHARRA_RC charra_cbor_get_next(
+	QCBORDecodeContext* ctx, QCBORItem* decoded_item, uint8_t expected_type) {
+	uint8_t type = 0;
+	bool is_expected_type = false;
 
-	if(QCBORDecode_GetNext(pCtx, pDecodedItem)) {
+	if (QCBORDecode_GetNext(ctx, decoded_item)) {
 		charra_log_error("CBOR Parser: Error getting next item");
 		return CHARRA_RC_MARSHALING_ERROR;
 	}
 
-	if(expected_type != QCBOR_TYPE_NONE) {
+	if (expected_type != QCBOR_TYPE_NONE) {
 		/* expect particular CBOR type */
-		type = pDecodedItem->uDataType;
+		type = decoded_item->uDataType;
 		is_expected_type = type == expected_type;
-		if(expected_type == CHARRA_CBOR_TYPE_BOOLEAN) {
-			is_expected_type = type == QCBOR_TYPE_FALSE || type == QCBOR_TYPE_TRUE;
+		if (expected_type == CHARRA_CBOR_TYPE_BOOLEAN) {
+			is_expected_type =
+				type == QCBOR_TYPE_FALSE || type == QCBOR_TYPE_TRUE;
 		}
-		if(!is_expected_type) {
+		if (!is_expected_type) {
 			charra_log_error("CBOR parser: expected type %s, found type %s.",
 				cbor_type_string(expected_type), cbor_type_string(type));
 			return CHARRA_RC_MARSHALING_ERROR;
@@ -118,8 +118,10 @@ CHARRA_RC charra_cbor_getnext(QCBORDecodeContext *pCtx, QCBORItem *pDecodedItem,
 	return CHARRA_RC_SUCCESS;
 }
 
-bool charra_cbor_getbool_val(QCBORItem *item) {
-	if(item->uDataType == QCBOR_TYPE_TRUE)
+bool charra_cbor_get_bool_val(QCBORItem* item) {
+	if (item->uDataType == QCBOR_TYPE_TRUE) {
 		return true;
+	}
+
 	return false;
 }

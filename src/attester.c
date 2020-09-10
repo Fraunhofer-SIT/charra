@@ -22,6 +22,7 @@
 #include <coap2/coap.h>
 #include <stdio.h>
 #include <string.h>
+#include <tss2/tss2_mu.h>
 #include <tss2/tss2_tpm2_types.h>
 
 #include "common/charra_log.h"
@@ -31,9 +32,10 @@
 #include "core/charra_marshaling.h"
 #include "util/cbor_util.h"
 #include "util/coap_util.h"
+#include "util/io_util.h"
 #include "util/tpm2_util.h"
 
-#define UNUSED __attribute__ ((unused))
+#define UNUSED __attribute__((unused))
 
 /* --- config ------------------------------------------------------------- */
 
@@ -45,7 +47,7 @@
 // #define LOG_LEVEL_CHARRA CHARRA_LOG_DEBUG
 
 /* config */
-static const unsigned int PORT = 5683;   // default port
+static const unsigned int PORT = 5683;	 // default port
 #define CBOR_ENCODER_BUFFER_LENGTH 20480 // 20 KiB should be sufficient
 
 /* --- resource handler forward declarations ------------------------------ */
@@ -96,10 +98,11 @@ int main(void) {
 	/* enter main loop */
 	charra_log_debug("[" LOG_NAME "] Entering main loop.");
 	while (TRUE) {
-                int timing;
+		int timing;
 		charra_log_info("[" LOG_NAME "] Waiting for connections.");
-                timing = coap_io_process(ctx, 0);
-                if(timing < 0) break;
+		timing = coap_io_process(ctx, 0);
+		if (timing < 0)
+			break;
 	}
 
 	result = EXIT_SUCCESS;
@@ -114,9 +117,10 @@ finish:
 /* --- resource handler definitions --------------------------------------- */
 
 static void coap_attestation_handler(struct coap_context_t* ctx UNUSED,
-	struct coap_resource_t* resource UNUSED, struct coap_session_t* session UNUSED,
-	struct coap_pdu_t* in, struct coap_binary_t* token UNUSED,
-	struct coap_string_t* query UNUSED, struct coap_pdu_t* out) {
+	struct coap_resource_t* resource UNUSED,
+	struct coap_session_t* session UNUSED, struct coap_pdu_t* in,
+	struct coap_binary_t* token UNUSED, struct coap_string_t* query UNUSED,
+	struct coap_pdu_t* out) {
 	CHARRA_RC charra_r = CHARRA_RC_SUCCESS;
 	int coap_r = 0;
 	TSS2_RC tss_r = 0;
@@ -141,7 +145,7 @@ static void coap_attestation_handler(struct coap_context_t* ctx UNUSED,
 
 	/* unmarshal data */
 	charra_log_info("[" LOG_NAME "] Parsing received CBOR data.");
-	msg_attestation_request_dto req;
+	msg_attestation_request_dto req = {0};
 	if ((charra_r = unmarshal_attestation_request(data_len, data, &req)) !=
 		CHARRA_RC_SUCCESS) {
 		charra_log_error("[" LOG_NAME "] Could not parse CBOR data.");
@@ -161,9 +165,12 @@ static void coap_attestation_handler(struct coap_context_t* ctx UNUSED,
 	qualifying_data.size = req.nonce_len;
 	memcpy(qualifying_data.buffer, req.nonce, req.nonce_len);
 
+	charra_log_info("Received nonce of length %d:", req.nonce_len);
+	charra_print_hex(req.nonce_len, req.nonce,
+		"                                   0x", "\n", false);
+
 	/* PCR selection */
-	TPML_PCR_SELECTION pcr_selection;
-	pcr_selection.count = 0;
+	TPML_PCR_SELECTION pcr_selection = {0};
 	if ((charra_r = charra_pcr_selections_to_tpm_pcr_selections(
 			 req.pcr_selections_len, req.pcr_selections, &pcr_selection)) !=
 		CHARRA_RC_SUCCESS) {
@@ -188,10 +195,10 @@ static void coap_attestation_handler(struct coap_context_t* ctx UNUSED,
 
 	/* do the TPM quote */
 	charra_log_info("[" LOG_NAME "] Do TPM Quote.");
-	TPM2B_ATTEST* attest = NULL;
+	TPM2B_ATTEST* attest_buf = NULL;
 	TPMT_SIGNATURE* signature = NULL;
 	if ((tss_r = tpm2_quote(esys_ctx, sig_key_handle, &pcr_selection,
-			 &qualifying_data, &attest, &signature)) != TSS2_RC_SUCCESS) {
+			 &qualifying_data, &attest_buf, &signature)) != TSS2_RC_SUCCESS) {
 		charra_log_error("[" LOG_NAME "] TPM2 quote.");
 		goto error;
 	} else {
@@ -202,16 +209,19 @@ static void coap_attestation_handler(struct coap_context_t* ctx UNUSED,
 
 	/* prepare response */
 	charra_log_info("[" LOG_NAME "] Preparing response.");
-	msg_attestation_response_dto res;
-	res.attestation_data_len = attest->size;
-	res.attestation_data = attest->attestationData;
-	res.tpm2_signature_len = sizeof(*signature);
-	res.tpm2_signature = (uint8_t*)signature;
+	msg_attestation_response_dto res = {
+		.attestation_data_len = attest_buf->size,
+		.attestation_data = {0}, // must be memcpy'd, see below
+		.tpm2_signature_len = sizeof(*signature),
+		.tpm2_signature = {0}}; // must be memcpy'd, see below
+	memcpy(res.attestation_data, attest_buf->attestationData,
+		res.attestation_data_len);
+	memcpy(res.tpm2_signature, signature, res.tpm2_signature_len);
 
 	/* marshal response */
-	charra_log_info("[" LOG_NAME "] Marshaling response.");
-	uint32_t res_buf_len;
-	uint8_t* res_buf;
+	charra_log_info("[" LOG_NAME "] Marshaling response to CBOR.");
+	uint32_t res_buf_len = 0;
+	uint8_t* res_buf = NULL;
 	marshal_attestation_response(&res, &res_buf_len, &res_buf);
 
 	/* add data to outgoing PDU */

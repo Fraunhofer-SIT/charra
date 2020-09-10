@@ -8,9 +8,17 @@
 ##############################################################################
 
 FROM tpm2software/tpm2-tss:ubuntu-18.04 AS base
+MAINTAINER Michael Eckel <michael.eckel@sit.fraunhofer.de>
 
 ## copy configs
 COPY "./docker/dist/etc/default/keyboard" "/etc/default/keyboard"
+
+## manual pages and Bash command completion
+RUN apt-get update \
+	&& apt-get install --no-install-recommends -y \
+	man-db \
+	bash-completion \
+	&& rm -rf /var/lib/apt/lists/*
 
 ## TPM2 TSS
 RUN git clone --depth=1 -b '2.4.1' \
@@ -52,13 +60,13 @@ RUN ./autogen.sh \
 	&& make install
 RUN rm -rfv /tmp/libcoap
 
-## mbed-crypto
+## mbedtls
 RUN git clone --depth=1 --recursive -b 'development' \
-	'https://github.com/ARMmbed/mbed-crypto.git' /tmp/mbed-crypto
-WORKDIR /tmp/mbed-crypto
+	'https://github.com/ARMmbed/mbedtls.git' /tmp/mbedtls
+WORKDIR /tmp/mbedtls
 RUN make -j lib SHARED=true \
 	&& make install
-RUN rm -rfv /tmp/mbed-crypto
+RUN rm -rfv /tmp/mbedtls
 
 ## QCBOR
 RUN git clone --depth=1 --recursive -b 'master' \

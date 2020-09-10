@@ -25,6 +25,7 @@
 
 #include "../common/charra_error.h"
 #include "../common/charra_log.h"
+#include "../util/io_util.h"
 #include "charra_dto.h"
 
 CHARRA_RC charra_tpm2_pcr_selection_to_bitmap(const uint32_t pcr_selection_len,
@@ -57,13 +58,12 @@ CHARRA_RC charra_tpm2_pcr_selection_to_bitmap(const uint32_t pcr_selection_len,
 
 		/* sanity check(s) */
 		if (pcr >= (TPM2_MAX_PCRS - 8)) {
-			charra_log_error(
-				"PCR index (%i) greater than TPM2_MAX_PCRS (%i).\n", pcr,
-				TPM2_MAX_PCRS);
+			charra_log_error("PCR index (%i) greater than TPM2_MAX_PCRS (%i).",
+				pcr, TPM2_MAX_PCRS);
 		}
 
 		/* set bit in PCR selection bitmap */
-		uint32_t selected_byte = (TPM2_PCR_SELECT_MAX - 1) - (pcr / 8) - 1;
+		uint32_t selected_byte = (pcr / 8);
 		uint8_t selected_bit = 1 << (pcr % 8);
 		pcr_selection_bitmap->pcrSelect[selected_byte] |= selected_bit;
 	}
