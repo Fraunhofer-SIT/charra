@@ -54,11 +54,11 @@ all.static: $(TARGETS)
 
 
 $(BINDIR)/attester: $(SRCDIR)/attester.c $(OBJECTS)
-	$(CC) $^ $(CFLAGS) $(INCLUDE) $(LIBINCLUDE) $(LDPATH) $(LDFLAGS) -g -o $@ -Wl,--gc-sections
+	$(CC) $^ $(CFLAGS) $(INCLUDE) $(LIBINCLUDE) $(LDPATH) $(LDFLAGS) -g -o $@ -Wl,--gc-sections -lm
 	###strip --strip-unneeded $@
 
 $(BINDIR)/verifier: $(SRCDIR)/verifier.c $(OBJECTS)
-	$(CC) $^ $(CFLAGS) $(INCLUDE) $(LIBINCLUDE) $(LDPATH) $(LDFLAGS) -g -o $@ -Wl,--gc-sections
+	$(CC) $^ $(CFLAGS) $(INCLUDE) $(LIBINCLUDE) $(LDPATH) $(LDFLAGS) -g -o $@ -Wl,--gc-sections -lm
 	###strip --strip-unneeded $@
 
 
