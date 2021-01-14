@@ -89,6 +89,8 @@ typedef struct {
 	uint8_t attestation_data[sizeof(TPMS_ATTEST)];
 	uint32_t tpm2_signature_len;
 	uint8_t tpm2_signature[sizeof(TPMT_SIGNATURE)];
+	uint32_t tpm2_public_key_len;
+	TPM2B_PUBLIC* tpm2_public_key;
 } msg_attestation_response_dto;
 
 #endif /* CHARRA_DTO_H */

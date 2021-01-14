@@ -34,7 +34,7 @@
  * @return TSS2_RC The TSS return code.
  */
 TSS2_RC tpm2_create_primary_key_rsa2048(
-	ESYS_CONTEXT* ctx, ESYS_TR* primary_handle);
+	ESYS_CONTEXT* ctx, ESYS_TR* primary_handle, TPM2B_PUBLIC** out_public);
 
 /**
  * @brief Stores a key in the TPM NVRAM under the first available NV index.
