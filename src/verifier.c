@@ -283,12 +283,14 @@ static void coap_attest_handler(struct coap_context_t* context UNUSED,
 
 	/* load TPM key */
 	charra_log_info("[" LOG_NAME "] Loading TPM key.");
-	if ((charra_r = charra_load_tpm2_key(esys_ctx, TPM_SIG_KEY_ID_LEN,
-			 (uint8_t*)TPM_SIG_KEY_ID, &sig_key_handle)) != CHARRA_RC_SUCCESS) {
-		charra_log_error("[" LOG_NAME "] Could not load TPM key.");
+	charra_r = charra_load_external_public_key(esys_ctx, res.tpm2_public_key,
+		&sig_key_handle);
+	if (charra_r == CHARRA_RC_SUCCESS) {
+		charra_log_info("[" LOG_NAME "] External public key loaded.");
+	}
+	else{
+		charra_log_error("[" LOG_NAME "] Loading external public key failed.");
 		goto error;
-	} else {
-		charra_log_info("[" LOG_NAME "] Loading of TPM key successful.");
 	}
 
 	/* prepare verification */
