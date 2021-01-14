@@ -30,7 +30,7 @@
 #include "../common/charra_log.h"
 
 TSS2_RC tpm2_create_primary_key_rsa2048(
-	ESYS_CONTEXT* ctx, ESYS_TR* primary_handle) {
+	ESYS_CONTEXT* ctx, ESYS_TR* primary_handle, TPM2B_PUBLIC** out_public) {
 	TSS2_RC r = TSS2_RC_SUCCESS;
 	char* error_msg = NULL;
 
