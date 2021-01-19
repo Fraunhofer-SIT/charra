@@ -3,7 +3,7 @@ bin/*
 obj/*
 
 # core dumps
-core
+#core
 
 # keep core folder
 !src/core/*
