@@ -295,7 +295,7 @@ CHARRA_RC unmarshal_attestation_response(uint32_t marshaled_data_len,
 	memcpy(&(res.tpm2_signature), item.val.string.ptr, res.tpm2_signature_len);
 
 	/* parse "tpm2_public_key (bytes)" */
-	if((cborerr = charra_cbor_getnext(&dc, &item, QCBOR_TYPE_BYTE_STRING)))
+	if ((cborerr = charra_cbor_get_next(&dc, &item, QCBOR_TYPE_BYTE_STRING)))
 		goto cbor_parse_error;
 	res.tpm2_public_key_len = item.val.string.len;
 	memcpy(

@@ -51,7 +51,7 @@ CHARRA_RC charra_load_external_public_key(ESYS_CONTEXT* ctx,
 	TPM2B_PUBLIC* external_public_key, ESYS_TR* key_handle) {
 	TSS2_RC r = TSS2_RC_SUCCESS;
 	if (external_public_key == NULL){
-		charra_log_error("External public key do not exist.");
+		charra_log_error("External public key does not exist.");
 		return CHARRA_RC_ERROR;
 	}
 

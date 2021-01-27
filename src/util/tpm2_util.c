@@ -109,7 +109,7 @@ TSS2_RC tpm2_create_primary_key_rsa2048(
 
 	if ((r = Esys_CreatePrimary(ctx, ESYS_TR_RH_OWNER, ESYS_TR_PASSWORD,
 			 ESYS_TR_NONE, ESYS_TR_NONE, &inSensitivePrimary, &inPublic,
-			 &outsideInfo, &creationPCR, primary_handle, NULL, NULL, NULL,
+			 &outsideInfo, &creationPCR, primary_handle, out_public, NULL, NULL,
 			 NULL)) != TSS2_RC_SUCCESS) {
 		error_msg = "Esys_CreatePrimary";
 		goto error;

@@ -47,9 +47,9 @@
 // #define LOG_LEVEL_CHARRA CHARRA_LOG_DEBUG
 
 /* config */
-static const unsigned int PORT = 5683;	 // default port
+static const unsigned int PORT = 5683;	   // default port
 static const unsigned int MAX_SIZE = 1300; // MTU payload max size
-#define CBOR_ENCODER_BUFFER_LENGTH 20480 // 20 KiB should be sufficient
+#define CBOR_ENCODER_BUFFER_LENGTH 20480   // 20 KiB should be sufficient
 
 /* --- resource handler forward declarations ------------------------------ */
 
@@ -190,8 +190,8 @@ static void coap_attestation_handler(struct coap_context_t* ctx UNUSED,
 	/* load TPM key */
 	charra_log_info("[" LOG_NAME "] Loading TPM key.");
 	if ((charra_r = charra_load_tpm2_key(esys_ctx, req.sig_key_id_len,
-			 req.sig_key_id, &sig_key_handle,
-			 &public_key)) != CHARRA_RC_SUCCESS) {
+			 req.sig_key_id, &sig_key_handle, &public_key)) !=
+		CHARRA_RC_SUCCESS) {
 		charra_log_error("[" LOG_NAME "] Could not load TPM key.");
 		goto error;
 	}
@@ -216,8 +216,8 @@ static void coap_attestation_handler(struct coap_context_t* ctx UNUSED,
 		.attestation_data_len = attest_buf->size,
 		.attestation_data = {0}, // must be memcpy'd, see below
 		.tpm2_signature_len = sizeof(*signature),
-		.tpm2_signature = {0}
-		.tpm2_public_key_len = sizeof(*public_key);
+		.tpm2_signature = {0}, // must be memcpy'd, see below
+		.tpm2_public_key_len = sizeof(*public_key),
 		.tpm2_public_key = {0}}; // must be memcpy'd, see below
 	memcpy(res.attestation_data, attest_buf->attestationData,
 		res.attestation_data_len);
