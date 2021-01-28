@@ -158,4 +158,58 @@ If you see "ATTESTATION SUCCESSFUL" you're done. Congratz :-D
       sleep 1 ; \
       pkill bin/attester
 
+## Remote attestation
 
+You can use attester and verifier on two different devices. To do that,
+you have to provide an external network for the attester container.
+
+1. Create [macvlan network](https://docs.docker.com/network/macvlan/)
+for attester docker container (check your gateway address and replace `x` with
+the correct number):
+
+```
+$ docker network create -d macvlan \
+  --subnet=192.168.x.0/24 \
+  --gateway=192.168.x.1 \
+  -o parent=eth0 pub_net
+```
+
+2. Add `--network` parameter to the `docker run` command in the [run.sh](https://github.com/Fraunhofer-SIT/charra/blob/master/docker/run.sh#L65)
+on the attester device:
+
+```
+## run (transient) Docker container
+/usr/bin/docker run --rm -it \
+	-v "${PWD}/:/home/bob/charra" \
+	--network=pub_net \
+	"${docker_image_fullname}" \
+	"$@"
+```
+
+3. Run the attester docker container and check the IP address.
+
+4. Put the attester address to the `DST_HOST` in the
+[verifier.c](https://github.com/Fraunhofer-SIT/charra/blob/master/src/verifier.c#L51)
+on the verifier device. Rebuild verifier script in the verifier docker
+container:
+
+```
+$ cd charra
+$ make -j
+```
+
+5.  Go to `charra` directory and run attester binary in the attester docker
+container:
+
+```
+$ cd charra
+$ ./bin/attester
+```
+
+6. Run the verifier binary in the verifier docker container:
+
+```
+$ ./bin/verifier
+```
+
+If you see "ATTESTATION SUCCESSFUL" you're done. Congratz :-D
