@@ -203,15 +203,7 @@ CHARRA_RC unmarshal_attestation_request(uint32_t marshaled_data_len,
 cbor_parse_error:
 	charra_log_error("CBOR parser: %s", qcbor_err_to_str(cborerr));
 	charra_log_info("CBOR parser: skipping parsing.");
-	// TODO: Free attestation_request->pcr_selections
-	/*if(attestation_request->pcr_selections != NULL) {
-		for(uint32_t j = 0; j < attestation_request->pcr_selections_len; j++) {
-			if(attestation_request->pcr_selections[j] != NULL) {
-				free(attestation_request->pcr_selections[j]);
-			}
-		}
-		free(attestation_request->pcr_selections);
-	}*/
+
 	return CHARRA_RC_MARSHALING_ERROR;
 }
 

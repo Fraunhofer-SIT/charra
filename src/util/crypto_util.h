@@ -26,6 +26,8 @@
 
 #include <tss2/tss2_tpm2_types.h>
 
+#include <mbedtls/rsa.h>
+
 #include "../common/charra_error.h"
 
 /* hashing functions */
@@ -59,5 +61,21 @@ CHARRA_RC hash_sm3_256(const size_t data_len, const uint8_t* const data,
 
 CHARRA_RC hash_sm3_256_array(const size_t count, const uint8_t* const array,
 	uint8_t digest[TPM2_SM3_256_DIGEST_SIZE]);
+
+CHARRA_RC charra_crypto_hash(mbedtls_md_type_t hash_algo,
+	const uint8_t* const data, const size_t data_len,
+	uint8_t digest[MBEDTLS_MD_MAX_SIZE]);
+
+CHARRA_RC charra_crypto_tpm_pub_key_to_mbedtls_pub_key(
+	const TPM2B_PUBLIC* tpm_rsa_pub_key,
+	mbedtls_rsa_context* mbedtls_rsa_pub_key);
+
+CHARRA_RC charra_crypto_rsa_verify_signature_hashed(
+	mbedtls_rsa_context* mbedtls_rsa_pub_key, mbedtls_md_type_t hash_algo,
+	const unsigned char* data_digest, const unsigned char* signature);
+
+CHARRA_RC charra_crypto_rsa_verify_signature(
+	mbedtls_rsa_context* mbedtls_rsa_pub_key, mbedtls_md_type_t hash_algo,
+	const unsigned char* data, size_t data_len, const unsigned char* signature);
 
 #endif /* SITIMA_CRYPTO_H */

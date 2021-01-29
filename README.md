@@ -1,18 +1,17 @@
 # CHARRA: CHAllenge-Response based Remote Attestation with TPM 2.0
 
-This is a proof-of-concept implementation of the "Challenge/Response Remote Attestation" interaction model of the [IETF RATS](https://datatracker.ietf.org/wg/rats/about/) [Reference Interaction Models for Remote Attestation Procedures](https://datatracker.ietf.org/doc/draft-ietf-rats-reference-interaction-models/) using TPM 2.0. The [IETF Remote ATtestation ProcedureS (RATS)](https://datatracker.ietf.org/wg/rats/about/) working group standardizes formats for describing assertions/claims about system components and associated evidence; and procedures and protocols to convey these assertions/claims to relying parties. Given the security and privacy sensitive nature of these assertions/claims, the working group specifies approaches to protect this exchanged data.
+This is a proof-of-concept implementation of the "Challenge/Response Remote Attestation" interaction model of the [IETF RATS](https://datatracker.ietf.org/wg/rats/about/) [Reference Interaction Models for Remote Attestation Procedures](https://datatracker.ietf.org/doc/draft-ietf-rats-reference-interaction-models/) using TPM 2.0. The [IETF Remote Attestation Procedures (RATS)](https://datatracker.ietf.org/wg/rats/about/) working group standardizes formats for describing assertions/claims about system components and associated evidence; and procedures and protocols to convey these assertions/claims to relying parties. Given the security and privacy sensitive nature of these assertions/claims, the working group specifies approaches to protect this exchanged data.
 
 This proof-of-concept implementation realizes the Attesting Computing Environment—a Computing Environment capable of monitoring and attesting a target Computing Environment—as well as the target Computing Environment itself, as described in the [RATS Architecture](https://datatracker.ietf.org/doc/draft-birkholz-rats-architecture/).
 
 Next steps:
 
+* Refactor and and implement forward-declared (but not yet implemented) functions
 * Block-wise CoAP data transfers
-* Verify TPM Quote with *mbedtls* using TPM public key
 * Use non-zero reference PCRs
 * Introduce a Make flag which disables console output (useful for embedded systems and firmware)
 * "Extended" *TPM Quote* using TPM audit session(s) and *TPM PCR Read* operations
 * Make CHARRA a library (`libcharra`) and make *attester* and *verifier* example code in `example` folder
-
 
 ## How it works (Protocol Flow)
 
@@ -33,12 +32,10 @@ The following diagram shows the protocol flow of the CHARRA attestation process.
             |                                       attestationResult <= |
             |                                                            |
 
-
 ## Building and Running
 
 CHARRA comes with a Docker test environment and Docker helper scripts to build and run it in Docker.
 It is also possible to build and run CHARRA manually.
-
 
 ### Building and Running in Docker
 
@@ -63,8 +60,37 @@ It is also possible to build and run CHARRA manually.
 
 If you see "ATTESTATION SUCCESSFUL" you're done. Congratz :-D
 
+### Building and Running in Docker on Raspberry Pi
+
+The CHARRA `Dockerfile` uses the official `tpm2software/tpm2-tss:` Docker image as a basis.
+This image is (at the moment) only available for the *amd64* architecture, not for ARM-based systems.
+That is why on the Raspberry Pi this image must be created manually.
+This guide was tested on a Raspberry Pi 4 with 4 GiB RAM running [Raspberry Pi OS Lite](https://www.raspberrypi.org/software/operating-systems/) in version *buster*.
+
+*Side note: Even on such a powerful device like the Raspberry Pi 4 with 4 GiB of RAM the build process can take very long (1+ hours).*
+
+1. Install dependencies:
+
+       sudo apt install build-essential m4
+
+2. Clone the TPM2 Software Container repository:
+
+       git clone 'https://github.com/tpm2-software/tpm2-software-container.git'
+
+3. Build the `Dockerfile`s:
+
+       make
+
+4. Build the Docker image `Dockerfile`s:
+
+       docker build -t 'tpm2software/tpm2-tss:ubuntu-18.04' -f ubuntu-18.04.docker .
+
+5. Then continue with the steps described in the previous section.
 
 ### Building and Running Manually
+
+The provided `Dockerfile` lets you quickly test CHARRA in a Docker environment.
+If you want to run CHARRA bare metal, please refer to this guide here.
 
 #### Build
 
@@ -112,13 +138,11 @@ The `Dockerfile` provides details on installing all dependencies and should be c
 
        make -j
 
-
 #### Further Preparation
 
 1. Download and install [IBM's TPM 2.0 Simulator](https://sourceforge.net/projects/ibmswtpm2/).
 
 2. Download and install the [TPM2 Tools](https://github.com/tpm2-software/tpm2-tools).
-
 
 #### Running
 
@@ -126,7 +150,7 @@ The `Dockerfile` provides details on installing all dependencies and should be c
 
        (cd /tmp ; pkill tpm_server ; rm -f NVChip; /usr/local/bin/tpm_server > /dev/null &)
 
-2. Send TPM startup command:
+2. Send TPM *startup* command:
 
        /usr/local/bin/tpm2_startup -Tmssim --clear
 
@@ -135,8 +159,6 @@ The `Dockerfile` provides details on installing all dependencies and should be c
        (bin/attester &); sleep .2 ; bin/verifier ; sleep 1 ; pkill -f bin/attester
 
 If you see "ATTESTATION SUCCESSFUL" you're done. Congratz :-D
-
-
 
 ## Debugging
 
@@ -158,58 +180,44 @@ If you see "ATTESTATION SUCCESSFUL" you're done. Congratz :-D
       sleep 1 ; \
       pkill bin/attester
 
-## Remote attestation
+## Remote Attestation
 
-You can use attester and verifier on two different devices. To do that,
-you have to provide an external network for the attester container.
+The attester and verifier can be used on two different devices.
+To do that, you have to provide an external network for the attester container.
 
 1. Create [macvlan network](https://docs.docker.com/network/macvlan/)
 for attester docker container (check your gateway address and replace `x` with
 the correct number):
 
-```
-$ docker network create -d macvlan \
-  --subnet=192.168.x.0/24 \
-  --gateway=192.168.x.1 \
-  -o parent=eth0 pub_net
-```
+       docker network create -d macvlan \
+           --subnet=192.168.x.0/24 \
+           --gateway=192.168.x.1 \
+           -o parent=eth0 pub_net
 
-2. Add `--network` parameter to the `docker run` command in the [run.sh](https://github.com/Fraunhofer-SIT/charra/blob/master/docker/run.sh#L65)
-on the attester device:
+2. Add `--network` parameter to the `docker run` command in the `docker/run.sh` on the attester device:
 
-```
-## run (transient) Docker container
-/usr/bin/docker run --rm -it \
-	-v "${PWD}/:/home/bob/charra" \
-	--network=pub_net \
-	"${docker_image_fullname}" \
-	"$@"
-```
+       ## run (transient) Docker container
+       /usr/bin/docker run --rm -it \
+           -v "${PWD}/:/home/bob/charra" \
+           --network=pub_net \
+           "${docker_image_fullname}" \
+           "$@"
 
 3. Run the attester docker container and check the IP address.
 
-4. Put the attester address to the `DST_HOST` in the
-[verifier.c](https://github.com/Fraunhofer-SIT/charra/blob/master/src/verifier.c#L51)
-on the verifier device. Rebuild verifier script in the verifier docker
-container:
+4. Put the attester address to the `DST_HOST` in `src/verifier.c` on the verifier device.
+   Rebuild verifier script in the verifier docker container:
 
-```
-$ cd charra
-$ make -j
-```
+       cd charra
+       make -j
 
-5.  Go to `charra` directory and run attester binary in the attester docker
-container:
+5. Go to `charra` directory and run attester binary in the attester docker container:
 
-```
-$ cd charra
-$ ./bin/attester
-```
+       cd charra
+       bin/attester
 
 6. Run the verifier binary in the verifier docker container:
 
-```
-$ ./bin/verifier
-```
+       /bin/verifier
 
 If you see "ATTESTATION SUCCESSFUL" you're done. Congratz :-D
