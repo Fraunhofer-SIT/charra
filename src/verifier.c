@@ -282,14 +282,14 @@ static void coap_attest_handler(struct coap_context_t* context UNUSED,
 	}
 
 	/* load TPM key */
+	TPM2B_PUBLIC* tpm2_public_key = (TPM2B_PUBLIC*)res.tpm2_public_key;
 	charra_log_info("[" LOG_NAME "] Loading TPM key.");
-	charra_r = charra_load_external_public_key(
-		esys_ctx, (TPM2B_PUBLIC*)res.tpm2_public_key, &sig_key_handle);
-	if (charra_r == CHARRA_RC_SUCCESS) {
-		charra_log_info("[" LOG_NAME "] External public key loaded.");
-	} else {
+	if ((charra_r = charra_load_external_public_key(esys_ctx, tpm2_public_key,
+			 &sig_key_handle)) != CHARRA_RC_SUCCESS) {
 		charra_log_error("[" LOG_NAME "] Loading external public key failed.");
 		goto error;
+	} else {
+		charra_log_info("[" LOG_NAME "] External public key loaded.");
 	}
 
 	/* prepare verification */
@@ -298,17 +298,42 @@ static void coap_attest_handler(struct coap_context_t* context UNUSED,
 	attest.size = res.attestation_data_len;
 	memcpy(
 		attest.attestationData, res.attestation_data, res.attestation_data_len);
-	TPMT_SIGNATURE signature;
+	TPMT_SIGNATURE signature = {0};
 	memcpy(&signature, res.tpm2_signature, res.tpm2_signature_len);
 
 	/* --- verify attestation signature --- */
 	bool attestation_result_signature = false;
 	{
-		charra_log_info("[" LOG_NAME "] Verifying TPM Quote signature ...");
+		charra_log_info(
+			"[" LOG_NAME "] Verifying TPM Quote signature with TPM ...");
 
 		if ((charra_r = charra_verify_tpm2_quote_signature_with_tpm(esys_ctx,
 				 sig_key_handle, TPM2_ALG_SHA256, &attest, &signature,
 				 &validation)) == CHARRA_RC_SUCCESS) {
+			charra_log_info(
+				"[" LOG_NAME "]     => TPM Quote signature is valid!");
+			attestation_result_signature = true;
+		} else {
+			charra_log_error(
+				"[" LOG_NAME "]     => TPM Quote signature is NOT valid!");
+		}
+	}
+	{
+		charra_log_info(
+			"[" LOG_NAME "] Verifying TPM Quote signature with mbedTLS ...");
+
+		/* convert TPM public key to mbedTLS public key */
+		mbedtls_rsa_context mbedtls_rsa_pub_key = {0};
+		if ((charra_r = charra_crypto_tpm_pub_key_to_mbedtls_pub_key(
+				 tpm2_public_key, &mbedtls_rsa_pub_key)) != CHARRA_RC_SUCCESS) {
+			charra_log_error("[" LOG_NAME "] mbedTLS RSA error");
+			goto error;
+		}
+
+		if ((charra_r = charra_crypto_rsa_verify_signature(&mbedtls_rsa_pub_key,
+				 MBEDTLS_MD_SHA256, res.attestation_data,
+				 (size_t)res.attestation_data_len,
+				 signature.signature.rsapss.sig.buffer)) == CHARRA_RC_SUCCESS) {
 			charra_log_info(
 				"[" LOG_NAME "]     => TPM Quote signature is valid!");
 			attestation_result_signature = true;

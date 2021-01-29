@@ -196,9 +196,10 @@ bool charra_verify_tpm2_quote_qualifying_data(uint16_t qualifying_data_len,
 	return true;
 }
 
-/* TODO Add specific versions of this function for all supported hashslgos, i.e.
- * charra_compute_pcr_composite_digest_sha256_from_ptr_array, etc., invoking
- * this generic funtion internally with TPM2_SHA256_DIGEST_SIZE, etc. */
+/* TODO Add specific versions of this function for all supported hash algos,
+ * i.e. charra_compute_pcr_composite_digest_sha256_from_ptr_array, etc.,
+ * invoking this generic funtion internally with TPM2_SHA256_DIGEST_SIZE, etc.
+ */
 CHARRA_RC charra_compute_pcr_composite_digest_from_ptr_array(
 	uint16_t hash_algo_digest_size UNUSED,
 	const uint8_t* expected_pcr_values[] UNUSED,
