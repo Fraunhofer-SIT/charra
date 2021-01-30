@@ -341,6 +341,7 @@ static void coap_attest_handler(struct coap_context_t* context UNUSED,
 			charra_log_error(
 				"[" LOG_NAME "]     => TPM Quote signature is NOT valid!");
 		}
+		mbedtls_rsa_free(&mbedtls_rsa_pub_key);
 	}
 
 	/* unmarshal attestation data */
