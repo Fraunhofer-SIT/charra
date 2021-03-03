@@ -2,8 +2,16 @@
 # main Makefile
 
 CFLAGS = -std=c99 -g -pedantic -Wall -Wextra \
-         -fdata-sections -ffunction-sections \
-         -DCHARRA_LOG_USE_COLOR
+         -Wno-missing-field-initializers \
+         -fdata-sections -ffunction-sections
+
+ifdef disable-log
+	CFLAGS += -DCHARRA_LOG_DISABLE
+endif
+ifdef disable-log-color
+	CFLAGS += -DCHARRA_LOG_DISABLE_COLOR
+endif
+
 
 SRCDIR = src
 INCDIR = include
@@ -26,8 +34,8 @@ LIBS =       coap-2 \
 
 # TCTI module to use (default is 'mssim')
 TCTI_MODULE=tss2-tcti-mssim
-ifdef WITH_TCTI
-	TCTI_MODULE=tss2-tcti-$(WITH_TCTI)
+ifdef with-tcti
+	TCTI_MODULE=tss2-tcti-$(with-tcti)
 	#@echo "Using tss2-tcti-"$(WITH_TCTI)
 endif
 LIBS += $(TCTI_MODULE)
@@ -36,6 +44,14 @@ LIBS += $(TCTI_MODULE)
 LDFLAGS_DYNAMIC = $(addprefix -l, $(LIBS))
 
 LDFLAGS_STATIC = $(addprefix -l:lib, $(addsuffix .a, $(LIBS)))
+
+
+ifdef address-sanitizer
+	CFLAGS += -fsanitize=address
+	LDFLAGS_STATIC += -fsanitize=address
+	LDFLAGS_DYNAMIC += -fsanitize=address
+endif
+
 
 SOURCES = $(shell find $(SRCDIR) -name '*.c')
 
@@ -51,8 +67,6 @@ TARGETS = $(addprefix $(BINDIR)/, attester verifier)
 
 .PHONY: all all.static libs clean cleanlibs cleanall
 
-
-
 ## --- targets ------------------------------------------------------------ ##
 
 all: LDFLAGS = $(LDFLAGS_DYNAMIC)
@@ -62,13 +76,25 @@ all.static: LDFLAGS = $(LDFLAGS_STATIC)
 all.static: $(TARGETS)
 
 
+## address sanitizer
+ifdef address-sanitizer
+	@echo "Enabling address sanitizer."
+	CFLAGS += -fsanitize=address
+	LDFLAGS += -fsanitize=address
+endif
+
+
 $(BINDIR)/attester: $(SRCDIR)/attester.c $(OBJECTS)
 	$(CC) $^ $(CFLAGS) $(INCLUDE) $(LIBINCLUDE) $(LDPATH) $(LDFLAGS) -g -o $@ -Wl,--gc-sections
-	###strip --strip-unneeded $@
+ifdef strip
+	strip --strip-unneeded $@
+endif
 
 $(BINDIR)/verifier: $(SRCDIR)/verifier.c $(OBJECTS)
 	$(CC) $^ $(CFLAGS) $(INCLUDE) $(LIBINCLUDE) $(LDPATH) $(LDFLAGS) -g -o $@ -Wl,--gc-sections
-	###strip --strip-unneeded $@
+ifdef strip
+	strip --strip-unneeded $@
+endif
 
 
 
@@ -116,6 +142,3 @@ cleanlibs: clean
 	$(MAKE) -C lib/ clean
 
 cleanall: cleanlibs clean
-
-
-

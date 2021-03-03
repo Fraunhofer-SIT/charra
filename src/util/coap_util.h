@@ -22,20 +22,137 @@
 #define COAP_UTIL_H
 
 #include <coap2/coap.h>
+#include <stdbool.h>
 
-#define TRUE (1 == 1)
-#define FALSE (!TRUE)
+/* --- type declarations/definitions -------------------------------------- */
 
-const char* charra_coap_method_to_str(const uint8_t method);
+/**
+ * @brief CoAP token type.
+ *
+ */
+typedef struct coap_token_t {
+	/**
+	 * @brief (Real) length of the token (max. 8).
+	 *
+	 */
+	size_t length;
 
-void charra_add_coap_resource(struct coap_context_t* ctx,
-	const unsigned char method, const char* resource_name,
+	/**
+	 * @brief The token (max. 8 bytes)
+	 *
+	 */
+	uint8_t data[8];
+} coap_token_t;
+
+/**
+ * @brief CoAP message ID type.
+ *
+ */
+typedef uint16_t coap_message_id_t;
+
+/**
+ * @brief CoAP message type.
+ *
+ */
+typedef uint8_t coap_message_t;
+/* confirmable message (requires ACK/RST) */
+#define COAP_MESSAGE_TYPE_CON ((coap_message_t)COAP_MESSAGE_CON)
+/* non-confirmable message (one-shot message) */
+#define COAP_MESSAGE_TYPE_NON ((coap_message_t)COAP_MESSAGE_NON)
+/* used to acknowledge confirmable messages */
+#define COAP_MESSAGE_TYPE_ACK ((coap_message_t)COAP_MESSAGE_ACK)
+/* indicates error in received messages */
+#define COAP_MESSAGE_TYPE_RST ((coap_message_t)COAP_MESSAGE_RST)
+
+/* --- function forward declarations -------------------------------------- */
+
+/**
+ * @brief Creates a new CoAP context.
+ *
+ * @param[in] enable_coap_block_mode whether to enable CoAP block mode.
+ * @return coap_context_t* the Coap context.
+ * @return NULL if an error occurred.
+ */
+coap_context_t* charra_coap_new_context(const bool enable_coap_block_mode);
+
+/**
+ * @brief Creates a CoAP server endpoint.
+ *
+ * @param[inout] coap_context the CoAP context.
+ * @param[in] listen_address the IP address to listen on (e.g. "0.0.0.0").
+ * @param[in] port the port (default CoAP UDP port is 5683).
+ * @param[in] coap_protocol the CoAP protocol.
+ * @return coap_endpoint_t* the CoAP endpoint.
+ * @return NULL if an error occurred.
+ */
+coap_endpoint_t* charra_coap_new_endpoint(coap_context_t* coap_context,
+	const char* listen_address, const uint16_t port,
+	const coap_proto_t coap_protocol);
+
+/**
+ * @brief Creates a CoAP client session.
+ *
+ * @param[inout] coap_context the CoAP context.
+ * @param[in] dest_address the destination IP address.
+ * @param[in] port the port (default CoAP UDP port is 5683).
+ * @param[in] coap_protocol the CoAP protocol.
+ * @return coap_session_t* the CoAP session.
+ * @return NULL if an error occurred.
+ */
+coap_session_t* charra_coap_new_client_session(coap_context_t* coap_context,
+	const char* dest_address, const uint16_t port,
+	const coap_proto_t coap_protocol);
+
+/**
+ * @brief Creates a new CoAP request with large data, using CoAP block-wise
+ * transfers.
+ *
+ * @param session the CoAP session.
+ * @param msg_type the CoAP message type.
+ * @param method the CoAP request method.
+ * @param options list of CoAP options.
+ * @param data the data to send (this can be larger than the typical size of
+ * 1024 bytes for one PDU since internally CoAP block-wise transfers are
+ * used).
+ * @param data_len the length of the data.
+ * @return coap_pdu_t* the created CoAP PDU.
+ * @return NULL in case of an error.
+ */
+coap_pdu_t* charra_coap_new_request(coap_session_t* session,
+	coap_message_t msg_type, coap_request_t method, coap_optlist_t** options,
+	const uint8_t* data, const size_t data_len);
+
+/**
+ * @brief Adds a CoAP resource.
+ *
+ * @param coap_context the CoAP context.
+ * @param method the CoAP request method.
+ * @param resource_name the resource name.
+ * @param handler the method handler function.
+ */
+void charra_coap_add_resource(struct coap_context_t* coap_context,
+	const coap_request_t method, const char* resource_name,
 	const coap_method_handler_t handler);
 
-void charra_coap_add_get_resource(struct coap_context_t* ctx,
-	const char* resource_name, const coap_method_handler_t handler);
+/**
+ * @brief Parses the libcoap log level from string and returns the
+ * appropriate enum constant. A default log level must be provided in case
+ * there is no match for the string respresentation.
+ *
+ * @param[in] log_level_str the libcoap log level string.
+ * @param[in] default_log_level the default libcoap log level in case
+ * there is no match for the string respresentation.
+ * @return charra_log_t the libcoap log level.
+ */
+coap_log_t charra_coap_log_level_from_str(
+	const char* log_level_str, const coap_log_t default_log_level);
 
-void charra_coap_add_fetch_resource(struct coap_context_t* ctx,
-	const char* resource_name, const coap_method_handler_t handler);
+/**
+ * @brief Returns the string representation of a CoAP request method.
+ *
+ * @param method the CoAP request method.
+ * @return const char* the string representation of a CoAP request method.
+ */
+const char* charra_coap_method_to_str(const coap_request_t method);
 
 #endif /* COAP_UTIL_H */
