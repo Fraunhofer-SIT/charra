@@ -20,6 +20,8 @@
 
 #include <arpa/inet.h>
 #include <coap2/coap.h>
+#include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <tss2/tss2_mu.h>
@@ -35,25 +37,35 @@
 #include "util/io_util.h"
 #include "util/tpm2_util.h"
 
-#define UNUSED __attribute__((unused))
+#define CHARRA_UNUSED __attribute__((unused))
 
 /* --- config ------------------------------------------------------------- */
 
+/* quit signal */
+static bool quit = false;
+
 /* logging */
 #define LOG_NAME "attester"
-#define LOG_LEVEL_COAP LOG_INFO
-// #define LOG_LEVEL_CBOR LOG_DEBUG
-#define LOG_LEVEL_CHARRA CHARRA_LOG_INFO
-// #define LOG_LEVEL_CHARRA CHARRA_LOG_DEBUG
 
 /* config */
-static const unsigned int PORT = 5683;	   // default port
-static const unsigned int MAX_SIZE = 1300; // MTU payload max size
-#define CBOR_ENCODER_BUFFER_LENGTH 20480   // 20 KiB should be sufficient
+static const char LISTEN_ADDRESS[] = "0.0.0.0";
+static const uint16_t PORT = COAP_DEFAULT_PORT; // default port 5683
+#define CBOR_ENCODER_BUFFER_LENGTH 20480		// 20 KiB should be sufficient
+// TODO allocate memory for CBOR buffer using malloc() since logs can be huge
 
-/* --- resource handler forward declarations ------------------------------ */
+/* --- function forward declarations -------------------------------------- */
 
-static void coap_attestation_handler(struct coap_context_t* ctx,
+/**
+ * @brief SIGINT handler: set quit to 1 for graceful termination.
+ *
+ * @param signum the signal number.
+ */
+static void handle_sigint(int signum);
+
+static void release_data(
+	struct coap_session_t* session CHARRA_UNUSED, void* app_ptr);
+
+static void coap_attest_handler(struct coap_context_t* ctx,
 	struct coap_resource_t* resource, struct coap_session_t* session,
 	struct coap_pdu_t* in_pdu, struct coap_binary_t* token,
 	struct coap_string_t* query, struct coap_pdu_t* out_pdu);
@@ -61,67 +73,80 @@ static void coap_attestation_handler(struct coap_context_t* ctx,
 /* --- main --------------------------------------------------------------- */
 
 int main(void) {
-	coap_context_t* ctx = NULL;
-	coap_address_t serv_addr;
-	coap_endpoint_t* endpoint = NULL;
 	int result = EXIT_FAILURE;
 
-	/* set CHARRA log level*/
-	charra_log_set_level(LOG_LEVEL_CHARRA);
+	/* handle SIGINT */
+	signal(SIGINT, handle_sigint);
 
-	/* start up CoAP and set log level*/
-	coap_startup();
-	coap_set_log_level(LOG_LEVEL_COAP);
-	charra_log_info("[" LOG_NAME "] Starting up.");
-
-	/* listen address and port */
-	coap_address_init(&serv_addr);
-	serv_addr.addr.sin.sin_family = AF_INET;
-	serv_addr.addr.sin.sin_addr.s_addr = INADDR_ANY;
-	serv_addr.addr.sin.sin_port = htons(PORT);
+	/* set CHARRA and libcoap log levels */
+	charra_log_set_level(charra_log_level_from_str(
+		(const char*)getenv("LOG_LEVEL_CHARRA"), CHARRA_LOG_INFO));
+	coap_set_log_level(charra_coap_log_level_from_str(
+		(const char*)getenv("LOG_LEVEL_COAP"), LOG_INFO));
 
 	/* create CoAP context */
-	charra_log_info("[" LOG_NAME "] Initializing CoAP endpoint.");
-	ctx = coap_new_context(NULL);
-	if (!ctx ||
-		!(endpoint = coap_new_endpoint(ctx, &serv_addr, COAP_PROTO_UDP))) {
-		charra_log_error(
-			"[" LOG_NAME "] Cannot create server session (initializing "
-			"CoAP context failed).");
-		goto finish;
+	coap_context_t* coap_context = NULL;
+	charra_log_info("[" LOG_NAME "] Initializing CoAP in block-wise mode.");
+	if ((coap_context = charra_coap_new_context(true)) == NULL) {
+		charra_log_error("[" LOG_NAME "] Cannot create CoAP context.");
+		goto error;
 	}
-	charra_log_debug("[" LOG_NAME "] Initialized CoAP context.");
 
-	/* register CoAP resources and handlers */
+	/* create CoAP server endpoint */
+	coap_endpoint_t* coap_endpoint = NULL;
+	charra_log_info("[" LOG_NAME "] Creating CoAP server endpoint.");
+	if ((coap_endpoint = charra_coap_new_endpoint(
+			 coap_context, LISTEN_ADDRESS, PORT, COAP_PROTO_UDP)) == NULL) {
+		charra_log_error(
+			"[" LOG_NAME "] Cannot create CoAP server endpoint.\n");
+		goto error;
+	}
+
+	/* register CoAP resource and resource handler */
 	charra_log_info("[" LOG_NAME "] Registering CoAP resources.");
-	charra_coap_add_fetch_resource(ctx, "attest", coap_attestation_handler);
+	charra_coap_add_resource(
+		coap_context, COAP_REQUEST_FETCH, "attest", coap_attest_handler);
 
 	/* enter main loop */
 	charra_log_debug("[" LOG_NAME "] Entering main loop.");
-	while (TRUE) {
-		int timing;
-		charra_log_info("[" LOG_NAME "] Waiting for connections.");
-		timing = coap_io_process(ctx, 0);
-		if (timing < 0)
-			break;
+	while (!quit) {
+		/* process CoAP I/O */
+		if (coap_io_process(coap_context, COAP_IO_WAIT) == -1) {
+			charra_log_error(
+				"[" LOG_NAME "] Error during CoAP I/O processing.");
+			goto error;
+		}
 	}
 
 	result = EXIT_SUCCESS;
+	goto finish;
+
+error:
+	result = EXIT_FAILURE;
 
 finish:
-	coap_free_context(ctx);
+	/* free CoAP memory */
+	// FIXME Why do the following 2 statements produce a segfault?
+	// coap_free_endpoint(coap_endpoint);
+	// coap_free_context(coap_context);
 	coap_cleanup();
 
 	return result;
 }
 
-/* --- resource handler definitions --------------------------------------- */
+/* --- function definitions ----------------------------------------------- */
 
-static void coap_attestation_handler(struct coap_context_t* ctx UNUSED,
-	struct coap_resource_t* resource UNUSED,
-	struct coap_session_t* session UNUSED, struct coap_pdu_t* in,
-	struct coap_binary_t* token UNUSED, struct coap_string_t* query UNUSED,
-	struct coap_pdu_t* out) {
+static void handle_sigint(int signum CHARRA_UNUSED) { quit = true; }
+
+static void release_data(
+	struct coap_session_t* session CHARRA_UNUSED, void* app_ptr) {
+	coap_delete_binary(app_ptr);
+}
+
+static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
+	struct coap_resource_t* resource, struct coap_session_t* session,
+	struct coap_pdu_t* in, struct coap_binary_t* token,
+	struct coap_string_t* query, struct coap_pdu_t* out) {
 	CHARRA_RC charra_r = CHARRA_RC_SUCCESS;
 	int coap_r = 0;
 	TSS2_RC tss_r = 0;
@@ -136,13 +161,18 @@ static void coap_attestation_handler(struct coap_context_t* ctx UNUSED,
 
 	/* get data */
 	size_t data_len = 0;
-	uint8_t* data = NULL;
-	if ((coap_r = coap_get_data(in, &data_len, &data)) == 0) {
+	const uint8_t* data = NULL;
+	size_t data_offset = 0;
+	size_t data_total_len = 0;
+	if ((coap_r = coap_get_data_large(
+			 in, &data_len, &data, &data_offset, &data_total_len)) == 0) {
 		charra_log_error("[" LOG_NAME "] Could not get CoAP PDU data.");
 		goto error;
 	} else {
 		charra_log_info(
 			"[" LOG_NAME "] Received data of length %zu.", data_len);
+		charra_log_info("[" LOG_NAME "] Received data of total length %zu.",
+			data_total_len);
 	}
 
 	/* unmarshal data */
@@ -210,6 +240,13 @@ static void coap_attestation_handler(struct coap_context_t* ctx UNUSED,
 
 	/* --- send response data --- */
 
+	unsigned char dummy_event_log[] =
+		"--- BEGIN CHARRA EVENT LOG ----------------\n"
+		"This is a dummy event log.\n"
+		"It is here just for demonstration purposes.\n"
+		"--- END CHARRA EVENT LOG ------------------\n";
+	const uint32_t dummy_event_log_len = sizeof(dummy_event_log);
+
 	/* prepare response */
 	charra_log_info("[" LOG_NAME "] Preparing response.");
 	msg_attestation_response_dto res = {
@@ -218,7 +255,9 @@ static void coap_attestation_handler(struct coap_context_t* ctx UNUSED,
 		.tpm2_signature_len = sizeof(*signature),
 		.tpm2_signature = {0}, // must be memcpy'd, see below
 		.tpm2_public_key_len = sizeof(*public_key),
-		.tpm2_public_key = {0}}; // must be memcpy'd, see below
+		.tpm2_public_key = {0}, // must be memcpy'd, see below
+		.event_log_len = dummy_event_log_len,
+		.event_log = dummy_event_log};
 	memcpy(res.attestation_data, attest_buf->attestationData,
 		res.attestation_data_len);
 	memcpy(res.tpm2_signature, signature, res.tpm2_signature_len);
@@ -230,13 +269,17 @@ static void coap_attestation_handler(struct coap_context_t* ctx UNUSED,
 	uint8_t* res_buf = NULL;
 	marshal_attestation_response(&res, &res_buf_len, &res_buf);
 
-	/* add data to outgoing PDU */
+	/* add response data to outgoing PDU and send it */
 	charra_log_info(
 		"[" LOG_NAME
 		"] Adding marshaled data to CoAP response PDU and send it.");
-	out->code = COAP_RESPONSE_CODE(205);
-	out->max_size = MAX_SIZE;
-	coap_add_data(out, res_buf_len, res_buf);
+	out->code = COAP_RESPONSE_CODE_CONTENT;
+	if ((coap_r = coap_add_data_large_response(resource, session, in, out,
+			 token, query, COAP_MEDIATYPE_APPLICATION_CBOR, -1, 0, res_buf_len,
+			 res_buf, release_data, res_buf)) == 0) {
+		charra_log_error(
+			"[" LOG_NAME "] Error invoking coap_add_data_large_response().");
+	}
 
 error:
 	/* flush handles */
@@ -248,5 +291,7 @@ error:
 	}
 
 	/* finalize ESAPI */
-	Esys_Finalize(&esys_ctx);
+	if (esys_ctx != NULL) {
+		Esys_Finalize(&esys_ctx);
+	}
 }

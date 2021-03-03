@@ -20,10 +20,12 @@
 
 #include <arpa/inet.h>
 #include <coap2/coap.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <tss2/tss2_tpm2_types.h>
+#include <unistd.h>
 
 #include "common/charra_log.h"
 #include "core/charra_dto.h"
@@ -36,21 +38,24 @@
 #include "util/io_util.h"
 #include "util/tpm2_util.h"
 
-#define UNUSED __attribute__((unused))
+#define CHARRA_UNUSED __attribute__((unused))
 
 /* --- config ------------------------------------------------------------- */
 
+/* quit signal */
+static bool quit = false;
+
 /* logging */
 #define LOG_NAME "verifier"
-#define LOG_LEVEL_COAP LOG_INFO
-// #define LOG_LEVEL_CBOR LOG_DEBUG
-#define LOG_LEVEL_CHARRA CHARRA_LOG_INFO
-// #define LOG_LEVEL_CHARRA CHARRA_LOG_DEBUG
 
 /* config */
 static const char DST_HOST[] = "127.0.0.1";
 static const unsigned int DST_PORT = 5683; // default port
 #define CBOR_ENCODER_BUFFER_LENGTH 20480   // 20 KiB should be sufficient
+#define COAP_IO_PROCESS_TIME_MS 2000 // CoAP IO process time in milliseconds
+#define PERIODIC_ATTESTATION_WAIT_TIME_S                                       \
+	2 // Wait time between attestations in seconds
+
 #define TPM_SIG_KEY_ID_LEN 14
 #define TPM_SIG_KEY_ID "PK.RSA.default"
 static const uint8_t TPM_PCR_SELECTION[TPM2_MAX_PCRS] = {
@@ -59,123 +64,175 @@ static const uint32_t TPM_PCR_SELECTION_LEN = 9;
 
 /* --- function forward declarations -------------------------------------- */
 
+/**
+ * @brief SIGINT handler: set quit to 1 for graceful termination.
+ *
+ * @param signum the signal number.
+ */
+static void handle_sigint(int signum);
+
 static CHARRA_RC create_attestation_request(
 	msg_attestation_request_dto* attestation_request);
 
-/* --- resource handler forward declarations ------------------------------ */
-
-static void coap_attest_handler(struct coap_context_t* context,
+static coap_response_t coap_attest_handler(struct coap_context_t* context,
 	coap_session_t* session, coap_pdu_t* sent, coap_pdu_t* received,
 	const coap_tid_t id);
 
-/* --- static variables */
+/* --- static variables --------------------------------------------------- */
 
-msg_attestation_request_dto last_request = {0};
-msg_attestation_response_dto last_response = {0};
+static msg_attestation_request_dto last_request = {0};
+static msg_attestation_response_dto last_response = {0};
 
 /* --- main --------------------------------------------------------------- */
 
 int main(void) {
-	coap_context_t* ctx = NULL;
-	coap_session_t* session = NULL;
-	coap_address_t dst_addr;
-	coap_pdu_t* pdu = NULL;
 	int result = EXIT_FAILURE;
 
-	/* set CHARRA log level*/
-	charra_log_set_level(LOG_LEVEL_CHARRA);
+	/* handle SIGINT */
+	signal(SIGINT, handle_sigint);
 
-	/* start up CoAP and set log level */
-	coap_startup();
-	coap_set_log_level(LOG_LEVEL_COAP);
-	charra_log_info("[" LOG_NAME "] Starting up.");
+	/* set CHARRA and libcoap log levels */
+	charra_log_set_level(charra_log_level_from_str(
+		(const char*)getenv("LOG_LEVEL_CHARRA"), CHARRA_LOG_INFO));
+	coap_set_log_level(charra_coap_log_level_from_str(
+		(const char*)getenv("LOG_LEVEL_COAP"), LOG_INFO));
 
-	/* destination address and port */
-	coap_address_init(&dst_addr);
-	dst_addr.addr.sin.sin_family = AF_INET;
-	inet_pton(AF_INET, DST_HOST, &dst_addr.addr.sin.sin_addr);
-	dst_addr.addr.sin.sin_port = htons(DST_PORT);
-
-	/* create CoAP context and client session */
-	charra_log_info("[" LOG_NAME "] Initializing CoAP endpoint.");
-	ctx = coap_new_context(NULL);
-	if (!ctx || !(session = coap_new_client_session(
-					  ctx, NULL, &dst_addr, COAP_PROTO_UDP))) {
-		charra_log_error(
-			"[" LOG_NAME "] Cannot create client session (initializing "
-			"CoAP context failed).");
+	/* create CoAP context */
+	coap_context_t* coap_context = NULL;
+	charra_log_info("[" LOG_NAME "] Initializing CoAP in block-wise mode.");
+	if ((coap_context = charra_coap_new_context(true)) == NULL) {
+		charra_log_error("[" LOG_NAME "] Cannot create CoAP context.");
 		goto finish;
 	}
 
-	/* register CoAP resource handlers */
-	charra_log_info("[" LOG_NAME "] Registering CoAP resource handlers.");
-	coap_register_response_handler(ctx, coap_attest_handler);
+	/* register CoAP response handler */
+	charra_log_info("[" LOG_NAME "] Registering CoAP response handler.");
+	coap_register_response_handler(coap_context, coap_attest_handler);
 
-	/* construct CoAP message */
-	charra_log_info("[" LOG_NAME "] Creating new attestation request.");
-	pdu = coap_pdu_init(COAP_MESSAGE_CON, COAP_REQUEST_FETCH,
-		coap_new_message_id(session), coap_session_max_pdu_size(session));
-	if (!pdu) {
-		charra_log_error("[" LOG_NAME "] Cannot create CoAP message PDU.");
+	/* create CoAP client session */
+	coap_session_t* coap_session = NULL;
+	charra_log_info("[" LOG_NAME "] Creating CoAP client session.");
+	if ((coap_session = charra_coap_new_client_session(
+			 coap_context, DST_HOST, DST_PORT, COAP_PROTO_UDP)) == NULL) {
+		charra_log_error("[" LOG_NAME "] Cannot create client session.");
 		goto finish;
 	}
 
-	/* add a Uri-Path option */
-	coap_add_option(pdu, COAP_OPTION_URI_PATH, 6, (const uint8_t*)"attest");
+	/* define needed variables */
+	CHARRA_RC charra_r = CHARRA_RC_SUCCESS;
+	msg_attestation_request_dto req = {0};
+	uint32_t req_buf_len = 0;
+	uint8_t* req_buf = NULL;
+	coap_optlist_t* coap_options = NULL;
+	coap_pdu_t* pdu = NULL;
+	coap_tid_t tid = COAP_INVALID_TID;
+	int coap_io_process_time = -1;
+
+	/* enter  periodic attestation loop */
+	// TODO enable periodic attestations
+	// charra_log_info("[" LOG_NAME "] Entering periodic attestation loop.");
+	// while (!quit) {
+	// 	/* cleanup */
+	// 	memset(&req, 0, sizeof(req));
+	// 	if (coap_options != NULL) {
+	// 		coap_delete_optlist(coap_options);
+	// 		coap_options = NULL;
+	// 	}
 
 	/* create attestation request */
-	msg_attestation_request_dto req = {0};
+	charra_log_info("[" LOG_NAME "] Creating attestation request.");
 	if (create_attestation_request(&req) != CHARRA_RC_SUCCESS) {
 		charra_log_error("[" LOG_NAME "] Cannot create attestation request.");
-		goto finish;
+		goto error;
+	} else {
+		/* store request data */
+		last_request = req;
 	}
-
-	/* store request data */
-	last_request = req;
 
 	/* marshal attestation request */
 	charra_log_info(
 		"[" LOG_NAME "] Marshaling attestation request data to CBOR.");
-	uint32_t req_buf_len = 0;
-	uint8_t* req_buf = NULL;
-	CHARRA_RC charra_err = CHARRA_RC_SUCCESS;
-	int coap_err = 0;
-	if ((charra_err = marshal_attestation_request(
+	if ((charra_r = marshal_attestation_request(
 			 &req, &req_buf_len, &req_buf)) != CHARRA_RC_SUCCESS) {
 		charra_log_error(
 			"[" LOG_NAME "] Marshaling attestation request data failed.");
-		goto finish;
+		goto error;
 	}
 
-	/* ATTENTION: libcoap returns an int != 0 on success! */
-	charra_log_info(
-		"[" LOG_NAME "] Adding attestation request data to CoAP PDU.");
-	if ((coap_err = coap_add_data(pdu, req_buf_len, req_buf)) == 0) {
-		charra_log_error(
-			"[" LOG_NAME "] Cannot add attestation request data to CoAP PDU.");
-		goto finish;
+	/* CoAP options */
+	charra_log_info("[" LOG_NAME "] Adding CoAP options.");
+	if (coap_insert_optlist(
+			&coap_options, coap_new_optlist(COAP_OPTION_URI_PATH, 6,
+							   (const uint8_t*)"attest")) != 1) {
+		charra_log_error("[" LOG_NAME "] Cannot create CoAP options.");
+		goto error;
 	}
 
-	/*send CoAP PDU */
+	/* new CoAP request PDU */
+	charra_log_info("[" LOG_NAME "] Creating request PDU.");
+	if ((pdu = charra_coap_new_request(coap_session, COAP_MESSAGE_TYPE_CON,
+			 COAP_REQUEST_FETCH, &coap_options, req_buf, req_buf_len)) ==
+		NULL) {
+		charra_log_error("[" LOG_NAME "] Cannot create request PDU.");
+		goto error;
+	}
+
+	/* send CoAP PDU */
 	charra_log_info("[" LOG_NAME "] Sending CoAP message.");
-	coap_send(session, pdu);
+	if ((tid = coap_send_large(coap_session, pdu)) == COAP_INVALID_TID) {
+		charra_log_error("[" LOG_NAME "] Cannot send CoAP message.");
+		goto error;
+	}
+
+	/* processing and waiting for response */
+	charra_log_info("[" LOG_NAME "] Processing and waiting for response ...");
+	while (coap_io_process_time <= COAP_IO_PROCESS_TIME_MS) {
+		/* process CoAP I/O */
+		if ((coap_io_process_time = coap_io_process(
+				 coap_context, COAP_IO_PROCESS_TIME_MS)) == -1) {
+			charra_log_error(
+				"[" LOG_NAME "] Error during CoAP I/O processing.");
+			goto error;
+		}
+	}
+
+	/* wait until next attestation */
+	// TODO enable periodic attestations
+	// charra_log_info(
+	// 	"[" LOG_NAME
+	// 	"] Waiting %d seconds until next attestation request ...",
+	// 	PERIODIC_ATTESTATION_WAIT_TIME_S);
+	// sleep(PERIODIC_ATTESTATION_WAIT_TIME_S);
+	// }
 
 	result = EXIT_SUCCESS;
+	goto finish;
 
-	if (coap_io_process(ctx, 20000) < 0) {
-		result = EXIT_FAILURE;
-	}
+error:
+	result = EXIT_FAILURE;
 
 finish:
 	/* free CoAP memory */
-	coap_session_release(session);
-	coap_free_context(ctx);
+	if (coap_options != NULL) {
+		coap_delete_optlist(coap_options);
+		coap_options = NULL;
+	}
+	if (coap_session != NULL) {
+		coap_session_release(coap_session);
+		coap_session = NULL;
+	}
+	if (coap_context != NULL) {
+		coap_free_context(coap_context);
+		coap_context = NULL;
+	}
 	coap_cleanup();
 
 	return result;
 }
 
 /* --- function definitions ----------------------------------------------- */
+
+static void handle_sigint(int signum CHARRA_UNUSED) { quit = true; }
 
 static CHARRA_RC create_attestation_request(
 	msg_attestation_request_dto* attestation_request) {
@@ -218,9 +275,10 @@ static CHARRA_RC create_attestation_request(
 
 /* --- resource handler definitions --------------------------------------- */
 
-static void coap_attest_handler(struct coap_context_t* context UNUSED,
-	coap_session_t* session UNUSED, coap_pdu_t* sent UNUSED, coap_pdu_t* in,
-	const coap_tid_t id UNUSED) {
+static coap_response_t coap_attest_handler(
+	struct coap_context_t* context CHARRA_UNUSED,
+	coap_session_t* session CHARRA_UNUSED, coap_pdu_t* sent CHARRA_UNUSED,
+	coap_pdu_t* in, const coap_tid_t id CHARRA_UNUSED) {
 	CHARRA_RC charra_r = CHARRA_RC_SUCCESS;
 	int coap_r = 0;
 	CHARRA_RC charra_err = CHARRA_RC_SUCCESS;
@@ -237,13 +295,18 @@ static void coap_attest_handler(struct coap_context_t* context UNUSED,
 
 	/* get data */
 	size_t data_len = 0;
-	uint8_t* data = NULL;
-	if ((coap_r = coap_get_data(in, &data_len, &data)) == 0) {
+	const uint8_t* data = NULL;
+	size_t data_offset = 0;
+	size_t data_total_len = 0;
+	if ((coap_r = coap_get_data_large(
+			 in, &data_len, &data, &data_offset, &data_total_len)) == 0) {
 		charra_log_error("[" LOG_NAME "] Could not get CoAP PDU data.");
 		goto error;
 	} else {
 		charra_log_info(
 			"[" LOG_NAME "] Received data of length %zu.", data_len);
+		charra_log_info("[" LOG_NAME "] Received data of total length %zu.",
+			data_total_len);
 	}
 
 	/* unmarshal data */
@@ -306,7 +369,7 @@ static void coap_attest_handler(struct coap_context_t* context UNUSED,
 	{
 		charra_log_info(
 			"[" LOG_NAME "] Verifying TPM Quote signature with TPM ...");
-
+		/* verify attestation signature with TPM */
 		if ((charra_r = charra_verify_tpm2_quote_signature_with_tpm(esys_ctx,
 				 sig_key_handle, TPM2_ALG_SHA256, &attest, &signature,
 				 &validation)) == CHARRA_RC_SUCCESS) {
@@ -319,10 +382,10 @@ static void coap_attest_handler(struct coap_context_t* context UNUSED,
 		}
 	}
 	{
-		charra_log_info(
-			"[" LOG_NAME "] Verifying TPM Quote signature with mbedTLS ...");
-
 		/* convert TPM public key to mbedTLS public key */
+		charra_log_info(
+			"[" LOG_NAME
+			"] Converting TPM public key to mbedTLS public key ...");
 		mbedtls_rsa_context mbedtls_rsa_pub_key = {0};
 		if ((charra_r = charra_crypto_tpm_pub_key_to_mbedtls_pub_key(
 				 tpm2_public_key, &mbedtls_rsa_pub_key)) != CHARRA_RC_SUCCESS) {
@@ -330,6 +393,9 @@ static void coap_attest_handler(struct coap_context_t* context UNUSED,
 			goto error;
 		}
 
+		/* verify attestation signature with mbedTLS */
+		charra_log_info(
+			"[" LOG_NAME "] Verifying TPM Quote signature with mbedTLS ...");
 		if ((charra_r = charra_crypto_rsa_verify_signature(&mbedtls_rsa_pub_key,
 				 MBEDTLS_MD_SHA256, res.attestation_data,
 				 (size_t)res.attestation_data_len,
@@ -392,12 +458,12 @@ static void coap_attest_handler(struct coap_context_t* context UNUSED,
 			"[" LOG_NAME
 			"] Computed PCR composite digest from reference PCRs is:");
 		charra_print_hex(sizeof(pcr_composite_digest), pcr_composite_digest,
-			"                                   0x", "\n", false);
+			"                                              0x", "\n", false);
 		charra_log_info(
 			"[" LOG_NAME "] Actual PCR composite digest from TPM Quote is:");
 		charra_print_hex(attest_struct.attested.quote.pcrDigest.size,
 			attest_struct.attested.quote.pcrDigest.buffer,
-			"                                   0x", "\n", false);
+			"                                              0x", "\n", false);
 
 		/* compare reference PCR composite with actual PCR composite */
 		attestation_result_pcrs = charra_verify_tpm2_quote_pcr_composite_digest(
@@ -415,11 +481,21 @@ static void coap_attest_handler(struct coap_context_t* context UNUSED,
 		}
 	}
 
+	/* verify event log */
+	// TODO: Implement real verification
+	bool attestation_event_log = true;
+	{
+		charra_log_info("[" LOG_NAME "] Verifying event log ...");
+		charra_log_info("[" LOG_NAME "] !!! For now, just print it. !!!");
+		charra_print_str(
+			res.event_log_len, res.event_log, "", "\n");
+	}
+
 	/* --- output result --- */
 
 	bool attestation_result = attestation_result_signature &&
 							  attestation_result_nonce &&
-							  attestation_result_pcrs;
+							  attestation_result_pcrs && attestation_event_log;
 
 	/* print attestation result */
 	charra_log_info("[" LOG_NAME "] +----------------------------+");
@@ -439,6 +515,12 @@ error:
 		}
 	}
 
+	/* free event log */
+	// TODO: Provide function charra_free_msg_attestation_response_dto()
+	if (res.event_log != NULL) {
+		free(res.event_log);
+	}
+
 	/* free ESAPI objects */
 	if (validation != NULL) {
 		Esys_Free(validation);
@@ -446,4 +528,6 @@ error:
 
 	/* finalize ESAPI */
 	Esys_Finalize(&esys_ctx);
+
+	return COAP_RESPONSE_OK;
 }

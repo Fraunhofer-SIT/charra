@@ -7,8 +7,8 @@
 # Hint: Check your Dockerfile at https://www.fromlatest.io/                  #
 ##############################################################################
 
-FROM tpm2software/tpm2-tss:ubuntu-18.04 AS base
-MAINTAINER Michael Eckel <michael.eckel@sit.fraunhofer.de>
+FROM tpm2software/tpm2-tss:ubuntu-20.04 AS base
+LABEL maintainer="Michael Eckel <michael.eckel@sit.fraunhofer.de>"
 
 ## copy configs
 COPY "./docker/dist/etc/default/keyboard" "/etc/default/keyboard"
@@ -50,7 +50,7 @@ RUN ./bootstrap \
 	&& make install
 RUN rm -rfv /tmp/tpm2-tools
 
-## libCoAP
+## libcoap
 RUN git clone --depth=1 --recursive -b 'develop' \
 	'https://github.com/obgm/libcoap.git' /tmp/libcoap
 WORKDIR /tmp/libcoap
@@ -88,6 +88,10 @@ RUN rm -rfv /tmp/t_cose
 RUN apt-get update \
 	&& apt-get install --no-install-recommends -y \
 	clang \
+	clang-tools \
+	cgdb \
+	gdb \
+	tmux \
 	valgrind \
 	&& rm -rf /var/lib/apt/lists/*
 

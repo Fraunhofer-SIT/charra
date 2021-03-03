@@ -39,7 +39,7 @@
 #include "io_util.h"
 #include "tpm2_util.h"
 
-#define UNUSED __attribute__((unused))
+#define CHARRA_UNUSED __attribute__((unused))
 
 CHARRA_RC charra_get_random_bytes_from_tpm(
 	const uint32_t len, uint8_t* random_bytes) {
@@ -201,10 +201,10 @@ bool charra_verify_tpm2_quote_qualifying_data(uint16_t qualifying_data_len,
  * invoking this generic funtion internally with TPM2_SHA256_DIGEST_SIZE, etc.
  */
 CHARRA_RC charra_compute_pcr_composite_digest_from_ptr_array(
-	uint16_t hash_algo_digest_size UNUSED,
-	const uint8_t* expected_pcr_values[] UNUSED,
-	size_t expected_pcr_values_len UNUSED,
-	uint8_t* pcr_composite_digest UNUSED) {
+	uint16_t hash_algo_digest_size CHARRA_UNUSED,
+	const uint8_t* expected_pcr_values[] CHARRA_UNUSED,
+	size_t expected_pcr_values_len CHARRA_UNUSED,
+	uint8_t* pcr_composite_digest CHARRA_UNUSED) {
 	// TODO: to be implemented
 	return CHARRA_RC_NOT_YET_IMPLEMENTED;
 }

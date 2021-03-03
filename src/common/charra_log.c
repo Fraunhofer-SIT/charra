@@ -35,7 +35,7 @@ static struct {
 static const char* charra_level_names[] = {
 	"TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"};
 
-#ifdef CHARRA_LOG_USE_COLOR
+#ifndef CHARRA_LOG_DISABLE_COLOR
 static const char* charra_level_colors[] = {
 	"\x1b[94m", "\x1b[36m", "\x1b[32m", "\x1b[33m", "\x1b[31m", "\x1b[35m"};
 #endif
@@ -80,7 +80,7 @@ void charra_log_log(
 		va_list args;
 		char buf[16];
 		buf[strftime(buf, sizeof(buf), "%H:%M:%S", lt)] = '\0';
-#ifdef CHARRA_LOG_USE_COLOR
+#ifndef CHARRA_LOG_DISABLE_COLOR
 		fprintf(stderr, "%s %s%-5s\x1b[0m \x1b[90m%s:%d:\x1b[0m ", buf,
 			charra_level_colors[level], charra_level_names[level], file, line);
 #else
@@ -110,4 +110,25 @@ void charra_log_log(
 
 	/* release lock */
 	charra_log_unlock();
+}
+
+charra_log_t charra_log_level_from_str(
+	const char* log_level_str, const charra_log_t default_log_level) {
+	if (log_level_str != NULL) {
+		if (strncmp(log_level_str, "TRACE", 5) == 0) {
+			return CHARRA_LOG_TRACE;
+		} else if (strncmp(log_level_str, "DEBUG", 5) == 0) {
+			return CHARRA_LOG_DEBUG;
+		} else if (strncmp(log_level_str, "INFO", 4) == 0) {
+			return CHARRA_LOG_INFO;
+		} else if (strncmp(log_level_str, "WARN", 4) == 0) {
+			return CHARRA_LOG_WARN;
+		} else if (strncmp(log_level_str, "ERROR", 5) == 0) {
+			return CHARRA_LOG_ERROR;
+		} else if (strncmp(log_level_str, "FATAL", 5) == 0) {
+			return CHARRA_LOG_FATAL;
+		}
+	}
+
+	return default_log_level;
 }

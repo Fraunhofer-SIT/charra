@@ -61,7 +61,7 @@ CHARRA_RC marshal_attestation_request(
 	/* encode "hello" */
 	QCBOREncode_AddBool(&ec, attestation_request->hello);
 
-	/* encode "key_id" */
+	/* encode "key-id" */
 	UsefulBufC key_id = {
 		attestation_request->sig_key_id, attestation_request->sig_key_id_len};
 	QCBOREncode_AddBytes(&ec, key_id);
@@ -71,7 +71,7 @@ CHARRA_RC marshal_attestation_request(
 		attestation_request->nonce, attestation_request->nonce_len};
 	QCBOREncode_AddBytes(&ec, nonce);
 
-	{
+	{ /* encode "pcr-selections" */
 		QCBOREncode_OpenArray(&ec);
 
 		for (uint32_t i = 0; i < attestation_request->pcr_selections_len; ++i) {
@@ -111,8 +111,9 @@ CHARRA_RC marshal_attestation_request(
 	/* set out params */
 	UsefulBufC encoded = {0};
 
-	if (QCBOREncode_Finish(&ec, &encoded))
+	if (QCBOREncode_Finish(&ec, &encoded)) {
 		return CHARRA_RC_MARSHALING_ERROR;
+	}
 
 	*marshaled_data_len = encoded.len;
 	*marshaled_data = (uint8_t*)encoded.ptr;
@@ -120,8 +121,9 @@ CHARRA_RC marshal_attestation_request(
 	return CHARRA_RC_SUCCESS;
 }
 
-CHARRA_RC unmarshal_attestation_request(uint32_t marshaled_data_len,
-	uint8_t* marshaled_data, msg_attestation_request_dto* attestation_request) {
+CHARRA_RC unmarshal_attestation_request(const uint32_t marshaled_data_len,
+	const uint8_t* marshaled_data,
+	msg_attestation_request_dto* attestation_request) {
 	msg_attestation_request_dto req = {0};
 
 	QCBORError cborerr = QCBOR_SUCCESS;
@@ -157,8 +159,6 @@ CHARRA_RC unmarshal_attestation_request(uint32_t marshaled_data_len,
 
 	/* initialize array and array length */
 	req.pcr_selections_len = (uint32_t)item.val.uCount;
-	// req->pcr_selections = (pcr_selection_dto*)calloc(item.val.uCount,
-	// sizeof(pcr_selection_dto));
 
 	/* go through all elements */
 	for (uint32_t i = 0; i < req.pcr_selections_len; ++i) {
@@ -177,8 +177,6 @@ CHARRA_RC unmarshal_attestation_request(uint32_t marshaled_data_len,
 
 		/* initialize array and array length */
 		req.pcr_selections[i].pcrs_len = (uint32_t)item.val.uCount;
-		// req.pcr_selections[i].pcrs =
-		// 	(uint8_t*)calloc(item.val.uCount, sizeof(uint8_t));
 
 		/* go through all elements */
 		for (uint32_t j = 0; j < req.pcr_selections[i].pcrs_len; ++j) {
@@ -218,6 +216,7 @@ CHARRA_RC marshal_attestation_response(
 	assert(attestation_response->attestation_data != NULL);
 	assert(attestation_response->tpm2_signature != NULL);
 	assert(attestation_response->tpm2_public_key != NULL);
+	assert(attestation_response->event_log != NULL);
 
 	UsefulBuf_MAKE_STACK_UB(buf, CBOR_ENCODER_BUFFER_LENGTH);
 	QCBOREncodeContext ec = {0};
@@ -228,19 +227,25 @@ CHARRA_RC marshal_attestation_response(
 	QCBOREncode_OpenArray(&ec);
 
 	/* encode "attestation-data" */
-	UsefulBufC attestation_data = {attestation_response->attestation_data,
-		attestation_response->attestation_data_len};
+	UsefulBufC attestation_data = {
+		.ptr = attestation_response->attestation_data,
+		.len = attestation_response->attestation_data_len};
 	QCBOREncode_AddBytes(&ec, attestation_data);
 
 	/* encode "tpm2-signature" */
-	UsefulBufC tpm2_signature = {attestation_response->tpm2_signature,
-		attestation_response->tpm2_signature_len};
+	UsefulBufC tpm2_signature = {.ptr = attestation_response->tpm2_signature,
+		.len = attestation_response->tpm2_signature_len};
 	QCBOREncode_AddBytes(&ec, tpm2_signature);
 
 	/* encode "tpm2-key-signature" */
-	UsefulBufC Tpm2KeyPublic = {attestation_response->tpm2_public_key,
-		attestation_response->tpm2_public_key_len};
-	QCBOREncode_AddBytes(&ec, Tpm2KeyPublic);
+	UsefulBufC tpm2_public_key = {.ptr = attestation_response->tpm2_public_key,
+		.len = attestation_response->tpm2_public_key_len};
+	QCBOREncode_AddBytes(&ec, tpm2_public_key);
+
+	/* encode "event-log" */
+	UsefulBufC event_log = {.ptr = attestation_response->event_log,
+		.len = attestation_response->event_log_len};
+	QCBOREncode_AddBytes(&ec, event_log);
 
 	/* close array: root_array_encoder */
 	QCBOREncode_CloseArray(&ec);
@@ -248,8 +253,9 @@ CHARRA_RC marshal_attestation_response(
 	/* set out params */
 	UsefulBufC encoded = {0};
 
-	if (QCBOREncode_Finish(&ec, &encoded))
+	if (QCBOREncode_Finish(&ec, &encoded)) {
 		return CHARRA_RC_MARSHALING_ERROR;
+	}
 
 	*marshaled_data_len = encoded.len;
 	*marshaled_data = (uint8_t*)encoded.ptr;
@@ -257,8 +263,8 @@ CHARRA_RC marshal_attestation_response(
 	return CHARRA_RC_SUCCESS;
 }
 
-CHARRA_RC unmarshal_attestation_response(uint32_t marshaled_data_len,
-	uint8_t* marshaled_data,
+CHARRA_RC unmarshal_attestation_response(const uint32_t marshaled_data_len,
+	const uint8_t* marshaled_data,
 	msg_attestation_response_dto* attestation_response) {
 	msg_attestation_response_dto res = {0};
 
@@ -286,12 +292,27 @@ CHARRA_RC unmarshal_attestation_response(uint32_t marshaled_data_len,
 	res.tpm2_signature_len = item.val.string.len;
 	memcpy(&(res.tpm2_signature), item.val.string.ptr, res.tpm2_signature_len);
 
-	/* parse "tpm2_public_key (bytes)" */
+	/* parse "tpm2_public_key" (bytes) */
 	if ((cborerr = charra_cbor_get_next(&dc, &item, QCBOR_TYPE_BYTE_STRING)))
 		goto cbor_parse_error;
 	res.tpm2_public_key_len = item.val.string.len;
 	memcpy(
 		&(res.tpm2_public_key), item.val.string.ptr, res.tpm2_public_key_len);
+
+	/* parse "event-log" (bytes) */
+	if ((cborerr = charra_cbor_get_next(&dc, &item, QCBOR_TYPE_BYTE_STRING)))
+		goto cbor_parse_error;
+	res.event_log_len = item.val.string.len;
+	uint8_t* event_log = (uint8_t*)malloc(res.event_log_len);
+	if (event_log == NULL) {
+		goto cbor_parse_error;
+	} else {
+		res.event_log = event_log;
+		if (memcpy(res.event_log, item.val.string.ptr, res.event_log_len) ==
+			NULL) {
+			goto cbor_parse_error;
+		}
+	}
 
 	if ((cborerr = QCBORDecode_Finish(&dc))) {
 		charra_log_error("CBOR parser: expected end of input, but could not "
@@ -307,5 +328,11 @@ CHARRA_RC unmarshal_attestation_response(uint32_t marshaled_data_len,
 cbor_parse_error:
 	charra_log_error("CBOR parser: %s", qcbor_err_to_str(cborerr));
 	charra_log_info("CBOR parser: skipping parsing.");
+
+	/* free */
+	if (event_log != NULL) {
+		free(event_log);
+	}
+
 	return CHARRA_RC_MARSHALING_ERROR;
 }
