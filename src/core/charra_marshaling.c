@@ -50,7 +50,8 @@ CHARRA_RC marshal_attestation_request(
 	assert(attestation_request->nonce_len <= sizeof(TPMU_HA));
 	assert(attestation_request->nonce != NULL);
 
-	UsefulBuf_MAKE_STACK_UB(buf, CBOR_ENCODER_BUFFER_LENGTH);
+	UsefulBuf buf = {.len = CBOR_ENCODER_BUFFER_LENGTH,
+		.ptr = malloc(CBOR_ENCODER_BUFFER_LENGTH)};
 	QCBOREncodeContext ec;
 
 	QCBOREncode_Init(&ec, buf);
@@ -218,7 +219,8 @@ CHARRA_RC marshal_attestation_response(
 	assert(attestation_response->tpm2_public_key != NULL);
 	assert(attestation_response->event_log != NULL);
 
-	UsefulBuf_MAKE_STACK_UB(buf, CBOR_ENCODER_BUFFER_LENGTH);
+	UsefulBuf buf = {.len = CBOR_ENCODER_BUFFER_LENGTH,
+		.ptr = malloc(CBOR_ENCODER_BUFFER_LENGTH)};
 	QCBOREncodeContext ec = {0};
 
 	QCBOREncode_Init(&ec, buf);
@@ -270,8 +272,8 @@ CHARRA_RC unmarshal_attestation_response(const uint32_t marshaled_data_len,
 
 	QCBORError cborerr = QCBOR_SUCCESS;
 	UsefulBufC marshaled_data_buf = {marshaled_data, marshaled_data_len};
-	QCBORDecodeContext dc;
-	QCBORItem item;
+	QCBORDecodeContext dc = {0};
+	QCBORItem item = {0};
 
 	QCBORDecode_Init(&dc, marshaled_data_buf, QCBOR_DECODE_MODE_NORMAL);
 

@@ -32,6 +32,7 @@
 
 #include <tss2/tss2_esys.h>
 #include <tss2/tss2_mu.h>
+#include <tss2/tss2_tctildr.h>
 #include <tss2/tss2_tpm2_types.h>
 
 #include "../common/charra_error.h"
@@ -51,7 +52,13 @@ CHARRA_RC charra_get_random_bytes_from_tpm(
 
 	TPM2B_DIGEST* tpm_random_bytes = NULL;
 
-	if ((tss2_rc = Esys_Initialize(&ctx, NULL, NULL)) != TSS2_RC_SUCCESS) {
+	TSS2_TCTI_CONTEXT* tcti_ctx = NULL;
+	if ((tss2_rc = Tss2_TctiLdr_Initialize(getenv("CHARRA_TCTI"), &tcti_ctx)) !=
+		TSS2_RC_SUCCESS) {
+		error_msg = "TPM2 Tss2_TctiLdr_Initialize failed.";
+		goto error;
+	}
+	if ((tss2_rc = Esys_Initialize(&ctx, tcti_ctx, NULL)) != TSS2_RC_SUCCESS) {
 		error_msg = "TPM2 Esys_Initialize failed.";
 		goto error;
 	}
@@ -78,6 +85,7 @@ error:
 
 	/* finalize ESAPI */
 	Esys_Finalize(&ctx);
+	Tss2_TctiLdr_Finalize(&tcti_ctx);
 
 	/* transform TSS2_RC to CHARRA_RC */
 	CHARRA_RC charra_rc =

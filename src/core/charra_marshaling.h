@@ -24,8 +24,8 @@
 #include <qcbor/qcbor.h>
 #include <tss2/tss2_esys.h>
 
-#include "../core/charra_dto.h"
 #include "../common/charra_error.h"
+#include "../core/charra_dto.h"
 
 /**
  * @brief Marshals an attestation request DTO.
@@ -50,7 +50,8 @@ CHARRA_RC marshal_attestation_request(
  * @return CHARRA_RC_ERROR on error.
  */
 CHARRA_RC unmarshal_attestation_request(const uint32_t marshaled_data_len,
-	const uint8_t* marshaled_data, msg_attestation_request_dto* attestation_request);
+	const uint8_t* marshaled_data,
+	msg_attestation_request_dto* attestation_request);
 
 /**
  * @brief Marshals an attestation response DTO.

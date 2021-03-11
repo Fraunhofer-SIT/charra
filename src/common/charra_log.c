@@ -28,12 +28,16 @@ static struct {
 	void* udata;
 	charra_log_LockFn lock;
 	FILE* fp;
-	int level;
+	charra_log_t level;
 	int quiet;
 } L;
 
-static const char* charra_level_names[] = {
-	"TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"};
+static const char* const charra_level_names[6] = {[CHARRA_LOG_TRACE] = "TRACE",
+	[CHARRA_LOG_DEBUG] = "DEBUG",
+	[CHARRA_LOG_INFO] = "INFO",
+	[CHARRA_LOG_WARN] = "WARN",
+	[CHARRA_LOG_ERROR] = "ERROR",
+	[CHARRA_LOG_FATAL] = "FATAL"};
 
 #ifndef CHARRA_LOG_DISABLE_COLOR
 static const char* charra_level_colors[] = {
@@ -58,12 +62,12 @@ void charra_log_set_lock(charra_log_LockFn fn) { L.lock = fn; }
 
 void charra_log_set_fp(FILE* fp) { L.fp = fp; }
 
-void charra_log_set_level(int level) { L.level = level; }
+void charra_log_set_level(charra_log_t level) { L.level = level; }
 
 void charra_log_set_quiet(int enable) { L.quiet = enable ? 1 : 0; }
 
 void charra_log_log(
-	int level, const char* file, int line, const char* fmt, ...) {
+	charra_log_t level, const char* file, int line, const char* fmt, ...) {
 	if (level < L.level) {
 		return;
 	}
@@ -112,23 +116,23 @@ void charra_log_log(
 	charra_log_unlock();
 }
 
-charra_log_t charra_log_level_from_str(
-	const char* log_level_str, const charra_log_t default_log_level) {
+int charra_log_level_from_str(
+	const char* log_level_str, charra_log_t* log_level) {
 	if (log_level_str != NULL) {
-		if (strncmp(log_level_str, "TRACE", 5) == 0) {
-			return CHARRA_LOG_TRACE;
-		} else if (strncmp(log_level_str, "DEBUG", 5) == 0) {
-			return CHARRA_LOG_DEBUG;
-		} else if (strncmp(log_level_str, "INFO", 4) == 0) {
-			return CHARRA_LOG_INFO;
-		} else if (strncmp(log_level_str, "WARN", 4) == 0) {
-			return CHARRA_LOG_WARN;
-		} else if (strncmp(log_level_str, "ERROR", 5) == 0) {
-			return CHARRA_LOG_ERROR;
-		} else if (strncmp(log_level_str, "FATAL", 5) == 0) {
-			return CHARRA_LOG_FATAL;
+		int array_size =
+			sizeof(charra_level_names) / sizeof(charra_level_names[0]);
+		for (int i = 0; i < array_size; i++) {
+			const char* name = charra_level_names[i];
+			if (name == NULL) {
+				continue;
+			}
+			if (strcmp(name, log_level_str) == 0) {
+				*log_level = i;
+				return 0;
+			}
 		}
+		return -1;
 	}
 
-	return default_log_level;
+	return -1;
 }

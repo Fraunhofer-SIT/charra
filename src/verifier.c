@@ -20,10 +20,12 @@
 
 #include <arpa/inet.h>
 #include <coap2/coap.h>
+#include <getopt.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <tss2/tss2_tctildr.h>
 #include <tss2/tss2_tpm2_types.h>
 #include <unistd.h>
 
@@ -33,6 +35,7 @@
 #include "core/charra_marshaling.h"
 #include "core/charra_rim_mgr.h"
 #include "util/charra_util.h"
+#include "util/cli_util.h"
 #include "util/coap_util.h"
 #include "util/crypto_util.h"
 #include "util/io_util.h"
@@ -47,12 +50,15 @@ static bool quit = false;
 
 /* logging */
 #define LOG_NAME "verifier"
+coap_log_t coap_log_level = LOG_INFO;
+// #define LOG_LEVEL_CBOR LOG_DEBUG
+charra_log_t charra_log_level = CHARRA_LOG_INFO;
 
 /* config */
-static const char DST_HOST[] = "127.0.0.1";
-static const unsigned int DST_PORT = 5683; // default port
-#define CBOR_ENCODER_BUFFER_LENGTH 20480   // 20 KiB should be sufficient
-#define COAP_IO_PROCESS_TIME_MS 2000 // CoAP IO process time in milliseconds
+char dst_host[16] = "127.0.0.1";		 // 15 characters for IPv4 plus \0
+unsigned int dst_port = 5683;			 // default port
+#define CBOR_ENCODER_BUFFER_LENGTH 20480 // 20 KiB should be sufficient
+#define COAP_IO_PROCESS_TIME_MS 2000	 // CoAP IO process time in milliseconds
 #define PERIODIC_ATTESTATION_WAIT_TIME_S                                       \
 	2 // Wait time between attestations in seconds
 
@@ -61,6 +67,8 @@ static const unsigned int DST_PORT = 5683; // default port
 static const uint8_t TPM_PCR_SELECTION[TPM2_MAX_PCRS] = {
 	0, 1, 2, 3, 4, 5, 6, 7, 10};
 static const uint32_t TPM_PCR_SELECTION_LEN = 9;
+coap_fixed_point_t coap_timeout = {
+	30, 0}; // timeout when waiting for attestation answer in seconds
 
 /* --- function forward declarations -------------------------------------- */
 
@@ -85,17 +93,50 @@ static msg_attestation_response_dto last_response = {0};
 
 /* --- main --------------------------------------------------------------- */
 
-int main(void) {
+int main(int argc, char** argv) {
 	int result = EXIT_FAILURE;
 
 	/* handle SIGINT */
 	signal(SIGINT, handle_sigint);
 
+	/* check environment variables */
+	charra_log_level_from_str(
+		(const char*)getenv("LOG_LEVEL_CHARRA"), &charra_log_level);
+	charra_coap_log_level_from_str(
+		(const char*)getenv("LOG_LEVEL_COAP"), &coap_log_level);
+
+	/* initialize structures to pass to the CLI parser */
+	cli_config cli_config = {
+		.caller = VERIFIER,
+		.common_config =
+			{
+				.charra_log_level = &charra_log_level,
+				.coap_log_level = &coap_log_level,
+				.port = &dst_port,
+			},
+		.verifier_config =
+			{
+				.dst_host = dst_host,
+				.timeout = &(coap_timeout.integer_part),
+			},
+	};
+
+	/* parse CLI arguments */
+	if ((result = parse_command_line_arguments(argc, argv, &cli_config)) != 0) {
+		// 1 means help message was displayed (thus exit), -1 means error
+		return (result == 1) ? EXIT_SUCCESS : EXIT_FAILURE;
+	}
+
 	/* set CHARRA and libcoap log levels */
-	charra_log_set_level(charra_log_level_from_str(
-		(const char*)getenv("LOG_LEVEL_CHARRA"), CHARRA_LOG_INFO));
-	coap_set_log_level(charra_coap_log_level_from_str(
-		(const char*)getenv("LOG_LEVEL_COAP"), LOG_INFO));
+	charra_log_set_level(charra_log_level);
+	coap_set_log_level(coap_log_level);
+
+	charra_log_debug("[" LOG_NAME "] Verifier Configuration:");
+	charra_log_debug("[" LOG_NAME "]     Destination port: %d", dst_port);
+	charra_log_debug("[" LOG_NAME "]     Destination host: %s", dst_host);
+	charra_log_debug("[" LOG_NAME
+					 "]     Timeout when waiting for attestation response: %ds",
+		coap_timeout.integer_part);
 
 	/* create CoAP context */
 	coap_context_t* coap_context = NULL;
@@ -113,7 +154,7 @@ int main(void) {
 	coap_session_t* coap_session = NULL;
 	charra_log_info("[" LOG_NAME "] Creating CoAP client session.");
 	if ((coap_session = charra_coap_new_client_session(
-			 coap_context, DST_HOST, DST_PORT, COAP_PROTO_UDP)) == NULL) {
+			 coap_context, dst_host, dst_port, COAP_PROTO_UDP)) == NULL) {
 		charra_log_error("[" LOG_NAME "] Cannot create client session.");
 		goto finish;
 	}
@@ -177,6 +218,9 @@ int main(void) {
 		goto error;
 	}
 
+	/* set timeout length */
+	coap_session_set_ack_timeout(coap_session, coap_timeout);
+
 	/* send CoAP PDU */
 	charra_log_info("[" LOG_NAME "] Sending CoAP message.");
 	if ((tid = coap_send_large(coap_session, pdu)) == COAP_INVALID_TID) {
@@ -224,6 +268,10 @@ finish:
 	if (coap_context != NULL) {
 		coap_free_context(coap_context);
 		coap_context = NULL;
+	}
+	if (req_buf != NULL) {
+		free(req_buf);
+		req_buf = NULL;
 	}
 	coap_cleanup();
 
@@ -339,7 +387,14 @@ static coap_response_t coap_attest_handler(
 
 	/* initialize ESAPI */
 	ESYS_CONTEXT* esys_ctx = NULL;
-	if ((tss_r = Esys_Initialize(&esys_ctx, NULL, NULL)) != TSS2_RC_SUCCESS) {
+	TSS2_TCTI_CONTEXT* tcti_ctx = NULL;
+	if ((tss_r = Tss2_TctiLdr_Initialize(getenv("CHARRA_TCTI"), &tcti_ctx)) !=
+		TSS2_RC_SUCCESS) {
+		charra_log_error("[" LOG_NAME "] Tss2_TctiLdr_Initialize.");
+		goto error;
+	}
+	if ((tss_r = Esys_Initialize(&esys_ctx, tcti_ctx, NULL)) !=
+		TSS2_RC_SUCCESS) {
 		charra_log_error("[" LOG_NAME "] Esys_Initialize.");
 		goto error;
 	}
@@ -487,8 +542,7 @@ static coap_response_t coap_attest_handler(
 	{
 		charra_log_info("[" LOG_NAME "] Verifying event log ...");
 		charra_log_info("[" LOG_NAME "] !!! For now, just print it. !!!");
-		charra_print_str(
-			res.event_log_len, res.event_log, "", "\n");
+		charra_print_str(res.event_log_len, res.event_log, "", "\n");
 	}
 
 	/* --- output result --- */
@@ -526,8 +580,13 @@ error:
 		Esys_Free(validation);
 	}
 
-	/* finalize ESAPI */
-	Esys_Finalize(&esys_ctx);
+	/* finalize ESAPI & TCTI*/
+	if (esys_ctx != NULL) {
+		Esys_Finalize(&esys_ctx);
+	}
+	if (tcti_ctx != NULL) {
+		Tss2_TctiLdr_Finalize(&tcti_ctx);
+	}
 
 	return COAP_RESPONSE_OK;
 }

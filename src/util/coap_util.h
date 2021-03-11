@@ -135,17 +135,16 @@ void charra_coap_add_resource(struct coap_context_t* coap_context,
 	const coap_method_handler_t handler);
 
 /**
- * @brief Parses the libcoap log level from string and returns the
- * appropriate enum constant. A default log level must be provided in case
- * there is no match for the string respresentation.
+ * @brief Parses the libcoap log level from string and writes the result into
+ * variable log_level. In case of an parsing error nothing is written and the
+ * function returns -1.
  *
  * @param[in] log_level_str the libcoap log level string.
- * @param[in] default_log_level the default libcoap log level in case
- * there is no match for the string respresentation.
- * @return charra_log_t the libcoap log level.
+ * @param[out] log_level the variable into which the log level is written.
+ * @return 0 on success, -1 on error.
  */
-coap_log_t charra_coap_log_level_from_str(
-	const char* log_level_str, const coap_log_t default_log_level);
+int charra_coap_log_level_from_str(
+	const char* log_level_str, coap_log_t* log_level);
 
 /**
  * @brief Returns the string representation of a CoAP request method.
