@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <getopt.h>
+#include <tss2/tss2_tctildr.h>
 #include <tss2/tss2_tpm2_types.h>
 #include <unistd.h>
 
@@ -378,7 +379,12 @@ static coap_response_t coap_attest_handler(
 
 	/* initialize ESAPI */
 	ESYS_CONTEXT* esys_ctx = NULL;
-	if ((tss_r = Esys_Initialize(&esys_ctx, NULL, NULL)) != TSS2_RC_SUCCESS) {
+	TSS2_TCTI_CONTEXT* tcti_ctx = NULL;
+	if ((tss_r = Tss2_TctiLdr_Initialize(getenv("CHARRA_TCTI"), &tcti_ctx)) != TSS2_RC_SUCCESS) {
+		charra_log_error("[" LOG_NAME "] Tss2_TctiLdr_Initialize.");
+		goto error;
+	}
+	if ((tss_r = Esys_Initialize(&esys_ctx, tcti_ctx, NULL)) != TSS2_RC_SUCCESS) {
 		charra_log_error("[" LOG_NAME "] Esys_Initialize.");
 		goto error;
 	}
@@ -565,8 +571,13 @@ error:
 		Esys_Free(validation);
 	}
 
-	/* finalize ESAPI */
-	Esys_Finalize(&esys_ctx);
+	/* finalize ESAPI & TCTI*/
+	if (esys_ctx != NULL) {
+		Esys_Finalize(&esys_ctx);
+	}
+	if (tcti_ctx != NULL) {
+		Tss2_TctiLdr_Finalize(&tcti_ctx);
+	}
 
 	return COAP_RESPONSE_OK;
 }

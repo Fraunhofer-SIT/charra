@@ -29,8 +29,8 @@ LDPATH =     -L/usr/local/lib/ \
 LIBS =       coap-2 \
              qcbor m \
              crypto ssl \
-			 mbedcrypto \
-             util tss2-esys tss2-sys tss2-mu
+	 					 mbedcrypto \
+             util tss2-esys tss2-sys tss2-mu tss2-tctildr
 
 # TCTI module to use (default is 'mssim')
 TCTI_MODULE=tss2-tcti-mssim

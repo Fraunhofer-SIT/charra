@@ -26,6 +26,7 @@
 #include <string.h>
 #include <tss2/tss2_mu.h>
 #include <tss2/tss2_tpm2_types.h>
+#include <tss2/tss2_tctildr.h>
 #include <stdlib.h>
 
 #include "common/charra_log.h"
@@ -248,7 +249,12 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
 
 	/* initialize ESAPI */
 	ESYS_CONTEXT* esys_ctx = NULL;
-	if ((tss_r = Esys_Initialize(&esys_ctx, NULL, NULL)) != TSS2_RC_SUCCESS) {
+	TSS2_TCTI_CONTEXT* tcti_ctx = NULL;
+	if ((tss_r = Tss2_TctiLdr_Initialize(getenv("CHARRA_TCTI"), &tcti_ctx)) != TSS2_RC_SUCCESS) {
+		charra_log_error("[" LOG_NAME "] Tss2_TctiLdr_Initialize.");
+		goto error;
+	}
+	if ((tss_r = Esys_Initialize(&esys_ctx, tcti_ctx, NULL)) != TSS2_RC_SUCCESS) {
 		charra_log_error("[" LOG_NAME "] Esys_Initialize.");
 		goto error;
 	}
@@ -349,5 +355,8 @@ error:
 	/* finalize ESAPI */
 	if (esys_ctx != NULL) {
 		Esys_Finalize(&esys_ctx);
+	}
+	if (tcti_ctx != NULL) {
+		Tss2_TctiLdr_Finalize(&tcti_ctx);
 	}
 }
