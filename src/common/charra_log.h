@@ -67,23 +67,24 @@ typedef enum {
 void charra_log_set_udata(void* udata);
 void charra_log_set_lock(charra_log_LockFn fn);
 void charra_log_set_fp(FILE* fp);
-void charra_log_set_level(int level);
+void charra_log_set_level(charra_log_t level);
 void charra_log_set_quiet(int enable);
 
 void charra_log_log(
-	int level, const char* file, int line, const char* fmt, ...);
+	charra_log_t level, const char* file, int line, const char* fmt, ...);
+
+
 
 /**
- * @brief Parses the CHARRA log level from string and returns the appropriate
- * enum constant. A default log level must be provided in case there is no match
- * for the string respresentation.
+ * @brief Parses the CHARRA log level from string and writes the result into
+ * variable log_level. In case of an parsing error nothing is written and the
+ * function returns -1.
  *
  * @param[in] log_level_str the CHARRA log level string.
- * @param[in] default_log_level the default CHARRA log level in case
- * there is no match for the string respresentation.
- * @return charra_log_t the CHARRA log level.
+ * @param[out] log_level the variable into which the result is written.
+ * @return 0 on success, -1 on error.
  */
-charra_log_t charra_log_level_from_str(
-	const char* log_level_str, const charra_log_t default_log_level);
+int charra_log_level_from_str(
+	const char* log_level_str, charra_log_t* log_level);
 
 #endif /* CHARRA_LOG_H */
