@@ -164,8 +164,8 @@ error:
 finish:
 	/* free CoAP memory */
 	// FIXME Why do the following 2 statements produce a segfault?
-	// coap_free_endpoint(coap_endpoint);
-	// coap_free_context(coap_context);
+	coap_free_endpoint(coap_endpoint);
+	coap_free_context(coap_context);
 	coap_cleanup();
 
 	return result;
@@ -177,7 +177,7 @@ static void handle_sigint(int signum CHARRA_UNUSED) { quit = true; }
 
 static void release_data(
 	struct coap_session_t* session CHARRA_UNUSED, void* app_ptr) {
-	coap_delete_binary(app_ptr);
+	free(app_ptr);
 }
 
 static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
@@ -284,7 +284,7 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
 
 	/* prepare response */
 	charra_log_info("[" LOG_NAME "] Preparing response.");
-	FILE *fp;
+	FILE *fp = NULL;
 	long int ima_event_log_len = 0;
 	if (use_ima_event_log == true) {
 		fp = fopen(ima_event_log_path, "r");
@@ -312,6 +312,12 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
 		res.attestation_data_len);
 	memcpy(res.tpm2_signature, signature, res.tpm2_signature_len);
 	memcpy(res.tpm2_public_key, public_key, res.tpm2_public_key_len);
+  free(signature);
+  signature = NULL;
+  free(attest_buf);
+  attest_buf = NULL;
+  free(public_key);
+  public_key = NULL;
 	if (use_ima_event_log == true) {
 		int read_size = fread(res.event_log, 1, ima_event_log_len, fp);
 		if (read_size != ima_event_log_len) {
@@ -320,7 +326,7 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
 		}
 		fclose(fp);
 	}
-
+    
 
 	/* marshal response */
 	charra_log_info("[" LOG_NAME "] Marshaling response to CBOR.");
@@ -340,10 +346,21 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
 			"[" LOG_NAME "] Error invoking coap_add_data_large_response().");
 	}
 
-	/* free ima event log */
-	free(res.event_log);
-
 error:
+  /* Free heap objects */
+  if (signature != NULL) {
+      free(signature);
+  }
+  if (attest_buf != NULL) {
+      free(attest_buf);
+  }
+  if (public_key != NULL) {
+      free(public_key);
+  }
+  if (res.event_log != NULL) {
+     free(res.event_log);
+  }
+
 	/* flush handles */
 	if (sig_key_handle != ESYS_TR_NONE) {
 		if (Esys_FlushContext(esys_ctx, sig_key_handle) != TSS2_RC_SUCCESS) {

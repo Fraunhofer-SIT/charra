@@ -265,7 +265,11 @@ finish:
 		coap_free_context(coap_context);
 		coap_context = NULL;
 	}
-	coap_cleanup();
+	if (req_buf != NULL) {
+        free(req_buf);
+        req_buf = NULL;
+    }
+    coap_cleanup();
 
 	return result;
 }

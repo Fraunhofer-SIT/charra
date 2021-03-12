@@ -155,7 +155,9 @@ void charra_coap_add_resource(struct coap_context_t* coap_context,
 	charra_log_info("[" LOG_NAME "] Adding CoAP %s resource '%s'.",
 		charra_coap_method_to_str(method), resource_name);
 
-	coap_str_const_t* resource_uri = coap_make_str_const(resource_name);
+	coap_str_const_t* resource_uri = coap_new_str_const(
+            (uint8_t const *) resource_name,
+            strlen(resource_name));
 	coap_resource_t* resource =
 		coap_resource_init(resource_uri, COAP_RESOURCE_FLAGS_RELEASE_URI);
 	coap_register_handler(resource, method, handler);
