@@ -127,8 +127,8 @@ error:
 finish:
 	/* free CoAP memory */
 	// FIXME Why do the following 2 statements produce a segfault?
-	// coap_free_endpoint(coap_endpoint);
-	// coap_free_context(coap_context);
+	coap_free_endpoint(coap_endpoint);
+	coap_free_context(coap_context);
 	coap_cleanup();
 
 	return result;
@@ -140,7 +140,7 @@ static void handle_sigint(int signum CHARRA_UNUSED) { quit = true; }
 
 static void release_data(
 	struct coap_session_t* session CHARRA_UNUSED, void* app_ptr) {
-	coap_delete_binary(app_ptr);
+	free(app_ptr);
 }
 
 static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
@@ -262,6 +262,12 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
 		res.attestation_data_len);
 	memcpy(res.tpm2_signature, signature, res.tpm2_signature_len);
 	memcpy(res.tpm2_public_key, public_key, res.tpm2_public_key_len);
+    free(signature);
+    signature = NULL;
+    free(attest_buf);
+    attest_buf = NULL;
+    free(public_key);
+    public_key = NULL;
 
 	/* marshal response */
 	charra_log_info("[" LOG_NAME "] Marshaling response to CBOR.");
@@ -282,6 +288,17 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
 	}
 
 error:
+    /* Free heap objects */
+    if (signature != NULL) {
+        free(signature);
+    }
+    if (attest_buf != NULL) {
+        free(attest_buf);
+    }
+    if (public_key != NULL) {
+        free(public_key);
+    }
+
 	/* flush handles */
 	if (sig_key_handle != ESYS_TR_NONE) {
 		if (Esys_FlushContext(esys_ctx, sig_key_handle) != TSS2_RC_SUCCESS) {
