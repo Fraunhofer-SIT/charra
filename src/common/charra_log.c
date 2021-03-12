@@ -32,15 +32,12 @@ static struct {
 	int quiet;
 } L;
 
-
-static const char* const charra_level_names[6] = {
-	[CHARRA_LOG_TRACE] = "TRACE",
+static const char* const charra_level_names[6] = {[CHARRA_LOG_TRACE] = "TRACE",
 	[CHARRA_LOG_DEBUG] = "DEBUG",
 	[CHARRA_LOG_INFO] = "INFO",
 	[CHARRA_LOG_WARN] = "WARN",
 	[CHARRA_LOG_ERROR] = "ERROR",
-	[CHARRA_LOG_FATAL] = "FATAL"
-};
+	[CHARRA_LOG_FATAL] = "FATAL"};
 
 #ifndef CHARRA_LOG_DISABLE_COLOR
 static const char* charra_level_colors[] = {
@@ -122,7 +119,8 @@ void charra_log_log(
 int charra_log_level_from_str(
 	const char* log_level_str, charra_log_t* log_level) {
 	if (log_level_str != NULL) {
-		int array_size = sizeof(charra_level_names) / sizeof(charra_level_names[0]);
+		int array_size =
+			sizeof(charra_level_names) / sizeof(charra_level_names[0]);
 		for (int i = 0; i < array_size; i++) {
 			const char* name = charra_level_names[i];
 			if (name == NULL) {

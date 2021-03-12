@@ -23,11 +23,11 @@
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <tss2/tss2_mu.h>
-#include <tss2/tss2_tpm2_types.h>
 #include <tss2/tss2_tctildr.h>
-#include <stdlib.h>
+#include <tss2/tss2_tpm2_types.h>
 
 #include "common/charra_log.h"
 #include "core/charra_dto.h"
@@ -35,10 +35,10 @@
 #include "core/charra_key_mgr.h"
 #include "core/charra_marshaling.h"
 #include "util/cbor_util.h"
+#include "util/cli_util.h"
 #include "util/coap_util.h"
 #include "util/io_util.h"
 #include "util/tpm2_util.h"
-#include "util/cli_util.h"
 
 #define CHARRA_UNUSED __attribute__((unused))
 
@@ -55,10 +55,11 @@ charra_log_t charra_log_level = CHARRA_LOG_INFO;
 
 /* config */
 static const char LISTEN_ADDRESS[] = "0.0.0.0";
-static unsigned int port = COAP_DEFAULT_PORT;	   // default port 5683
-#define CBOR_ENCODER_BUFFER_LENGTH 20480   // 20 KiB should be sufficient
+static unsigned int port = COAP_DEFAULT_PORT; // default port 5683
+#define CBOR_ENCODER_BUFFER_LENGTH 20480	  // 20 KiB should be sufficient
 bool use_ima_event_log = false;
-char* ima_event_log_path = "/sys/kernel/security/ima/binary_runtime_measurements";
+char* ima_event_log_path =
+	"/sys/kernel/security/ima/binary_runtime_measurements";
 // TODO allocate memory for CBOR buffer using malloc() since logs can be huge
 
 /**
@@ -93,15 +94,17 @@ int main(int argc, char** argv) {
 	/* initialize structures to pass to the CLI parser */
 	cli_config cli_config = {
 		.caller = ATTESTER,
-		.common_config = {
-			.charra_log_level = &charra_log_level,
-			.coap_log_level = &coap_log_level,
-			.port = &port,
-		},
-		.attester_config = {
-			.use_ima_event_log = &use_ima_event_log,
-			.ima_event_log_path = &ima_event_log_path,
-		},
+		.common_config =
+			{
+				.charra_log_level = &charra_log_level,
+				.coap_log_level = &coap_log_level,
+				.port = &port,
+			},
+		.attester_config =
+			{
+				.use_ima_event_log = &use_ima_event_log,
+				.ima_event_log_path = &ima_event_log_path,
+			},
 	};
 
 	/* parse CLI arguments */
@@ -116,9 +119,11 @@ int main(int argc, char** argv) {
 
 	charra_log_debug("[" LOG_NAME "] Attester Configuration:");
 	charra_log_debug("[" LOG_NAME "]     Used local port: %d", port);
-	charra_log_debug("[" LOG_NAME "]     IMA event log attestation enabled: %s", (use_ima_event_log == true) ? "true" : "false");
+	charra_log_debug("[" LOG_NAME "]     IMA event log attestation enabled: %s",
+		(use_ima_event_log == true) ? "true" : "false");
 	if (use_ima_event_log) {
-		charra_log_debug("[" LOG_NAME "]     IMA event log path %s", ima_event_log_path);
+		charra_log_debug(
+			"[" LOG_NAME "]     IMA event log path %s", ima_event_log_path);
 	}
 
 	/* create CoAP context */
@@ -250,11 +255,13 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
 	/* initialize ESAPI */
 	ESYS_CONTEXT* esys_ctx = NULL;
 	TSS2_TCTI_CONTEXT* tcti_ctx = NULL;
-	if ((tss_r = Tss2_TctiLdr_Initialize(getenv("CHARRA_TCTI"), &tcti_ctx)) != TSS2_RC_SUCCESS) {
+	if ((tss_r = Tss2_TctiLdr_Initialize(getenv("CHARRA_TCTI"), &tcti_ctx)) !=
+		TSS2_RC_SUCCESS) {
 		charra_log_error("[" LOG_NAME "] Tss2_TctiLdr_Initialize.");
 		goto error;
 	}
-	if ((tss_r = Esys_Initialize(&esys_ctx, tcti_ctx, NULL)) != TSS2_RC_SUCCESS) {
+	if ((tss_r = Esys_Initialize(&esys_ctx, tcti_ctx, NULL)) !=
+		TSS2_RC_SUCCESS) {
 		charra_log_error("[" LOG_NAME "] Esys_Initialize.");
 		goto error;
 	}
@@ -284,7 +291,7 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
 
 	/* prepare response */
 	charra_log_info("[" LOG_NAME "] Preparing response.");
-	FILE *fp = NULL;
+	FILE* fp = NULL;
 	long int ima_event_log_len = 0;
 	if (use_ima_event_log == true) {
 		fp = fopen(ima_event_log_path, "r");
@@ -295,7 +302,10 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
 		fseek(fp, 0L, SEEK_END);
 		ima_event_log_len = ftell(fp);
 		fseek(fp, 0L, SEEK_SET);
-		charra_log_info("[" LOG_NAME "] Including IMA event log of size %d bytes in the response.", ima_event_log_len);
+		charra_log_info(
+			"[" LOG_NAME
+			"] Including IMA event log of size %d bytes in the response.",
+			ima_event_log_len);
 	}
 
 	msg_attestation_response_dto res = {
@@ -312,21 +322,22 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
 		res.attestation_data_len);
 	memcpy(res.tpm2_signature, signature, res.tpm2_signature_len);
 	memcpy(res.tpm2_public_key, public_key, res.tpm2_public_key_len);
-  free(signature);
-  signature = NULL;
-  free(attest_buf);
-  attest_buf = NULL;
-  free(public_key);
-  public_key = NULL;
+	free(signature);
+	signature = NULL;
+	free(attest_buf);
+	attest_buf = NULL;
+	free(public_key);
+	public_key = NULL;
 	if (use_ima_event_log == true) {
 		int read_size = fread(res.event_log, 1, ima_event_log_len, fp);
 		if (read_size != ima_event_log_len) {
-			charra_log_error("[" LOG_NAME "] Expected to read IMA list with size %d, acutally read %d bytes.", ima_event_log_len);
+			charra_log_error("[" LOG_NAME "] Expected to read IMA list with "
+										  "size %d, acutally read %d bytes.",
+				ima_event_log_len);
 			goto error;
 		}
 		fclose(fp);
 	}
-    
 
 	/* marshal response */
 	charra_log_info("[" LOG_NAME "] Marshaling response to CBOR.");
@@ -347,19 +358,19 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
 	}
 
 error:
-  /* Free heap objects */
-  if (signature != NULL) {
-      free(signature);
-  }
-  if (attest_buf != NULL) {
-      free(attest_buf);
-  }
-  if (public_key != NULL) {
-      free(public_key);
-  }
-  if (res.event_log != NULL) {
-     free(res.event_log);
-  }
+	/* Free heap objects */
+	if (signature != NULL) {
+		free(signature);
+	}
+	if (attest_buf != NULL) {
+		free(attest_buf);
+	}
+	if (public_key != NULL) {
+		free(public_key);
+	}
+	if (res.event_log != NULL) {
+		free(res.event_log);
+	}
 
 	/* flush handles */
 	if (sig_key_handle != ESYS_TR_NONE) {

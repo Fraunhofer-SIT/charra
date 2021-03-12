@@ -23,8 +23,8 @@
 #include <stdbool.h>
 
 typedef enum {
- VERIFIER,
- ATTESTER,
+	VERIFIER,
+	ATTESTER,
 } cli_parser_caller;
 
 /**
@@ -32,9 +32,9 @@ typedef enum {
  * which might geht modified by the CLI parser
  */
 typedef struct {
-  charra_log_t* charra_log_level;
-  coap_log_t* coap_log_level;
-  unsigned int* port;
+	charra_log_t* charra_log_level;
+	coap_log_t* coap_log_level;
+	unsigned int* port;
 } cli_config_common;
 
 /**
@@ -42,8 +42,8 @@ typedef struct {
  * which might geht modified by the CLI parser
  */
 typedef struct {
- bool* use_ima_event_log;
- char** ima_event_log_path;
+	bool* use_ima_event_log;
+	char** ima_event_log_path;
 } cli_config_attester;
 
 /**
@@ -51,27 +51,29 @@ typedef struct {
  * which might geht modified by the CLI parser
  */
 typedef struct {
- char* dst_host;
- uint16_t* timeout;
+	char* dst_host;
+	uint16_t* timeout;
 } cli_config_verifier;
 
- /**
-  * A structure holding the pointers to all config parameters which might get modified by the CLI parser
-  */
- typedef struct {
-   cli_parser_caller caller;
-   cli_config_common common_config;
-   cli_config_attester attester_config;
-   cli_config_verifier verifier_config;
- } cli_config;
-
- /**
- *  @brief parses command line interface arguments
- *
- * @param argc The number of arguments which were given to the CLI.
- * @param argv The arguments which were given to the CLI.
- * @param variables A struct holding a caller identifier and pointers to config
-                    variables which might get modified depending on the CLI arguments.
- * @return 0 on success, -1 on parse error, 1 when help message was displayed
+/**
+ * A structure holding the pointers to all config parameters which might get
+ * modified by the CLI parser
  */
- int parse_command_line_arguments (int argc, char** argv, cli_config* variables);
+typedef struct {
+	cli_parser_caller caller;
+	cli_config_common common_config;
+	cli_config_attester attester_config;
+	cli_config_verifier verifier_config;
+} cli_config;
+
+/**
+*  @brief parses command line interface arguments
+*
+* @param argc The number of arguments which were given to the CLI.
+* @param argv The arguments which were given to the CLI.
+* @param variables A struct holding a caller identifier and pointers to config
+				   variables which might get modified depending on the CLI
+arguments.
+* @return 0 on success, -1 on parse error, 1 when help message was displayed
+*/
+int parse_command_line_arguments(int argc, char** argv, cli_config* variables);

@@ -41,7 +41,8 @@ CHARRA_RC charra_tpm2_pcr_selection_to_bitmap(const uint32_t pcr_selection_len,
 	const uint8_t pcr_selection[], TPMS_PCR_SELECTION* pcr_selection_bitmap);
 
 CHARRA_RC charra_pcr_selections_to_tpm_pcr_selections(
-	const uint32_t pcr_selection_list_len, pcr_selection_dto* pcr_selection_list,
+	const uint32_t pcr_selection_list_len,
+	pcr_selection_dto* pcr_selection_list,
 	TPML_PCR_SELECTION* tpm_pcr_selections);
 
 #endif /* CHARRA_HELPER_H */

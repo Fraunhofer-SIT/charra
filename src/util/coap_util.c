@@ -29,8 +29,7 @@
 
 #define LOG_NAME "coap-util"
 
-static const char* const coap_level_names[10] = {
-	[LOG_EMERG] = "EMERG",
+static const char* const coap_level_names[10] = {[LOG_EMERG] = "EMERG",
 	[LOG_ALERT] = "ALERT",
 	[LOG_CRIT] = "CRIT",
 	[LOG_ERR] = "ERR",
@@ -38,8 +37,7 @@ static const char* const coap_level_names[10] = {
 	[LOG_NOTICE] = "NOTICE",
 	[LOG_INFO] = "INFO",
 	[LOG_DEBUG] = "DEBUG",
-	[COAP_LOG_CIPHERS] = "CIPHERS"
-};
+	[COAP_LOG_CIPHERS] = "CIPHERS"};
 
 /* --- function definitions ----------------------------------------------- */
 
@@ -156,8 +154,7 @@ void charra_coap_add_resource(struct coap_context_t* coap_context,
 		charra_coap_method_to_str(method), resource_name);
 
 	coap_str_const_t* resource_uri = coap_new_str_const(
-            (uint8_t const *) resource_name,
-            strlen(resource_name));
+		(uint8_t const*)resource_name, strlen(resource_name));
 	coap_resource_t* resource =
 		coap_resource_init(resource_uri, COAP_RESOURCE_FLAGS_RELEASE_URI);
 	coap_register_handler(resource, method, handler);
