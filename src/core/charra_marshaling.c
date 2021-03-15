@@ -49,7 +49,7 @@ CHARRA_RC marshal_attestation_request(
 	assert(attestation_request->pcr_selections->pcrs != NULL);
 	assert(attestation_request->nonce_len <= sizeof(TPMU_HA));
 	assert(attestation_request->nonce != NULL);
-
+  
 	UsefulBuf buf = {.len = CBOR_ENCODER_BUFFER_LENGTH,
 		.ptr = malloc(CBOR_ENCODER_BUFFER_LENGTH)};
 	QCBOREncodeContext ec;
