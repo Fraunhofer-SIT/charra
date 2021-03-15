@@ -50,8 +50,8 @@ CHARRA_RC marshal_attestation_request(
 	assert(attestation_request->nonce_len <= sizeof(TPMU_HA));
 	assert(attestation_request->nonce != NULL);
 
-    UsefulBuf buf = {.len = CBOR_ENCODER_BUFFER_LENGTH,
-        .ptr = malloc(CBOR_ENCODER_BUFFER_LENGTH)};
+	UsefulBuf buf = {.len = CBOR_ENCODER_BUFFER_LENGTH,
+		.ptr = malloc(CBOR_ENCODER_BUFFER_LENGTH)};
 	QCBOREncodeContext ec;
 
 	QCBOREncode_Init(&ec, buf);
@@ -219,9 +219,9 @@ CHARRA_RC marshal_attestation_response(
 	assert(attestation_response->tpm2_public_key != NULL);
 	assert(attestation_response->event_log != NULL);
 
-    UsefulBuf buf = {.len = CBOR_ENCODER_BUFFER_LENGTH,
-        .ptr = malloc(CBOR_ENCODER_BUFFER_LENGTH)};
-    QCBOREncodeContext ec = {0};
+	UsefulBuf buf = {.len = CBOR_ENCODER_BUFFER_LENGTH,
+		.ptr = malloc(CBOR_ENCODER_BUFFER_LENGTH)};
+	QCBOREncodeContext ec = {0};
 
 	QCBOREncode_Init(&ec, buf);
 

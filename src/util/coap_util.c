@@ -29,6 +29,16 @@
 
 #define LOG_NAME "coap-util"
 
+static const char* const coap_level_names[10] = {[LOG_EMERG] = "EMERG",
+	[LOG_ALERT] = "ALERT",
+	[LOG_CRIT] = "CRIT",
+	[LOG_ERR] = "ERR",
+	[LOG_WARNING] = "WARNING",
+	[LOG_NOTICE] = "NOTICE",
+	[LOG_INFO] = "INFO",
+	[LOG_DEBUG] = "DEBUG",
+	[COAP_LOG_CIPHERS] = "CIPHERS"};
+
 /* --- function definitions ----------------------------------------------- */
 
 coap_context_t* charra_coap_new_context(const bool enable_coap_block_mode) {
@@ -144,39 +154,31 @@ void charra_coap_add_resource(struct coap_context_t* coap_context,
 		charra_coap_method_to_str(method), resource_name);
 
 	coap_str_const_t* resource_uri = coap_new_str_const(
-            (uint8_t const *) resource_name,
-            strlen(resource_name));
+		(uint8_t const*)resource_name, strlen(resource_name));
 	coap_resource_t* resource =
 		coap_resource_init(resource_uri, COAP_RESOURCE_FLAGS_RELEASE_URI);
 	coap_register_handler(resource, method, handler);
 	coap_add_resource(coap_context, resource);
 }
 
-coap_log_t charra_coap_log_level_from_str(
-	const char* log_level_str, coap_log_t default_log_level) {
+int charra_coap_log_level_from_str(
+	const char* log_level_str, coap_log_t* log_level) {
 	if (log_level_str != NULL) {
-		if (strncmp(log_level_str, "EMERG", 5) == 0) {
-			return LOG_EMERG;
-		} else if (strncmp(log_level_str, "ALERT", 5) == 0) {
-			return LOG_ALERT;
-		} else if (strncmp(log_level_str, "CRIT", 4) == 0) {
-			return LOG_CRIT;
-		} else if (strncmp(log_level_str, "ERR", 3) == 0) {
-			return LOG_ERR;
-		} else if (strncmp(log_level_str, "WARNING", 7) == 0) {
-			return LOG_WARNING;
-		} else if (strncmp(log_level_str, "NOTICE", 6) == 0) {
-			return LOG_NOTICE;
-		} else if (strncmp(log_level_str, "INFO", 4) == 0) {
-			return LOG_INFO;
-		} else if (strncmp(log_level_str, "DEBUG", 5) == 0) {
-			return LOG_DEBUG;
-		} else if (strncmp(log_level_str, "CIPHERS", 7) == 0) {
-			return COAP_LOG_CIPHERS;
+		int array_size = sizeof(coap_level_names) / sizeof(coap_level_names[0]);
+		for (int i = 0; i < array_size; i++) {
+			const char* name = coap_level_names[i];
+			if (name == NULL) {
+				continue;
+			}
+			if (strcmp(name, log_level_str) == 0) {
+				*log_level = i;
+				return 0;
+			}
 		}
+		return -1;
 	}
 
-	return default_log_level;
+	return -1;
 }
 
 const char* charra_coap_method_to_str(const coap_request_t method) {
