@@ -332,7 +332,7 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
 		int read_size = fread(res.event_log, 1, ima_event_log_len, fp);
 		if (read_size != ima_event_log_len) {
 			charra_log_error("[" LOG_NAME "] Expected to read IMA list with "
-										  "size %d, acutally read %d bytes.",
+							 "size %d, acutally read %d bytes.",
 				ima_event_log_len);
 			goto error;
 		}
