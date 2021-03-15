@@ -47,6 +47,7 @@
 
 /* quit signal */
 static bool quit = false;
+static bool attestation_finished = false;
 
 /* logging */
 #define LOG_NAME "verifier"
@@ -67,8 +68,8 @@ unsigned int dst_port = 5683;			 // default port
 static const uint8_t TPM_PCR_SELECTION[TPM2_MAX_PCRS] = {
 	0, 1, 2, 3, 4, 5, 6, 7, 10};
 static const uint32_t TPM_PCR_SELECTION_LEN = 9;
-coap_fixed_point_t coap_timeout = {
-	30, 0}; // timeout when waiting for attestation answer in seconds
+uint16_t attestation_response_timeout =
+	30; // timeout when waiting for attestation answer in seconds
 
 /* --- function forward declarations -------------------------------------- */
 
@@ -117,7 +118,7 @@ int main(int argc, char** argv) {
 		.verifier_config =
 			{
 				.dst_host = dst_host,
-				.timeout = &(coap_timeout.integer_part),
+				.timeout = &attestation_response_timeout,
 			},
 	};
 
@@ -136,7 +137,7 @@ int main(int argc, char** argv) {
 	charra_log_debug("[" LOG_NAME "]     Destination host: %s", dst_host);
 	charra_log_debug("[" LOG_NAME
 					 "]     Timeout when waiting for attestation response: %ds",
-		coap_timeout.integer_part);
+		attestation_response_timeout);
 
 	/* create CoAP context */
 	coap_context_t* coap_context = NULL;
@@ -219,6 +220,7 @@ int main(int argc, char** argv) {
 	}
 
 	/* set timeout length */
+	coap_fixed_point_t coap_timeout = {attestation_response_timeout, 0};
 	coap_session_set_ack_timeout(coap_session, coap_timeout);
 
 	/* send CoAP PDU */
@@ -230,12 +232,24 @@ int main(int argc, char** argv) {
 
 	/* processing and waiting for response */
 	charra_log_info("[" LOG_NAME "] Processing and waiting for response ...");
-	while (coap_io_process_time <= COAP_IO_PROCESS_TIME_MS) {
+	uint16_t response_wait_time = 0;
+	while (attestation_finished != true) {
 		/* process CoAP I/O */
 		if ((coap_io_process_time = coap_io_process(
 				 coap_context, COAP_IO_PROCESS_TIME_MS)) == -1) {
 			charra_log_error(
 				"[" LOG_NAME "] Error during CoAP I/O processing.");
+			goto error;
+		}
+		/* This wait time is not 100% accurate, it only includes the elapsed
+		 * time inside the coap_io_process function. But should be good enough.
+		 */
+		response_wait_time += coap_io_process_time;
+		if (response_wait_time >= (attestation_response_timeout * 1000)) {
+			charra_log_error("[" LOG_NAME
+							 "] Timeout after %d ms while waiting for or "
+							 "processing attestation response.",
+				response_wait_time);
 			goto error;
 		}
 	}
@@ -588,5 +602,6 @@ error:
 		Tss2_TctiLdr_Finalize(&tcti_ctx);
 	}
 
+	attestation_finished = true;
 	return COAP_RESPONSE_OK;
 }
