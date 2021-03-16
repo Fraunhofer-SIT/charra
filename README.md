@@ -6,6 +6,20 @@ This is a proof-of-concept implementation of the "Challenge/Response Remote Atte
 
 This proof-of-concept implementation realizes the Attesting Computing Environment—a Computing Environment capable of monitoring and attesting a target Computing Environment—as well as the target Computing Environment itself, as described in the [RATS Architecture](https://datatracker.ietf.org/doc/draft-ietf-rats-architecture/).
 
+
+## Changelog 2020-03-16
+
+* Updated `README.md` to include building *tpm2software/tpm2-tss* Docker image which CHARRA uses as a basis.
+  Reason: recently, the official *tpm2software/tpm2-tss* Docker images were removed from [Docker Hub](https://hub.docker.com/r/tpm2software/tpm2-tss).
+
+* Added Docker Compose file and description on how to use it to `README.md`.
+
+* Added `.editorconfig` file.
+
+* Using most recent stable versions of *tpm2-tss* and *tpm2-tools*.
+
+* Added compressed CHARRA SVG logo (`*.svgz`).
+
 ## Changelog 2020-03-10
 
 * Added support for CoAP large/block-wise data transfers, utilizing latest features of [libcoap](https://github.com/obgm/libcoap).
@@ -67,91 +81,124 @@ This proof-of-concept implementation realizes the Attesting Computing Environmen
 * Use non-zero reference PCRs.
 * "Extended" *TPM Quote* using TPM audit session(s) and *TPM PCR Read* operations.
 * Make CHARRA a library (`libcharra`) and make *attester* and *verifier* example code in `example` folder.
+* Dynamic allocation for QCBOR encoded data:
+  > You pass a UsefulBuf that has a NULL pointer and size set to SIZE_MAX to QCBOREncode_Init() and then do the encode just like when you do it for real.
+  > See documentation for QCBOREncode_Init(). — Laurence Lundblade (developer of QCBOR)
+* Add `*_free()` functions for all data transfer objects (DTOs).
 * Introduce semantic versioning as CHARRA develops along the way to become stable.
 
 *The order of the list is entirely arbitrary and does not reflect any priorities.*
 
-## How it works (Protocol Flow)
+## How it Works: Protocol Flow
 
 The following diagram shows the protocol flow of the CHARRA attestation process.
 
-    .----------.                                                .----------.
-    | Attester |                                                | Verifier |
-    '----------'                                                '----------'
-         |                                                            |
-         | <----------------- requestAttestation(nonce, keyID, pcrSelection)
-         |                                                            |
-    tpmQuote(nonce, pcrSelection)                                     |
-         | => evidence                                                |
-         |                                                            |
-         | evidence ------------------------------------------------> |
-         |                                                            |
-         |                  appraiseEvidence(evidence, nonce, referencePcrs)
-         |                                       attestationResult <= |
-         |                                                            |
+    .----------.                                    .----------.
+    | Attester |                                    | Verifier |
+    '----------'                                    '----------'
+         |                                                |
+         | <----- requestAttestation(nonce, keyID, pcrSelection)
+         |                                                |
+    tpmQuote(nonce, pcrSelection)                         |
+         | => evidence                                    |
+         |                                                |
+     evidence ------------------------------------------> |
+         |                                                |
+         |      appraiseEvidence(evidence, nonce, referencePcrs)
+         |                           attestationResult <= |
+         |                                                |
 
-## Building and Running
+## Build and Run
 
 CHARRA comes with a Docker test environment and Docker helper scripts to build and run it in Docker.
 It is also possible to build and run CHARRA manually.
+All commands assume to be executed in [Bash](https://www.gnu.org/software/bash/), the Bourne-again shell.
 
-### Building and Running in Docker
+### Using Docker
 
-1. Install Docker.
+Running CHARRA in Docker is the "quickstart" way of running it.
+This way, you do not need to install all the dependencies into your system in order to try CHARRA.
+All steps to get it up and running are described in the following.
 
-2. Build Docker image:
+#### Build the Docker Base Image
+
+The CHARRA `Dockerfile` uses on the official [*tpm2software/tpm2-tss* Docker images](https://github.com/tpm2-software/tpm2-software-container.git) as a basis.
+Recently, these official images were removed from [Docker Hub](https://hub.docker.com/r/tpm2software/tpm2-tss>).
+That is why the Docker base image for CHARRA must now be built manually.
+
+1. Install [Docker](https://docs.docker.com/engine/install/).
+
+2. Install dependencies (*make* and *m4*):
+
+       ## On Ubuntu
+       sudo apt install make m4
+
+       ## On Fedora
+       sudo dnf install make m4
+
+3. Clone the [TPM2 Software Container](https://github.com/tpm2-software/tpm2-software-container) repository:
+
+       git clone 'https://github.com/tpm2-software/tpm2-software-container.git' \
+           'tmp/tpm2-software-container'
+       pushd 'tmp/tpm2-software-container'
+
+4. Create `*.docker` files:
+
+       make
+
+5. Build Docker image:
+
+       docker build -t 'tpm2software/tpm2-tss:ubuntu-20.04' -f ubuntu-20.04.docker .
+       popd
+
+#### Build the CHARRA Docker Image using Docker Compose
+
+1. Install [Docker Compose](https://docs.docker.com/compose/install/).
+
+2. Build the CHARRA image(s):
+
+       docker-compose build --build-arg uid="$UID" --build-arg gid="$UID"
+
+3. Run the CHARRA container:
+
+       docker-compose run --rm charra-dev-env
+
+<!-- TODO: Uncomment this when verified that it works
+### Run CHARRA Apps in Docker Compose
+
+    docker-compose run --rm -T charra-attester &
+    docker-compose run --rm -T charra-verifier
+-->
+
+#### Build the CHARRA Docker Image using Docker
+
+1. Build CHARRA Docker image:
 
        ./docker/build.sh
 
-3. Run Docker image:
+2. Run CHARRA Docker container:
 
        ./docker/run.sh
 
-4. Compile CHARRA (inside container):
+#### Compile and Run CHARRA
+
+1. Compile CHARRA (inside container):
 
        cd charra/
        make -j
 
-5. Run CHARRA (inside container):
+2. Run CHARRA (inside container):
 
-       (bin/attester &); sleep .2 ; bin/verifier ; sleep 1 ; pkill attester
+       (bin/attester &); sleep .2 ; bin/verifier ; sleep 1 ; pkill -SIGINT attester
 
 If you see "ATTESTATION SUCCESSFUL" you're done. Congratz :-D
 
-### Building and Running in Docker on Raspberry Pi
-
-The CHARRA `Dockerfile` uses the official [`tpm2software/tpm2-tss` Docker image](https://hub.docker.com/r/tpm2software/tpm2-tss) as a basis.
-This image is (at the time of writing this) only available for the *amd64* architecture, not for ARM-based systems.
-
-That is why on the Raspberry Pi this Docker image must be created manually.
-This guide was tested on a Raspberry Pi 4 with 4 GiB RAM running [Raspberry Pi OS Lite](https://www.raspberrypi.org/software/operating-systems/) in version *buster*.
-
-*Side note: Even on such a powerful device like the Raspberry Pi 4 with 4 GiB of RAM the build process can take very long (1+ hours).*
-
-1. Install dependencies:
-
-       sudo apt install build-essential m4
-
-2. Clone the TPM2 Software Container repository:
-
-       git clone 'https://github.com/tpm2-software/tpm2-software-container.git'
-
-3. Build the `Dockerfile`:
-
-       make
-
-4. Build the Docker image:
-
-       docker build -t 'tpm2software/tpm2-tss:ubuntu-20.04' -f ubuntu-20.04.docker .
-
-5. Then continue with the steps described in the previous section.
-
-### Building and Running Manually
+### Compile and Run Manually
 
 The provided `Dockerfile` lets you quickly test CHARRA in a Docker environment.
 If you want to run CHARRA bare metal, please refer to this guide here.
 
-#### Build
+#### Compile
 
 The `Dockerfile` provides details on installing all dependencies and should be considered authoritative over this.
 
@@ -163,7 +210,9 @@ The `Dockerfile` provides details on installing all dependencies and should be c
            'https://github.com/obgm/libcoap.git' /tmp/libcoap
        cd /tmp/libcoap
        ./autogen.sh
-       ./configure --disable-tests --disable-documentation --disable-manpages --disable-dtls --disable-shared --enable-fast-install
+       ./configure --disable-tests --disable-documentation \
+           --disable-manpages --disable-dtls --disable-shared \
+           --enable-fast-install
        make -j
        make install
 
@@ -203,7 +252,7 @@ The `Dockerfile` provides details on installing all dependencies and should be c
 
 2. Download and install the [TPM2 Tools](https://github.com/tpm2-software/tpm2-tools).
 
-#### Running
+#### Run
 
 1. Start the TPM Simulator (and remove the state file `NVChip`):
 
@@ -246,7 +295,7 @@ If you see "ATTESTATION SUCCESSFUL" you're done. Congratz :-D
 
   This Make flag is part of the CHARRA `Makefile` and adds the `-fsanitize=address` argument to `CFLAGS` and `LDFLAGS`.
 
-## Running Attester and Verifier on different Devices
+## Run Attester and Verifier on different Devices
 
 The attester and verifier can be used on two different devices.
 To do that, you have to provide an external network for the attester Docker container.

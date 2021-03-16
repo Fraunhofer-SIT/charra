@@ -10,6 +10,15 @@
 FROM tpm2software/tpm2-tss:ubuntu-20.04 AS base
 LABEL maintainer="Michael Eckel <michael.eckel@sit.fraunhofer.de>"
 
+## glocal arguments with default values
+ARG user=bob
+ARG uid=1000
+ARG gid=1000
+
+RUN echo "BUILD ARG 'user': $user"
+RUN echo "BUILD ARG 'uid':  $uid"
+RUN echo "BUILD ARG 'gid':  $gid"
+
 ## copy configs
 COPY "./docker/dist/etc/default/keyboard" "/etc/default/keyboard"
 
@@ -21,7 +30,7 @@ RUN apt-get update \
 	&& rm -rf /var/lib/apt/lists/*
 
 ## TPM2 TSS
-RUN git clone --depth=1 -b '2.4.1' \
+RUN git clone --depth=1 -b '3.0.3' \
 	'https://github.com/tpm2-software/tpm2-tss.git' /tmp/tpm2-tss
 WORKDIR /tmp/tpm2-tss
 ENV LD_LIBRARY_PATH /usr/local/lib
@@ -41,7 +50,7 @@ RUN ln -sf 'libtss2-tcti-mssim.so' '/usr/local/lib/libtss2-tcti-default.so'
 RUN rm -rf /tmp/tpm2-tss
 
 ## TPM2 tools
-RUN git clone --depth=1 -b '4.2' \
+RUN git clone --depth=1 -b '5.0' \
 	'https://github.com/tpm2-software/tpm2-tools.git' /tmp/tpm2-tools
 WORKDIR /tmp/tpm2-tools
 RUN ./bootstrap \
@@ -101,11 +110,6 @@ RUN apt-get update \
 	gosu \
 	sudo \
 	&& rm -rf /var/lib/apt/lists/*
-
-## set default values
-ARG user=bob
-ARG uid=1000
-ARG gid=1000
 
 ## create non-root user and grant sudo permission
 RUN export user="$user" uid="$uid" gid="$gid" \
