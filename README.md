@@ -7,6 +7,14 @@ This is a proof-of-concept implementation of the "Challenge/Response Remote Atte
 This proof-of-concept implementation realizes the Attesting Computing Environment—a Computing Environment capable of monitoring and attesting a target Computing Environment—as well as the target Computing Environment itself, as described in the [RATS Architecture](https://datatracker.ietf.org/doc/draft-ietf-rats-architecture/).
 
 
+## Changelog 2020-03-16 (v2)
+
+* Added random nonce generation with mbed TLS in Verifier.
+  Made it configurable whether to use the TPM or mbed TLS to generate the nonce.
+
+* Added media type CBOR to attestation request in Verifier.
+  Credits go to @mrdeep1.
+
 ## Changelog 2020-03-16
 
 * Updated `README.md` to include building *tpm2software/tpm2-tss* Docker image which CHARRA uses as a basis.
@@ -18,7 +26,7 @@ This proof-of-concept implementation realizes the Attesting Computing Environmen
 
 * Using most recent stable versions of *tpm2-tss* and *tpm2-tools*.
 
-* Added compressed CHARRA SVG logo (`*.svgz`).
+* Added compressed CHARRA SVG logo (`*.svgz`). See [charra-logo.svgz](./charra-logo.svgz).
 
 ## Changelog 2020-03-10
 
@@ -70,11 +78,10 @@ This proof-of-concept implementation realizes the Attesting Computing Environmen
 
 * Updated `README.md`.
 
-* CHARRA now has a logo, see [charra-logo.svg](./charra-logo.svg),  [charra-logo.png](./charra-logo.png), and [charra-logo_small.png](./charra-logo_small.png).
+* CHARRA now has a logo, see [charra-logo.svg](./charra-logo.svg), [charra-logo.png](./charra-logo.png), and [charra-logo_small.png](./charra-logo_small.png).
 
 ## Next Steps
 
-* Add *docker-compose* file.
 * Allow verifier to perform periodic attestations, e.g. perform attestation every 10 seconds.
 * Update documentation. Perhaps externalize building and installation into `INSTALL.md`.
 * Refactor and implement forward-declared (but not yet implemented) functions.

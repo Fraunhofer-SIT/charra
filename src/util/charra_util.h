@@ -30,14 +30,24 @@
 #define CHARRA_UTIL_H
 
 /**
- * @brief Get random bytes.
+ * @brief Retrieve random bytes.
  *
  * @param[in] len the requested number of random bytes.
  * @param[out] random_bytes the random bytes.
  * @return CHARRA_RC_SUCCESS on success.
  * @return CHARRA_RC_ERROR on error.
  */
-CHARRA_RC charra_get_random_bytes_from_tpm(
+CHARRA_RC charra_random_bytes(const uint32_t len, uint8_t* random_bytes);
+
+/**
+ * @brief Retrieve random bytes from a TPM.
+ *
+ * @param[in] len the requested number of random bytes.
+ * @param[out] random_bytes the random bytes.
+ * @return CHARRA_RC_SUCCESS on success.
+ * @return CHARRA_RC_ERROR on error.
+ */
+CHARRA_RC charra_random_bytes_from_tpm(
 	const uint32_t len, uint8_t* random_bytes);
 
 /**
