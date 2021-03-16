@@ -26,6 +26,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <mbedtls/ctr_drbg.h>
+#include <mbedtls/entropy.h>
 #include <mbedtls/sha1.h>
 #include <mbedtls/sha256.h>
 #include <mbedtls/sha512.h>
@@ -42,7 +44,45 @@
 
 #define CHARRA_UNUSED __attribute__((unused))
 
-CHARRA_RC charra_get_random_bytes_from_tpm(
+static const unsigned char mbedtls_personalization[] =
+	"CHARRA_mbedtls_random_personalization";
+static const unsigned char mbedtls_personalization_len =
+	sizeof(mbedtls_personalization);
+
+CHARRA_RC charra_random_bytes(const uint32_t len, uint8_t* random_bytes) {
+	CHARRA_RC charra_r = CHARRA_RC_SUCCESS;
+	/* initialize contexts */
+	mbedtls_entropy_context entropy = {0};
+	mbedtls_entropy_init(&entropy);
+	mbedtls_ctr_drbg_context ctr_drbg = {0};
+	mbedtls_ctr_drbg_init(&ctr_drbg);
+
+	/* add seed */
+	if (mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy,
+			mbedtls_personalization, mbedtls_personalization_len) != 0) {
+		charra_r = CHARRA_RC_CRYPTO_ERROR;
+		goto error;
+	}
+
+	/* add prediction resistance */
+	mbedtls_ctr_drbg_set_prediction_resistance(
+		&ctr_drbg, MBEDTLS_CTR_DRBG_PR_ON);
+
+	if (mbedtls_ctr_drbg_random(
+			&ctr_drbg, (unsigned char*)random_bytes, (size_t)len) != 0) {
+		charra_r = CHARRA_RC_CRYPTO_ERROR;
+		goto error;
+	}
+
+error:
+	/* clean up */
+	mbedtls_ctr_drbg_free(&ctr_drbg);
+	mbedtls_entropy_free(&entropy);
+
+	return charra_r;
+}
+
+CHARRA_RC charra_random_bytes_from_tpm(
 	const uint32_t len, uint8_t* random_bytes) {
 	assert(len <= sizeof(TPMU_HA));
 

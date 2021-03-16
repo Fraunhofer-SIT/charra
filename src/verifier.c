@@ -62,6 +62,7 @@ unsigned int dst_port = 5683;			 // default port
 #define COAP_IO_PROCESS_TIME_MS 2000	 // CoAP IO process time in milliseconds
 #define PERIODIC_ATTESTATION_WAIT_TIME_S                                       \
 	2 // Wait time between attestations in seconds
+static const bool USE_TPM_FOR_RANDOM_NONCE_GENERATION = false;
 
 #define TPM_SIG_KEY_ID_LEN 14
 #define TPM_SIG_KEY_ID "PK.RSA.default"
@@ -170,6 +171,17 @@ int main(int argc, char** argv) {
 	coap_tid_t tid = COAP_INVALID_TID;
 	int coap_io_process_time = -1;
 
+	/* create CoAP option for content type */
+	uint8_t coap_mediatype_cbor_buf[4] = {0};
+	unsigned int coap_mediatype_cbor_buf_len = 0;
+	if ((coap_mediatype_cbor_buf_len = coap_encode_var_safe(
+			 coap_mediatype_cbor_buf, sizeof(coap_mediatype_cbor_buf),
+			 COAP_MEDIATYPE_APPLICATION_CBOR)) == 0) {
+		charra_log_error(
+			"[" LOG_NAME "] Cannot create option for CONTENT_TYPE.");
+		goto error;
+	}
+
 	/* enter  periodic attestation loop */
 	// TODO enable periodic attestations
 	// charra_log_info("[" LOG_NAME "] Entering periodic attestation loop.");
@@ -202,11 +214,18 @@ int main(int argc, char** argv) {
 	}
 
 	/* CoAP options */
-	charra_log_info("[" LOG_NAME "] Adding CoAP options.");
+	charra_log_info("[" LOG_NAME "] Adding CoAP option URI_PATH.");
 	if (coap_insert_optlist(
 			&coap_options, coap_new_optlist(COAP_OPTION_URI_PATH, 6,
 							   (const uint8_t*)"attest")) != 1) {
-		charra_log_error("[" LOG_NAME "] Cannot create CoAP options.");
+		charra_log_error("[" LOG_NAME "] Cannot add CoAP option URI_PATH.");
+		goto error;
+	}
+	charra_log_info("[" LOG_NAME "] Adding CoAP option CONTENT_TYPE.");
+	if (coap_insert_optlist(&coap_options,
+			coap_new_optlist(COAP_OPTION_CONTENT_TYPE,
+				coap_mediatype_cbor_buf_len, coap_mediatype_cbor_buf)) != 1) {
+		charra_log_error("[" LOG_NAME "] Cannot add CoAP option CONTENT_TYPE.");
 		goto error;
 	}
 
@@ -303,10 +322,18 @@ static CHARRA_RC create_attestation_request(
 	/* generate nonce */
 	uint32_t nonce_len = 20;
 	uint8_t nonce[nonce_len];
-	if ((err = charra_get_random_bytes_from_tpm(nonce_len, nonce) !=
-			   CHARRA_RC_SUCCESS)) {
-		charra_log_error("Could not get random bytes for nonce.");
-		return err;
+	if (USE_TPM_FOR_RANDOM_NONCE_GENERATION) {
+		if ((err = charra_random_bytes_from_tpm(nonce_len, nonce) !=
+				   CHARRA_RC_SUCCESS)) {
+			charra_log_error("Could not get random bytes from TPM for nonce.");
+			return err;
+		}
+	} else {
+		if ((err = charra_random_bytes(nonce_len, nonce) !=
+				   CHARRA_RC_SUCCESS)) {
+			charra_log_error("Could not get random bytes for nonce.");
+			return err;
+		}
 	}
 	charra_log_info("Generated nonce of length %d:", nonce_len);
 	charra_print_hex(
