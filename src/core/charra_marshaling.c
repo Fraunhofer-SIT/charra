@@ -217,7 +217,9 @@ CHARRA_RC marshal_attestation_response(
 	assert(attestation_response->attestation_data != NULL);
 	assert(attestation_response->tpm2_signature != NULL);
 	assert(attestation_response->tpm2_public_key != NULL);
-	assert(attestation_response->event_log != NULL);
+	if (attestation_response->event_log_len != 0) {
+		assert(attestation_response->event_log != NULL);
+	}
 
 	UsefulBuf buf = {.len = CBOR_ENCODER_BUFFER_LENGTH,
 		.ptr = malloc(CBOR_ENCODER_BUFFER_LENGTH)};

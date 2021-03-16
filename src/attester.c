@@ -30,6 +30,7 @@
 #include <tss2/tss2_tpm2_types.h>
 
 #include "common/charra_log.h"
+#include "core/charra_cvector.h"
 #include "core/charra_dto.h"
 #include "core/charra_helper.h"
 #include "core/charra_key_mgr.h"
@@ -289,24 +290,33 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
 
 	/* --- send response data --- */
 
+	/* read IMA event log if configured */
+	cvector_vector_type(uint8_t) ima_event_log = NULL;
+	if (use_ima_event_log == true) {
+		charra_log_info("[" LOG_NAME "] Reading IMA event log.");
+		// the size of the event log chunks which get read at once
+#define IMA_EVENT_LOG_STEP_SIZE 1024
+		// use logarithmic growth for the cvector. Otherwise it would grow on
+		// every cvector_push_back() call
+#define CVECTOR_LOGARITHMIC_GROWTH
+		FILE* fp = NULL;
+		fp = fopen(ima_event_log_path, "rb");
+		uint8_t processing_array[IMA_EVENT_LOG_STEP_SIZE] = {0};
+		int read_size = 0;
+		do {
+			read_size = fread(
+				processing_array, sizeof(char), IMA_EVENT_LOG_STEP_SIZE, fp);
+			for (int i = 0; i < read_size; i++) {
+				cvector_push_back(ima_event_log, processing_array[i]);
+			}
+		} while (read_size == IMA_EVENT_LOG_STEP_SIZE);
+		fclose(fp);
+		charra_log_info("[" LOG_NAME "] IMA event log has a size of %d bytes.",
+			cvector_size(ima_event_log));
+	}
+
 	/* prepare response */
 	charra_log_info("[" LOG_NAME "] Preparing response.");
-	FILE* fp = NULL;
-	long int ima_event_log_len = 0;
-	if (use_ima_event_log == true) {
-		fp = fopen(ima_event_log_path, "r");
-		if (fp == NULL) {
-			charra_log_error("[" LOG_NAME "] IMA list could not be opened.");
-			goto error;
-		}
-		fseek(fp, 0L, SEEK_END);
-		ima_event_log_len = ftell(fp);
-		fseek(fp, 0L, SEEK_SET);
-		charra_log_info(
-			"[" LOG_NAME
-			"] Including IMA event log of size %d bytes in the response.",
-			ima_event_log_len);
-	}
 
 	msg_attestation_response_dto res = {
 		.attestation_data_len = attest_buf->size,
@@ -315,8 +325,8 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
 		.tpm2_signature = {0}, // must be memcpy'd, see below
 		.tpm2_public_key_len = sizeof(*public_key),
 		.tpm2_public_key = {0}, // must be memcpy'd, see below
-		.event_log_len = ima_event_log_len,
-		.event_log = malloc(ima_event_log_len),
+		.event_log_len = cvector_size(ima_event_log),
+		.event_log = ima_event_log,
 	};
 	memcpy(res.attestation_data, attest_buf->attestationData,
 		res.attestation_data_len);
@@ -328,16 +338,6 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
 	attest_buf = NULL;
 	free(public_key);
 	public_key = NULL;
-	if (use_ima_event_log == true) {
-		int read_size = fread(res.event_log, 1, ima_event_log_len, fp);
-		if (read_size != ima_event_log_len) {
-			charra_log_error("[" LOG_NAME "] Expected to read IMA list with "
-							 "size %d, acutally read %d bytes.",
-				ima_event_log_len);
-			goto error;
-		}
-		fclose(fp);
-	}
 
 	/* marshal response */
 	charra_log_info("[" LOG_NAME "] Marshaling response to CBOR.");
@@ -369,7 +369,7 @@ error:
 		free(public_key);
 	}
 	if (res.event_log != NULL) {
-		free(res.event_log);
+		cvector_free(ima_event_log);
 	}
 
 	/* flush handles */

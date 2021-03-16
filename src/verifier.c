@@ -582,8 +582,19 @@ static coap_response_t coap_attest_handler(
 	bool attestation_event_log = true;
 	{
 		charra_log_info("[" LOG_NAME "] Verifying event log ...");
-		charra_log_info("[" LOG_NAME "] !!! For now, just print it. !!!");
-		charra_print_str(res.event_log_len, res.event_log, "", "\n");
+		charra_log_info("[" LOG_NAME "]     IMA Event Log size is %d bytes.",
+			res.event_log_len);
+		charra_log_info("[" LOG_NAME "]     !!! This is to be implemented");
+		if (charra_log_level <= CHARRA_LOG_DEBUG) {
+			if (res.event_log_len > 20) {
+				charra_log_debug("[" LOG_NAME "]     Printing 10 bytes of the start and end of the event log in hex:");
+				charra_print_hex(10, res.event_log, "", " ... ", false);
+				charra_print_hex(10, (res.event_log + res.event_log_len - 10), "", "\n", false);
+			} else {
+				charra_log_debug("[" LOG_NAME "]     Printing event log in hex:");
+				charra_print_hex(res.event_log_len, res.event_log, "", "\n", false);
+			}
+		}
 	}
 
 	/* --- output result --- */
