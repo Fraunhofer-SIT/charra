@@ -1,0 +1,23 @@
+# http://editorconfig.org
+root = true
+
+[*]
+indent_style = tab
+indent_size = 4
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# Use 4 spaces for the Python files
+[*.h,*.c]
+indent_style = tab
+indent_size = 4
+max_line_length = 80
+
+# Makefiles always use tabs for indentation
+[Makefile]
+indent_style = tab
+
+[*.md]
+trim_trailing_whitespace = true
