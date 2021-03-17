@@ -30,6 +30,7 @@
 #include <unistd.h>
 
 #include "common/charra_log.h"
+#include "common/charra_macro.h"
 #include "core/charra_dto.h"
 #include "core/charra_key_mgr.h"
 #include "core/charra_marshaling.h"
@@ -56,10 +57,9 @@ coap_log_t coap_log_level = LOG_INFO;
 charra_log_t charra_log_level = CHARRA_LOG_INFO;
 
 /* config */
-char dst_host[16] = "127.0.0.1";		 // 15 characters for IPv4 plus \0
-unsigned int dst_port = 5683;			 // default port
-#define CBOR_ENCODER_BUFFER_LENGTH 20480 // 20 KiB should be sufficient
-#define COAP_IO_PROCESS_TIME_MS 2000	 // CoAP IO process time in milliseconds
+char dst_host[16] = "127.0.0.1";	 // 15 characters for IPv4 plus \0
+unsigned int dst_port = 5683;		 // default port
+#define COAP_IO_PROCESS_TIME_MS 2000 // CoAP IO process time in milliseconds
 #define PERIODIC_ATTESTATION_WAIT_TIME_S                                       \
 	2 // Wait time between attestations in seconds
 static const bool USE_TPM_FOR_RANDOM_NONCE_GENERATION = false;
@@ -165,7 +165,7 @@ int main(int argc, char** argv) {
 	CHARRA_RC charra_r = CHARRA_RC_SUCCESS;
 	msg_attestation_request_dto req = {0};
 	uint32_t req_buf_len = 0;
-	uint8_t* req_buf = NULL;
+	uint8_t* req_buf = NULL; // TODO make dynamic
 	coap_optlist_t* coap_options = NULL;
 	coap_pdu_t* pdu = NULL;
 	coap_tid_t tid = COAP_INVALID_TID;
@@ -206,7 +206,7 @@ int main(int argc, char** argv) {
 	/* marshal attestation request */
 	charra_log_info(
 		"[" LOG_NAME "] Marshaling attestation request data to CBOR.");
-	if ((charra_r = marshal_attestation_request(
+	if ((charra_r = charra_marshal_attestation_request(
 			 &req, &req_buf_len, &req_buf)) != CHARRA_RC_SUCCESS) {
 		charra_log_error(
 			"[" LOG_NAME "] Marshaling attestation request data failed.");
@@ -290,22 +290,13 @@ error:
 
 finish:
 	/* free CoAP memory */
-	if (coap_options != NULL) {
-		coap_delete_optlist(coap_options);
-		coap_options = NULL;
-	}
-	if (coap_session != NULL) {
-		coap_session_release(coap_session);
-		coap_session = NULL;
-	}
-	if (coap_context != NULL) {
-		coap_free_context(coap_context);
-		coap_context = NULL;
-	}
-	if (req_buf != NULL) {
-		free(req_buf);
-		req_buf = NULL;
-	}
+	charra_free_if_not_null_ex(coap_options, coap_delete_optlist);
+	charra_free_if_not_null_ex(coap_session, coap_session_release);
+	charra_free_if_not_null_ex(coap_context, coap_free_context);
+
+	/* free variables */
+	charra_free_if_not_null(req_buf);
+
 	coap_cleanup();
 
 	return result;
@@ -401,8 +392,8 @@ static coap_response_t coap_attest_handler(
 	/* unmarshal data */
 	charra_log_info("[" LOG_NAME "] Parsing received CBOR data.");
 	msg_attestation_response_dto res = {0};
-	if ((charra_err = unmarshal_attestation_response(data_len, data, &res)) !=
-		CHARRA_RC_SUCCESS) {
+	if ((charra_err = charra_unmarshal_attestation_response(
+			 data_len, data, &res)) != CHARRA_RC_SUCCESS) {
 		charra_log_error("[" LOG_NAME "] Could not parse CBOR data.");
 		goto error;
 	}
@@ -582,17 +573,25 @@ static coap_response_t coap_attest_handler(
 	bool attestation_event_log = true;
 	{
 		charra_log_info("[" LOG_NAME "] Verifying event log ...");
+		charra_log_info(
+			"[" LOG_NAME "]     <<< This is to be implemented. >>>");
 		charra_log_info("[" LOG_NAME "]     IMA Event Log size is %d bytes.",
 			res.event_log_len);
-		charra_log_info("[" LOG_NAME "]     !!! This is to be implemented");
+		charra_log_debug("[" LOG_NAME "]     IMA Event Log:");
+
 		if (charra_log_level <= CHARRA_LOG_DEBUG) {
 			if (res.event_log_len > 20) {
-				charra_log_debug("[" LOG_NAME "]     Printing 10 bytes of the start and end of the event log in hex:");
-				charra_print_hex(10, res.event_log, "", " ... ", false);
-				charra_print_hex(10, (res.event_log + res.event_log_len - 10), "", "\n", false);
+				charra_print_hex(10, res.event_log,
+					"                                                  0x",
+					"...", false);
+				charra_print_hex(10, (res.event_log + res.event_log_len - 10),
+					"", "\n", false);
+			} else if ((res.event_log_len > 0)) {
+				charra_print_hex(res.event_log_len, res.event_log,
+					"                                                  0x",
+					"\n", false);
 			} else {
-				charra_log_debug("[" LOG_NAME "]     Printing event log in hex:");
-				charra_print_hex(res.event_log_len, res.event_log, "", "\n", false);
+				charra_log_debug("[" LOG_NAME "]     <none>");
 			}
 		}
 	}
@@ -623,16 +622,14 @@ error:
 
 	/* free event log */
 	// TODO: Provide function charra_free_msg_attestation_response_dto()
-	if (res.event_log != NULL) {
-		free(res.event_log);
-	}
+	charra_free_if_not_null(res.event_log);
 
 	/* free ESAPI objects */
 	if (validation != NULL) {
 		Esys_Free(validation);
 	}
 
-	/* finalize ESAPI & TCTI*/
+	/* finalize ESAPI & TCTI */
 	if (esys_ctx != NULL) {
 		Esys_Finalize(&esys_ctx);
 	}

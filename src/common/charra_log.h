@@ -27,13 +27,13 @@
 
 typedef void (*charra_log_LockFn)(void* udata, int lock);
 
-typedef enum {
-	CHARRA_LOG_TRACE,
-	CHARRA_LOG_DEBUG,
-	CHARRA_LOG_INFO,
-	CHARRA_LOG_WARN,
-	CHARRA_LOG_ERROR,
-	CHARRA_LOG_FATAL,
+typedef enum charra_log_t {
+	CHARRA_LOG_TRACE = 0,
+	CHARRA_LOG_DEBUG = 1,
+	CHARRA_LOG_INFO = 2,
+	CHARRA_LOG_WARN = 3,
+	CHARRA_LOG_ERROR = 4,
+	CHARRA_LOG_FATAL = 5,
 } charra_log_t;
 
 #if (!CHARRA_LOG_DISABLE)

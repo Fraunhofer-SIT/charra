@@ -6,8 +6,16 @@ This is a proof-of-concept implementation of the "Challenge/Response Remote Atte
 
 This proof-of-concept implementation realizes the Attesting Computing Environment—a Computing Environment capable of monitoring and attesting a target Computing Environment—as well as the target Computing Environment itself, as described in the [RATS Architecture](https://datatracker.ietf.org/doc/draft-ietf-rats-architecture/).
 
+## Changelog 2021-03-17
 
-## Changelog 2020-03-16 (v2)
+* Dynamic memory allocation for QCBOR encoded data using *malloc()*.
+  Thanks, @laurencelundblade.
+
+* Fixed some bugs.
+
+* Introduced macros for `free()`'ing heap data.
+
+## Changelog 2021-03-16 (v2)
 
 * Added random nonce generation with mbed TLS in Verifier.
   Made it configurable whether to use the TPM or mbed TLS to generate the nonce.
@@ -15,7 +23,7 @@ This proof-of-concept implementation realizes the Attesting Computing Environmen
 * Added media type CBOR to attestation request in Verifier.
   Credits go to @mrdeep1.
 
-## Changelog 2020-03-16
+## Changelog 2021-03-16 (v1)
 
 * Updated `README.md` to include building *tpm2software/tpm2-tss* Docker image which CHARRA uses as a basis.
   Reason: recently, the official *tpm2software/tpm2-tss* Docker images were removed from [Docker Hub](https://hub.docker.com/r/tpm2software/tpm2-tss).
@@ -28,7 +36,7 @@ This proof-of-concept implementation realizes the Attesting Computing Environmen
 
 * Added compressed CHARRA SVG logo (`*.svgz`). See [charra-logo.svgz](./charra-logo.svgz).
 
-## Changelog 2020-03-10
+## Changelog 2021-03-10
 
 * Added support for CoAP large/block-wise data transfers, utilizing latest features of [libcoap](https://github.com/obgm/libcoap).
   This enables CHARRA to send and receive data of arbitrary size.
@@ -88,9 +96,6 @@ This proof-of-concept implementation realizes the Attesting Computing Environmen
 * Use non-zero reference PCRs.
 * "Extended" *TPM Quote* using TPM audit session(s) and *TPM PCR Read* operations.
 * Make CHARRA a library (`libcharra`) and make *attester* and *verifier* example code in `example` folder.
-* Dynamic allocation for QCBOR encoded data:
-  > You pass a UsefulBuf that has a NULL pointer and size set to SIZE_MAX to QCBOREncode_Init() and then do the encode just like when you do it for real.
-  > See documentation for QCBOREncode_Init(). — Laurence Lundblade (developer of QCBOR)
 * Add `*_free()` functions for all data transfer objects (DTOs).
 * Introduce semantic versioning as CHARRA develops along the way to become stable.
 
