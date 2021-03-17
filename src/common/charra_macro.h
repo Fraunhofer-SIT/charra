@@ -23,24 +23,14 @@
 
 #include <stdlib.h>
 
-#define charra_free_and_null(var)                                              \
-	{                                                                          \
-		free(var);                                                             \
-		var = NULL;                                                            \
-	}
-
 #define charra_free_and_null_ex(var, func_name)                                \
 	{                                                                          \
 		func_name(var);                                                        \
 		var = NULL;                                                            \
 	}
 
-#define charra_free_if_not_null(var)                                           \
-	{                                                                          \
-		if (var != NULL) {                                                     \
-			charra_free_and_null(var);                                         \
-		}                                                                      \
-	}
+#define charra_free_and_null(var)                                              \
+	{ charra_free_and_null_ex(var, free); }
 
 #define charra_free_if_not_null_ex(var, func_name)                             \
 	{                                                                          \
@@ -48,5 +38,8 @@
 			charra_free_and_null_ex(var, func_name);                           \
 		}                                                                      \
 	}
+
+#define charra_free_if_not_null(var)                                           \
+	{ charra_free_if_not_null_ex(var, free); }
 
 #endif /* CHARRA_MACRO_H */
