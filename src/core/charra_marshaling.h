@@ -36,7 +36,7 @@
  * @return CHARRA_RC_SUCCESS on success.
  * @return CHARRA_RC_ERROR on error.
  */
-CHARRA_RC marshal_attestation_request(
+CHARRA_RC charra_marshal_attestation_request(
 	const msg_attestation_request_dto* attestation_request,
 	uint32_t* marshaled_data_len, uint8_t** marshaled_data);
 
@@ -49,8 +49,8 @@ CHARRA_RC marshal_attestation_request(
  * @return CHARRA_RC_SUCCESS on success.
  * @return CHARRA_RC_ERROR on error.
  */
-CHARRA_RC unmarshal_attestation_request(const uint32_t marshaled_data_len,
-	const uint8_t* marshaled_data,
+CHARRA_RC charra_unmarshal_attestation_request(
+	const uint32_t marshaled_data_len, const uint8_t* marshaled_data,
 	msg_attestation_request_dto* attestation_request);
 
 /**
@@ -62,7 +62,7 @@ CHARRA_RC unmarshal_attestation_request(const uint32_t marshaled_data_len,
  * @return CHARRA_RC_SUCCESS on success.
  * @return CHARRA_RC_ERROR on error.
  */
-CHARRA_RC marshal_attestation_response(
+CHARRA_RC charra_marshal_attestation_response(
 	const msg_attestation_response_dto* attestation_response,
 	uint32_t* marshaled_data_len, uint8_t** marshaled_data);
 
@@ -75,8 +75,8 @@ CHARRA_RC marshal_attestation_response(
  * @return CHARRA_RC_SUCCESS on success.
  * @return CHARRA_RC_ERROR on error.
  */
-CHARRA_RC unmarshal_attestation_response(const uint32_t marshaled_data_len,
-	const uint8_t* marshaled_data,
+CHARRA_RC charra_unmarshal_attestation_response(
+	const uint32_t marshaled_data_len, const uint8_t* marshaled_data,
 	msg_attestation_response_dto* attestation_response);
 
 #endif /* MARSHALING_UTIL_H */

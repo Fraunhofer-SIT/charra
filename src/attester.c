@@ -30,6 +30,7 @@
 #include <tss2/tss2_tpm2_types.h>
 
 #include "common/charra_log.h"
+#include "common/charra_macro.h"
 #include "core/charra_cvector.h"
 #include "core/charra_dto.h"
 #include "core/charra_helper.h"
@@ -169,9 +170,8 @@ error:
 
 finish:
 	/* free CoAP memory */
-	// FIXME Why do the following 2 statements produce a segfault?
-	coap_free_endpoint(coap_endpoint);
-	coap_free_context(coap_context);
+	charra_free_and_null_ex(coap_endpoint, coap_free_endpoint);
+	charra_free_and_null_ex(coap_context, coap_free_context);
 	coap_cleanup();
 
 	return result;
@@ -183,7 +183,7 @@ static void handle_sigint(int signum CHARRA_UNUSED) { quit = true; }
 
 static void release_data(
 	struct coap_session_t* session CHARRA_UNUSED, void* app_ptr) {
-	free(app_ptr);
+	charra_free_and_null(app_ptr);
 }
 
 static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
@@ -221,8 +221,8 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
 	/* unmarshal data */
 	charra_log_info("[" LOG_NAME "] Parsing received CBOR data.");
 	msg_attestation_request_dto req = {0};
-	if ((charra_r = unmarshal_attestation_request(data_len, data, &req)) !=
-		CHARRA_RC_SUCCESS) {
+	if ((charra_r = charra_unmarshal_attestation_request(
+			 data_len, data, &req)) != CHARRA_RC_SUCCESS) {
 		charra_log_error("[" LOG_NAME "] Could not parse CBOR data.");
 		goto error;
 	}
@@ -294,23 +294,46 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
 	cvector_vector_type(uint8_t) ima_event_log = NULL;
 	if (use_ima_event_log == true) {
 		charra_log_info("[" LOG_NAME "] Reading IMA event log.");
+
+		/* TODO this functionality should be externalized to io_util. Signature
+		 * of the function could be:
+		 * CHARRA_RC charra_io_read_continuous_file(
+		 * const char* filename, uint8_t** file_content,
+		 * size_t* file_content_len); */
+
 		// the size of the event log chunks which get read at once
 #define IMA_EVENT_LOG_STEP_SIZE 1024
 		// use logarithmic growth for the cvector. Otherwise it would grow on
 		// every cvector_push_back() call
 #define CVECTOR_LOGARITHMIC_GROWTH
 		FILE* fp = NULL;
-		fp = fopen(ima_event_log_path, "rb");
+		if ((fp = fopen(ima_event_log_path, "rb")) == NULL) {
+			charra_log_error(
+				"[" LOG_NAME "] Cannot open file '%s'.", ima_event_log_path);
+			goto error;
+		}
 		uint8_t processing_array[IMA_EVENT_LOG_STEP_SIZE] = {0};
-		int read_size = 0;
+		size_t read_size = 0;
 		do {
-			read_size = fread(
-				processing_array, sizeof(char), IMA_EVENT_LOG_STEP_SIZE, fp);
-			for (int i = 0; i < read_size; i++) {
+			read_size = fread(processing_array, sizeof(*processing_array),
+				IMA_EVENT_LOG_STEP_SIZE, fp);
+			for (size_t i = 0; i < read_size; ++i) {
 				cvector_push_back(ima_event_log, processing_array[i]);
 			}
 		} while (read_size == IMA_EVENT_LOG_STEP_SIZE);
-		fclose(fp);
+
+		/* flush and close file */
+		if (fflush(fp) != 0) {
+			charra_log_error(
+				"[" LOG_NAME "] Error flushing file '%s'.", ima_event_log_path);
+			goto error;
+		}
+		if (fclose(fp) != 0) {
+			charra_log_error(
+				"[" LOG_NAME "] Error flushing file '%s'.", ima_event_log_path);
+			goto error;
+		}
+
 		charra_log_info("[" LOG_NAME "] IMA event log has a size of %d bytes.",
 			cvector_size(ima_event_log));
 	}
@@ -318,6 +341,7 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
 	/* prepare response */
 	charra_log_info("[" LOG_NAME "] Preparing response.");
 
+	/* prepare response DTO */
 	msg_attestation_response_dto res = {
 		.attestation_data_len = attest_buf->size,
 		.attestation_data = {0}, // must be memcpy'd, see below
@@ -332,18 +356,26 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
 		res.attestation_data_len);
 	memcpy(res.tpm2_signature, signature, res.tpm2_signature_len);
 	memcpy(res.tpm2_public_key, public_key, res.tpm2_public_key_len);
-	free(signature);
-	signature = NULL;
-	free(attest_buf);
-	attest_buf = NULL;
-	free(public_key);
-	public_key = NULL;
+
+	/* clean up */
+	charra_free_and_null(signature);
+	charra_free_and_null(attest_buf);
+	charra_free_and_null(public_key);
 
 	/* marshal response */
 	charra_log_info("[" LOG_NAME "] Marshaling response to CBOR.");
 	uint32_t res_buf_len = 0;
 	uint8_t* res_buf = NULL;
-	marshal_attestation_response(&res, &res_buf_len, &res_buf);
+	if ((charra_r = charra_marshal_attestation_response(
+			 &res, &res_buf_len, &res_buf)) != CHARRA_RC_SUCCESS) {
+		charra_log_error("[" LOG_NAME "] Error marshaling data.");
+		goto error;
+	}
+	charra_log_info(
+		"[" LOG_NAME "] Size of marshaled response is %d bytes.", res_buf_len);
+
+	// TODO in case an error above occurred, a error respone should be sent
+	// TODO the Verifier should be able to handle this error reponse
 
 	/* add response data to outgoing PDU and send it */
 	charra_log_info(
@@ -355,22 +387,15 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
 			 res_buf, release_data, res_buf)) == 0) {
 		charra_log_error(
 			"[" LOG_NAME "] Error invoking coap_add_data_large_response().");
+		goto error;
 	}
 
 error:
 	/* Free heap objects */
-	if (signature != NULL) {
-		free(signature);
-	}
-	if (attest_buf != NULL) {
-		free(attest_buf);
-	}
-	if (public_key != NULL) {
-		free(public_key);
-	}
-	if (res.event_log != NULL) {
-		cvector_free(ima_event_log);
-	}
+	charra_free_if_not_null(signature);
+	charra_free_if_not_null(attest_buf);
+	charra_free_if_not_null(public_key);
+	charra_free_if_not_null_ex(res.event_log, cvector_free);
 
 	/* flush handles */
 	if (sig_key_handle != ESYS_TR_NONE) {
