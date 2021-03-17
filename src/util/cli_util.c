@@ -31,7 +31,8 @@ static const struct option verifier_options[] = {{"help", no_argument, 0, 'h'},
 	{"verbose", no_argument, 0, 'v'}, {"log-level", required_argument, 0, 'l'},
 	{"coap-log-level", required_argument, 0, 'c'},
 	{"port", required_argument, 0, 'p'}, {"ip", required_argument, 0, 'i'},
-	{"timeout", required_argument, 0, 't'}, {0}};
+	{"timeout", required_argument, 0, 't'},
+	{"pcr-file", required_argument, 0, 'f'}, {0}};
 
 static const struct option attester_options[] = {{"help", no_argument, 0, 'h'},
 	{"verbose", no_argument, 0, 'v'}, {"log-level", optional_argument, 0, 'l'},
@@ -83,6 +84,9 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 				printf("     --timeout=SECONDS:      Wait up to SECONDS for "
 					   "the attestation answer. Default is %d.\n",
 					*(variables->verifier_config.timeout));
+				printf("     --pcr-file=PATH:        Read reference PCRs from "
+					   "PATH. Default path is '%s'\n",
+					*(variables->verifier_config.reference_pcr_file_path));
 			} else {
 				printf("     --port=PORT:            Open PORT instead of port "
 					   "%d.\n",
@@ -108,8 +112,8 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 			int result = charra_log_level_from_str(
 				optarg, variables->common_config.charra_log_level);
 			if (result != 0) {
-				printf("[%s] Error while parsing '-l/--log-level': "
-					   "Unrecognized argument %s\n",
+				charra_log_error("[%s] Error while parsing '-l/--log-level': "
+								 "Unrecognized argument %s",
 					log_name, optarg);
 				return -1;
 			}
@@ -120,8 +124,8 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 			int result = charra_coap_log_level_from_str(
 				optarg, variables->common_config.coap_log_level);
 			if (result != 0) {
-				printf("[%s] Error while parsing '-l/--log-level': "
-					   "Unrecognized argument %s\n",
+				charra_log_error("[%s] Error while parsing '-l/--log-level': "
+								 "Unrecognized argument %s",
 					log_name, optarg);
 				return -1;
 			}
@@ -133,8 +137,9 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 			*(variables->common_config.port) =
 				(unsigned int)strtoul(optarg, &end, 10);
 			if (*(variables->common_config.port) == 0 || end == optarg) {
-				printf("[%s] Error while parsing '--port': Port could not be "
-					   "parsed\n",
+				charra_log_error(
+					"[%s] Error while parsing '--port': Port could not be "
+					"parsed",
 					log_name);
 				return -1;
 			}
@@ -146,8 +151,9 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 			if (identifier == 'i') { // set IP address
 				int argument_length = strlen(optarg);
 				if (argument_length > 15) {
-					printf("[%s] Error while parsing '--ip': Input too long "
-						   "for IPv4 address\n",
+					charra_log_error(
+						"[%s] Error while parsing '--ip': Input too long "
+						"for IPv4 address",
 						log_name);
 					return -1;
 				}
@@ -161,12 +167,29 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 					(uint16_t)strtoul(optarg, &end, 10);
 				if (*(variables->verifier_config.timeout) == 0 ||
 					end == optarg) {
-					printf("[%s] Error while parsing '--port': Port could not "
-						   "be parsed\n",
+					charra_log_error(
+						"[%s] Error while parsing '--port': Port could not "
+						"be parsed",
 						log_name);
 					return -1;
 				}
 				continue;
+			}
+
+			else if (identifier == 'f') {
+				uint32_t length = strlen(optarg);
+				char* path = malloc(length * sizeof(char));
+				strcpy(path, optarg);
+				if (check_file_existence(path) == CHARRA_RC_SUCCESS) {
+					*(variables->verifier_config.reference_pcr_file_path) =
+						path;
+					continue;
+				} else {
+					charra_log_error(
+						"[%s] Reference PCR file ''%s' does not exist.",
+						log_name, path);
+					return -1;
+				}
 			}
 
 		}
@@ -187,7 +210,8 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 
 		// undefined behaviour, probably because getopt_long returned an
 		// identifier which is not checked here
-		printf("[%s] Error: Undefined behaviour while parsing command line\n",
+		charra_log_error(
+			"[%s] Error: Undefined behaviour while parsing command line",
 			log_name);
 		return -1;
 	}

@@ -66,11 +66,13 @@ static const bool USE_TPM_FOR_RANDOM_NONCE_GENERATION = false;
 
 #define TPM_SIG_KEY_ID_LEN 14
 #define TPM_SIG_KEY_ID "PK.RSA.default"
+// TODO: Make PCR selection configurable via CLI
 static const uint8_t TPM_PCR_SELECTION[TPM2_MAX_PCRS] = {
 	0, 1, 2, 3, 4, 5, 6, 7, 10};
 static const uint32_t TPM_PCR_SELECTION_LEN = 9;
 uint16_t attestation_response_timeout =
 	30; // timeout when waiting for attestation answer in seconds
+char* reference_pcr_file_path = "reference-pcrs.txt";
 
 /* --- function forward declarations -------------------------------------- */
 
@@ -120,8 +122,13 @@ int main(int argc, char** argv) {
 			{
 				.dst_host = dst_host,
 				.timeout = &attestation_response_timeout,
+				.reference_pcr_file_path = &reference_pcr_file_path,
 			},
 	};
+
+	/* set log level before parsing CLI to be able to print errors. */
+	charra_log_set_level(charra_log_level);
+	coap_set_log_level(coap_log_level);
 
 	/* parse CLI arguments */
 	if ((result = parse_command_line_arguments(argc, argv, &cli_config)) != 0) {
@@ -139,6 +146,7 @@ int main(int argc, char** argv) {
 	charra_log_debug("[" LOG_NAME
 					 "]     Timeout when waiting for attestation response: %ds",
 		attestation_response_timeout);
+	charra_log_debug("[" LOG_NAME "]     Reference PCR file path: '%s'", reference_pcr_file_path);
 
 	/* create CoAP context */
 	coap_context_t* coap_context = NULL;
@@ -525,12 +533,23 @@ static coap_response_t coap_attest_handler(
 	{
 		charra_log_info("[" LOG_NAME "] Verifying PCRs ...");
 
+		/* allocate reference PCR values */
+		uint8_t** reference_pcrs = malloc(TPM_PCR_SELECTION_LEN * sizeof(uint8_t*));
+		for (uint32_t i = 0; i < TPM_PCR_SELECTION_LEN; i++){
+			reference_pcrs[i] = malloc(TPM2_SHA256_DIGEST_SIZE * sizeof(uint8_t));
+		}
+
 		/* get reference PCRs */
-		uint8_t* reference_pcrs[TPM2_MAX_PCRS] = {0};
-		if ((charra_r = charra_get_reference_pcrs_sha256(TPM_PCR_SELECTION,
+		if ((charra_r = charra_get_reference_pcrs_sha256(reference_pcr_file_path, TPM_PCR_SELECTION,
 				 TPM_PCR_SELECTION_LEN, reference_pcrs)) != CHARRA_RC_SUCCESS) {
 			charra_log_error("[" LOG_NAME "] Error getting reference PCRs.");
+			charra_free_reference_pcrs_sha256(reference_pcrs, TPM_PCR_SELECTION_LEN);
 			goto error;
+		}
+
+		if (charra_log_level <= CHARRA_LOG_DEBUG) {
+			charra_log_debug("[" LOG_NAME "] Reference PCR content:");
+			charra_print_pcr_content(TPM_PCR_SELECTION, TPM_PCR_SELECTION_LEN, reference_pcrs);
 		}
 
 		/* compute PCR composite digest from reference PCRs */
@@ -566,6 +585,8 @@ static coap_response_t coap_attest_handler(
 				"]     => PCR composite digest is NOT valid! (does "
 				"not match the one from reference PCRs)");
 		}
+
+		charra_free_reference_pcrs_sha256(reference_pcrs, TPM_PCR_SELECTION_LEN);
 	}
 
 	/* verify event log */

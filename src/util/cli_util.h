@@ -53,6 +53,7 @@ typedef struct {
 typedef struct {
 	char* dst_host;
 	uint16_t* timeout;
+	char** reference_pcr_file_path;
 } cli_config_verifier;
 
 /**

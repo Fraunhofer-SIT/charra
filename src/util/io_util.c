@@ -51,6 +51,64 @@ void charra_print_str(const size_t buf_len, const uint8_t* const buf,
 	printf("%s", postfix);
 }
 
+void charra_print_pcr_content(const uint8_t* pcr_selection,
+	const uint32_t pcr_selection_len, uint8_t** pcrs) {
+	for (uint32_t i = 0; i < pcr_selection_len; i++) {
+		printf("%02d: 0x", pcr_selection[i]);
+		for (uint32_t j = 0; j < TPM2_SHA256_DIGEST_SIZE; j++) {
+			charra_print_hex(1, &pcrs[i][j], "", "", true);
+		}
+		printf("\n");
+	}
+}
+
+CHARRA_RC check_file_existence(const char* filename) {
+	FILE* fp = NULL;
+	if ((fp = fopen(filename, "r")) == NULL) {
+		return CHARRA_RC_ERROR;
+	}
+	return CHARRA_RC_SUCCESS;
+}
+
+CHARRA_RC charra_io_read_file(
+	const char* filename, char** file_content, size_t* file_content_len) {
+	FILE* fp = NULL;
+	if ((fp = fopen(filename, "r")) == NULL) {
+		charra_log_error("Cannot open file '%s'.", filename);
+		return CHARRA_RC_ERROR;
+	}
+	fseek(fp, 0L, SEEK_END);
+	size_t file_size = ftell(fp);
+	fseek(fp, 0L, SEEK_SET);
+	char* file_buffer = malloc(file_size * sizeof(char));
+	size_t read_size = fread(file_buffer, sizeof(*file_buffer), file_size, fp);
+	if (read_size < file_size) {
+		charra_log_error(
+			"Error while reading file '%s', expected size %d, got size %d.",
+			filename, file_size, read_size);
+		charra_free_if_not_null(file_buffer);
+		return CHARRA_RC_ERROR;
+	}
+	/* flush and close file */
+	if (fflush(fp) != 0) {
+		charra_log_error("Error flushing file '%s'.", filename);
+		charra_free_if_not_null(file_buffer);
+		return CHARRA_RC_ERROR;
+	}
+	if (fclose(fp) != 0) {
+		charra_log_error("Error closing file '%s'.", filename);
+		charra_free_if_not_null(file_buffer);
+		return CHARRA_RC_ERROR;
+	}
+	*file_content = file_buffer;
+	*file_content_len = read_size;
+	return CHARRA_RC_SUCCESS;
+}
+
+void charra_free_file_buffer(char** file_content) {
+	charra_free_if_not_null(*file_content);
+}
+
 CHARRA_RC charra_io_read_continuous_binary_file(
 	const char* filename, uint8_t** file_content, size_t* file_content_len) {
 	// the size of the event log chunks which get read at once
