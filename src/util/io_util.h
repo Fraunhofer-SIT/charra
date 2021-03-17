@@ -21,6 +21,8 @@
 #ifndef IO_UTIL_H
 #define IO_UTIL_H
 
+#include "../common/charra_error.h"
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -56,5 +58,27 @@ void charra_print_hex(const size_t buf_len, const uint8_t* const buf,
  */
 void charra_print_str(const size_t buf_len, const uint8_t* const buf,
 	const char* prefix, const char* postfix);
+
+/**
+ * @brief read binary file of unknown length into a cvector. Used for IMA event
+ * log reading, which is a char device. The cvector will be initialized inside
+ * this function.
+ *
+ * @param[in] filename the path of the file to be read
+ * @param[out] file_content A pointer to the cvector, assumed to be
+ * uninitialized upon calling.
+ * @param[out] file_content_len The actual length of the file (aka the size of
+ * file_content).
+ * @return CHARRA_RC CHARRA_RC_SUCCESS on success, otherwise CHARRA_RC_ERROR
+ */
+CHARRA_RC charra_io_read_continuous_binary_file(
+	const char* filename, uint8_t** file_content, size_t* file_content_len);
+
+/**
+ * @brief free cvector holding the file content.
+ *
+ * @param[in] file_content A pointer to the cvector.
+ */
+void charra_free_continous_file_buffer(uint8_t** file_content);
 
 #endif /* IO_UTIL_H */
