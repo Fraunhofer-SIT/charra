@@ -31,7 +31,6 @@
 
 #include "common/charra_log.h"
 #include "common/charra_macro.h"
-#include "core/charra_cvector.h"
 #include "core/charra_dto.h"
 #include "core/charra_helper.h"
 #include "core/charra_key_mgr.h"
@@ -291,51 +290,17 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
 	/* --- send response data --- */
 
 	/* read IMA event log if configured */
-	cvector_vector_type(uint8_t) ima_event_log = NULL;
+	uint8_t* ima_event_log = NULL;
+	size_t ima_event_log_len = 0;
 	if (use_ima_event_log == true) {
 		charra_log_info("[" LOG_NAME "] Reading IMA event log.");
-
-		/* TODO this functionality should be externalized to io_util. Signature
-		 * of the function could be:
-		 * CHARRA_RC charra_io_read_continuous_file(
-		 * const char* filename, uint8_t** file_content,
-		 * size_t* file_content_len); */
-
-		// the size of the event log chunks which get read at once
-#define IMA_EVENT_LOG_STEP_SIZE 1024
-		// use logarithmic growth for the cvector. Otherwise it would grow on
-		// every cvector_push_back() call
-#define CVECTOR_LOGARITHMIC_GROWTH
-		FILE* fp = NULL;
-		if ((fp = fopen(ima_event_log_path, "rb")) == NULL) {
-			charra_log_error(
-				"[" LOG_NAME "] Cannot open file '%s'.", ima_event_log_path);
+		CHARRA_RC rc = charra_io_read_continuous_binary_file(
+			ima_event_log_path, &ima_event_log, &ima_event_log_len);
+		if (rc != CHARRA_RC_SUCCESS) {
 			goto error;
 		}
-		uint8_t processing_array[IMA_EVENT_LOG_STEP_SIZE] = {0};
-		size_t read_size = 0;
-		do {
-			read_size = fread(processing_array, sizeof(*processing_array),
-				IMA_EVENT_LOG_STEP_SIZE, fp);
-			for (size_t i = 0; i < read_size; ++i) {
-				cvector_push_back(ima_event_log, processing_array[i]);
-			}
-		} while (read_size == IMA_EVENT_LOG_STEP_SIZE);
-
-		/* flush and close file */
-		if (fflush(fp) != 0) {
-			charra_log_error(
-				"[" LOG_NAME "] Error flushing file '%s'.", ima_event_log_path);
-			goto error;
-		}
-		if (fclose(fp) != 0) {
-			charra_log_error(
-				"[" LOG_NAME "] Error flushing file '%s'.", ima_event_log_path);
-			goto error;
-		}
-
 		charra_log_info("[" LOG_NAME "] IMA event log has a size of %d bytes.",
-			cvector_size(ima_event_log));
+			ima_event_log_len);
 	}
 
 	/* prepare response */
@@ -349,7 +314,7 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
 		.tpm2_signature = {0}, // must be memcpy'd, see below
 		.tpm2_public_key_len = sizeof(*public_key),
 		.tpm2_public_key = {0}, // must be memcpy'd, see below
-		.event_log_len = cvector_size(ima_event_log),
+		.event_log_len = ima_event_log_len,
 		.event_log = ima_event_log,
 	};
 	memcpy(res.attestation_data, attest_buf->attestationData,
@@ -395,7 +360,7 @@ error:
 	charra_free_if_not_null(signature);
 	charra_free_if_not_null(attest_buf);
 	charra_free_if_not_null(public_key);
-	charra_free_if_not_null_ex(res.event_log, cvector_free);
+	charra_free_continous_file_buffer(&ima_event_log);
 
 	/* flush handles */
 	if (sig_key_handle != ESYS_TR_NONE) {
