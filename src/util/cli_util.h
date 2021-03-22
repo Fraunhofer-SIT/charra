@@ -54,6 +54,8 @@ typedef struct {
 	char* dst_host;
 	uint16_t* timeout;
 	char** reference_pcr_file_path;
+	uint8_t* tpm_pcr_selection;
+	uint32_t* tpm_pcr_selection_len;
 } cli_config_verifier;
 
 /**

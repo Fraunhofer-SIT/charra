@@ -121,6 +121,4 @@ CHARRA_RC charra_io_read_continuous_binary_file(
  */
 void charra_free_continous_file_buffer(uint8_t** file_content);
 
-
-
 #endif /* IO_UTIL_H */

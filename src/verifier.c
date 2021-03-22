@@ -67,9 +67,8 @@ static const bool USE_TPM_FOR_RANDOM_NONCE_GENERATION = false;
 #define TPM_SIG_KEY_ID_LEN 14
 #define TPM_SIG_KEY_ID "PK.RSA.default"
 // TODO: Make PCR selection configurable via CLI
-static const uint8_t TPM_PCR_SELECTION[TPM2_MAX_PCRS] = {
-	0, 1, 2, 3, 4, 5, 6, 7, 10};
-static const uint32_t TPM_PCR_SELECTION_LEN = 9;
+static uint8_t tpm_pcr_selection[TPM2_MAX_PCRS] = {0, 1, 2, 3, 4, 5, 6, 7, 10};
+static uint32_t tpm_pcr_selection_len = 9;
 uint16_t attestation_response_timeout =
 	30; // timeout when waiting for attestation answer in seconds
 char* reference_pcr_file_path = "reference-pcrs.txt";
@@ -123,6 +122,8 @@ int main(int argc, char** argv) {
 				.dst_host = dst_host,
 				.timeout = &attestation_response_timeout,
 				.reference_pcr_file_path = &reference_pcr_file_path,
+				.tpm_pcr_selection = tpm_pcr_selection,
+				.tpm_pcr_selection_len = &tpm_pcr_selection_len,
 			},
 	};
 
@@ -136,7 +137,7 @@ int main(int argc, char** argv) {
 		return (result == 1) ? EXIT_SUCCESS : EXIT_FAILURE;
 	}
 
-	/* set CHARRA and libcoap log levels */
+	/* set CHARRA and libcoap log levels again in case CLI changed these */
 	charra_log_set_level(charra_log_level);
 	coap_set_log_level(coap_log_level);
 
@@ -146,7 +147,16 @@ int main(int argc, char** argv) {
 	charra_log_debug("[" LOG_NAME
 					 "]     Timeout when waiting for attestation response: %ds",
 		attestation_response_timeout);
-	charra_log_debug("[" LOG_NAME "]     Reference PCR file path: '%s'", reference_pcr_file_path);
+	charra_log_debug("[" LOG_NAME "]     Reference PCR file path: '%s'",
+		reference_pcr_file_path);
+	charra_log_debug("[" LOG_NAME "]     PCR selection with length %d:",
+		tpm_pcr_selection_len);
+	if (charra_log_level <= CHARRA_LOG_DEBUG) {
+		for (uint32_t i = 0; i < tpm_pcr_selection_len; i++) {
+			printf("%d ", tpm_pcr_selection[i]);
+		}
+		printf("\n");
+	}
 
 	/* create CoAP context */
 	coap_context_t* coap_context = NULL;
@@ -352,7 +362,7 @@ static CHARRA_RC create_attestation_request(
 		}}};
 	memcpy(req.sig_key_id, TPM_SIG_KEY_ID, TPM_SIG_KEY_ID_LEN);
 	memcpy(req.nonce, nonce, nonce_len);
-	memcpy(req.pcr_selections->pcrs, TPM_PCR_SELECTION, TPM_PCR_SELECTION_LEN);
+	memcpy(req.pcr_selections->pcrs, tpm_pcr_selection, tpm_pcr_selection_len);
 
 	/* set output param(s) */
 	*attestation_request = req;
@@ -534,22 +544,27 @@ static coap_response_t coap_attest_handler(
 		charra_log_info("[" LOG_NAME "] Verifying PCRs ...");
 
 		/* allocate reference PCR values */
-		uint8_t** reference_pcrs = malloc(TPM_PCR_SELECTION_LEN * sizeof(uint8_t*));
-		for (uint32_t i = 0; i < TPM_PCR_SELECTION_LEN; i++){
-			reference_pcrs[i] = malloc(TPM2_SHA256_DIGEST_SIZE * sizeof(uint8_t));
+		uint8_t** reference_pcrs =
+			malloc(tpm_pcr_selection_len * sizeof(uint8_t*));
+		for (uint32_t i = 0; i < tpm_pcr_selection_len; i++) {
+			reference_pcrs[i] =
+				malloc(TPM2_SHA256_DIGEST_SIZE * sizeof(uint8_t));
 		}
 
 		/* get reference PCRs */
-		if ((charra_r = charra_get_reference_pcrs_sha256(reference_pcr_file_path, TPM_PCR_SELECTION,
-				 TPM_PCR_SELECTION_LEN, reference_pcrs)) != CHARRA_RC_SUCCESS) {
+		if ((charra_r = charra_get_reference_pcrs_sha256(
+				 reference_pcr_file_path, tpm_pcr_selection,
+				 tpm_pcr_selection_len, reference_pcrs)) != CHARRA_RC_SUCCESS) {
 			charra_log_error("[" LOG_NAME "] Error getting reference PCRs.");
-			charra_free_reference_pcrs_sha256(reference_pcrs, TPM_PCR_SELECTION_LEN);
+			charra_free_reference_pcrs_sha256(
+				reference_pcrs, tpm_pcr_selection_len);
 			goto error;
 		}
 
 		if (charra_log_level <= CHARRA_LOG_DEBUG) {
 			charra_log_debug("[" LOG_NAME "] Reference PCR content:");
-			charra_print_pcr_content(TPM_PCR_SELECTION, TPM_PCR_SELECTION_LEN, reference_pcrs);
+			charra_print_pcr_content(
+				tpm_pcr_selection, tpm_pcr_selection_len, reference_pcrs);
 		}
 
 		/* compute PCR composite digest from reference PCRs */
@@ -559,7 +574,7 @@ static coap_response_t coap_attest_handler(
 		 * implemented, instead of hash_sha256_array() (then maybe remove
 		 * hash_sha256_array() function) */
 		charra_r = hash_sha256_array(
-			reference_pcrs, TPM_PCR_SELECTION_LEN, pcr_composite_digest);
+			reference_pcrs, tpm_pcr_selection_len, pcr_composite_digest);
 		charra_log_info(
 			"[" LOG_NAME
 			"] Computed PCR composite digest from reference PCRs is:");
@@ -586,7 +601,8 @@ static coap_response_t coap_attest_handler(
 				"not match the one from reference PCRs)");
 		}
 
-		charra_free_reference_pcrs_sha256(reference_pcrs, TPM_PCR_SELECTION_LEN);
+		charra_free_reference_pcrs_sha256(
+			reference_pcrs, tpm_pcr_selection_len);
 	}
 
 	/* verify event log */
