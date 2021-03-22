@@ -23,6 +23,7 @@
 #include "../common/charra_log.h"
 #include "coap_util.h"
 #include "io_util.h"
+#include <errno.h>
 #include <getopt.h>
 #include <stdlib.h>
 
@@ -32,7 +33,8 @@ static const struct option verifier_options[] = {{"help", no_argument, 0, 'h'},
 	{"coap-log-level", required_argument, 0, 'c'},
 	{"port", required_argument, 0, 'p'}, {"ip", required_argument, 0, 'i'},
 	{"timeout", required_argument, 0, 't'},
-	{"pcr-file", required_argument, 0, 'f'}, {0}};
+	{"pcr-file", required_argument, 0, 'f'},
+	{"pcr-selection", required_argument, 0, 's'}, {0}};
 
 static const struct option attester_options[] = {{"help", no_argument, 0, 'h'},
 	{"verbose", no_argument, 0, 'v'}, {"log-level", optional_argument, 0, 'l'},
@@ -87,6 +89,10 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 				printf("     --pcr-file=PATH:        Read reference PCRs from "
 					   "PATH. Default path is '%s'\n",
 					*(variables->verifier_config.reference_pcr_file_path));
+				printf("     --pcr-selection=PCR1[,PCR2...]: Specifies which "
+					   "PCRs to check on the attester. PCR numbers shall be "
+					   "ordered from smallest to biggest, comma-seperated and "
+					   "without whitespace.\n");
 			} else {
 				printf("     --port=PORT:            Open PORT instead of port "
 					   "%d.\n",
@@ -190,6 +196,51 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 						log_name, path);
 					return -1;
 				}
+			}
+
+			else if (identifier == 's') {
+				uint32_t length = strlen(optarg);
+				uint8_t* tpm_pcr_selection =
+					variables->verifier_config.tpm_pcr_selection;
+				uint32_t* tpm_pcr_selection_len =
+					variables->verifier_config.tpm_pcr_selection_len;
+				for (uint32_t i = 0; i < *tpm_pcr_selection_len; i++) {
+					tpm_pcr_selection[i] =
+						0; // overwrite static config with zeros in case CLI
+						   // config uses less PCRs
+				}
+				*tpm_pcr_selection_len = 0;
+				char* number_start = optarg;
+				int last_number = -1;
+				do {
+					char* end = NULL;
+					errno = 0;
+					uint32_t number = strtoul(number_start, &end, 10);
+					if (end == number_start || errno != 0) {
+						charra_log_error("[%s] PCR selection could not be "
+										 "parsed, parse error at '%s'",
+							log_name, number_start);
+						return -1;
+					} else if (number >= TPM2_MAX_PCRS) {
+						charra_log_error(
+							"[%s] One PCR from the PCR selection was parsed as "
+							"%d, but the TPM2 only has PCRs up to %d.",
+							log_name, number, TPM2_MAX_PCRS - 1);
+						return -1;
+					} else if ((int)number <= last_number) {
+						charra_log_error(
+							"[%s] PCR selection was detected to not be ordered "
+							"from smallest to biggest. Last parsed number %d "
+							"is bigger or equal to current number %d.",
+							log_name, last_number, number);
+						return -1;
+					}
+					number_start = end + 1;
+					tpm_pcr_selection[*tpm_pcr_selection_len] = number;
+					(*tpm_pcr_selection_len)++;
+					last_number = number;
+				} while (number_start < optarg + length);
+				continue;
 			}
 
 		}
