@@ -28,6 +28,7 @@
 #include <tss2/tss2_tpm2_types.h>
 
 #include "../common/charra_error.h"
+#include "../util/charra_util.h"
 #include "../util/io_util.h"
 
 /* hashing functions */
@@ -308,4 +309,28 @@ CHARRA_RC charra_crypto_rsa_verify_signature(
 
 error:
 	return charra_r;
+}
+
+CHARRA_RC compute_and_check_PCR_digest(uint8_t** pcr_values,
+	uint32_t pcr_values_len, const TPMS_ATTEST* const attest_struct) {
+	uint8_t pcr_composite_digest[TPM2_SHA256_DIGEST_SIZE] = {0};
+	/* TODO use crypto-agile (generic) version
+	 * charra_compute_pcr_composite_digest_from_ptr_array(), once
+	 * implemented, instead of hash_sha256_array() (then maybe remove
+	 * hash_sha256_array() function) */
+	CHARRA_RC charra_r =
+		hash_sha256_array(pcr_values, pcr_values_len, pcr_composite_digest);
+	if (charra_r != CHARRA_RC_SUCCESS) {
+		return CHARRA_RC_ERROR;
+	}
+	bool matching = charra_verify_tpm2_quote_pcr_composite_digest(
+		attest_struct, pcr_composite_digest, TPM2_SHA256_DIGEST_SIZE);
+	charra_print_hex(sizeof(pcr_composite_digest),
+		pcr_composite_digest,
+		"                                              0x", "\n", false);
+	if (matching) {
+		return CHARRA_RC_SUCCESS;
+	} else {
+		return CHARRA_RC_NO_MATCH;
+	}
 }

@@ -78,4 +78,17 @@ CHARRA_RC charra_crypto_rsa_verify_signature(
 	mbedtls_rsa_context* mbedtls_rsa_pub_key, mbedtls_md_type_t hash_algo,
 	const unsigned char* data, size_t data_len, const unsigned char* signature);
 
+/**
+ * @brief Compute PCR composite digest from PCR values and check if it matches
+ * with the digest given in attest_struct.
+ *
+ * @param pcr_values 2D array of pcr values
+ * @param pcr_values_len number of PCR values in pcr_values
+ * @param attest_struct structure holding the digest to check against
+ * @returns CHARRA_RC_SUCCESS on matching digests, CHARRA_RC_NO_MATCH
+ * on non-matching digests, CHARRA_RC_ERROR on error
+ */
+CHARRA_RC compute_and_check_PCR_digest(uint8_t** pcr_values,
+	uint32_t pcr_value_len, const TPMS_ATTEST* const attest_struct);
+
 #endif /* SITIMA_CRYPTO_H */
