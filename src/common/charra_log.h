@@ -74,6 +74,12 @@ void charra_log_log(
 	charra_log_t level, const char* file, int line, const char* fmt, ...);
 
 /**
+ * @brief the same as charra_log_log(), but does not append filename, timestamp
+ * or '\n' to the output.
+ */
+void charra_log_log_raw(charra_log_t level, const char* fmt, ...);
+
+/**
  * @brief Parses the CHARRA log level from string and writes the result into
  * variable log_level. In case of an parsing error nothing is written and the
  * function returns -1.

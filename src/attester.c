@@ -240,7 +240,7 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
 	memcpy(qualifying_data.buffer, req.nonce, req.nonce_len);
 
 	charra_log_info("Received nonce of length %d:", req.nonce_len);
-	charra_print_hex(req.nonce_len, req.nonce,
+	charra_print_hex(CHARRA_LOG_INFO, req.nonce_len, req.nonce,
 		"                                   0x", "\n", false);
 
 	/* PCR selection */

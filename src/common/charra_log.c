@@ -116,6 +116,36 @@ void charra_log_log(
 	charra_log_unlock();
 }
 
+void charra_log_log_raw(charra_log_t level, const char* fmt, ...) {
+	if (level < L.level) {
+		return;
+	}
+
+	/* acquire lock */
+	charra_log_lock();
+
+	/* log to stderr */
+	if (!L.quiet) {
+		va_list args;
+		va_start(args, fmt);
+		vfprintf(stderr, fmt, args);
+		va_end(args);
+		fflush(stderr);
+	}
+
+	/* log to file */
+	if (L.fp) {
+		va_list args;
+		va_start(args, fmt);
+		vfprintf(L.fp, fmt, args);
+		va_end(args);
+		fflush(L.fp);
+	}
+
+	/* release lock */
+	charra_log_unlock();
+}
+
 int charra_log_level_from_str(
 	const char* log_level_str, charra_log_t* log_level) {
 	if (log_level_str != NULL) {

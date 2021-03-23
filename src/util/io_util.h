@@ -22,6 +22,7 @@
 #define IO_UTIL_H
 
 #include "../common/charra_error.h"
+#include "../common/charra_log.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -45,8 +46,9 @@
  * @param upper_case true: print in uppercase (e.g. "012..ABCDEF"); false: print
  * in lowercase (e.g. "012..abcdef").
  */
-void charra_print_hex(const size_t buf_len, const uint8_t* const buf,
-	const char* prefix, const char* postfix, const bool upper_case);
+void charra_print_hex(const charra_log_t level, const size_t buf_len,
+	const uint8_t* const buf, const char* prefix, const char* postfix,
+	const bool upper_case);
 
 /**
  * @brief
@@ -57,8 +59,8 @@ void charra_print_hex(const size_t buf_len, const uint8_t* const buf,
  * empty ("").
  * @param postfix  A postfix to the output, e.g. "\n", or leave it empty ("").
  */
-void charra_print_str(const size_t buf_len, const uint8_t* const buf,
-	const char* prefix, const char* postfix);
+void charra_print_str(const charra_log_t level, const size_t buf_len,
+	const uint8_t* const buf, const char* prefix, const char* postfix);
 
 /**
  * @brief Print PCR content of selected PCRs.
@@ -67,8 +69,9 @@ void charra_print_str(const size_t buf_len, const uint8_t* const buf,
  * @param pcr_selection_len the number of PCRs to print
  * @param pcrs the content of the PCRs
  */
-void charra_print_pcr_content(const uint8_t* pcr_selection,
-	const uint32_t pcr_selection_len, uint8_t** pcrs);
+void charra_print_pcr_content(const charra_log_t level,
+	const uint8_t* pcr_selection, const uint32_t pcr_selection_len,
+	uint8_t** pcrs);
 
 /**
  * @brief Checks if file is existing.
