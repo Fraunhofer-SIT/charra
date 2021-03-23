@@ -345,8 +345,8 @@ static CHARRA_RC create_attestation_request(
 		}
 	}
 	charra_log_info("Generated nonce of length %d:", nonce_len);
-	charra_print_hex(
-		nonce_len, nonce, "                                   0x", "\n", false);
+	charra_print_hex(CHARRA_LOG_INFO, nonce_len, nonce,
+		"                                   0x", "\n", false);
 
 	/* build attestation request */
 	msg_attestation_request_dto req = {.hello = false,
@@ -545,7 +545,8 @@ static coap_response_t coap_attest_handler(
 
 		charra_log_info(
 			"[" LOG_NAME "] Actual PCR composite digest from TPM Quote is:");
-		charra_print_hex(attest_struct.attested.quote.pcrDigest.size,
+		charra_print_hex(CHARRA_LOG_INFO,
+			attest_struct.attested.quote.pcrDigest.size,
 			attest_struct.attested.quote.pcrDigest.buffer,
 			"                                              0x", "\n", false);
 
@@ -575,20 +576,18 @@ static coap_response_t coap_attest_handler(
 			res.event_log_len);
 		charra_log_debug("[" LOG_NAME "]     IMA Event Log:");
 
-		if (charra_log_level <= CHARRA_LOG_DEBUG) {
-			if (res.event_log_len > 20) {
-				charra_print_hex(10, res.event_log,
-					"                                                  0x",
-					"...", false);
-				charra_print_hex(10, (res.event_log + res.event_log_len - 10),
-					"", "\n", false);
-			} else if ((res.event_log_len > 0)) {
-				charra_print_hex(res.event_log_len, res.event_log,
-					"                                                  0x",
-					"\n", false);
-			} else {
-				charra_log_debug("[" LOG_NAME "]     <none>");
-			}
+		if (res.event_log_len > 20) {
+			charra_print_hex(CHARRA_LOG_DEBUG, 10, res.event_log,
+				"                                                  0x", "...",
+				false);
+			charra_print_hex(CHARRA_LOG_DEBUG, 10,
+				(res.event_log + res.event_log_len - 10), "", "\n", false);
+		} else if ((res.event_log_len > 0)) {
+			charra_print_hex(CHARRA_LOG_DEBUG, res.event_log_len, res.event_log,
+				"                                                  0x", "\n",
+				false);
+		} else {
+			charra_log_debug("[" LOG_NAME "]     <none>");
 		}
 	}
 

@@ -28,37 +28,39 @@
 #include <stdint.h>
 #include <stdio.h>
 
-void charra_print_hex(const size_t buf_len, const uint8_t* const buf,
-	const char* prefix, const char* postfix, const bool upper_case) {
+void charra_print_hex(const charra_log_t level, const size_t buf_len,
+	const uint8_t* const buf, const char* prefix, const char* postfix,
+	const bool upper_case) {
 	const char* const hex_case = upper_case ? "%02X" : "%02x";
 
-	printf("%s", prefix);
+	charra_log_log_raw(level, "%s", prefix);
 	/* print upper case */
 	for (size_t i = 0; i < buf_len; ++i) {
-		printf(hex_case, buf[i]);
+		charra_log_log_raw(level, hex_case, buf[i]);
 	}
-	printf("%s", postfix);
+	charra_log_log_raw(level, "%s", postfix);
 }
 
-void charra_print_str(const size_t buf_len, const uint8_t* const buf,
-	const char* prefix, const char* postfix) {
+void charra_print_str(const charra_log_t level, const size_t buf_len,
+	const uint8_t* const buf, const char* prefix, const char* postfix) {
 
-	printf("%s", prefix);
+	charra_log_log_raw(level, "%s", prefix);
 	/* print upper case */
 	for (size_t i = 0; i < buf_len; ++i) {
-		printf("%c", buf[i]);
+		charra_log_log_raw(level, "%c", buf[i]);
 	}
-	printf("%s", postfix);
+	charra_log_log_raw(level, "%s", postfix);
 }
 
-void charra_print_pcr_content(const uint8_t* pcr_selection,
-	const uint32_t pcr_selection_len, uint8_t** pcrs) {
+void charra_print_pcr_content(const charra_log_t level,
+	const uint8_t* pcr_selection, const uint32_t pcr_selection_len,
+	uint8_t** pcrs) {
 	for (uint32_t i = 0; i < pcr_selection_len; i++) {
-		printf("%02d: 0x", pcr_selection[i]);
+		charra_log_log_raw(level, "%02d: 0x", pcr_selection[i]);
 		for (uint32_t j = 0; j < TPM2_SHA256_DIGEST_SIZE; j++) {
-			charra_print_hex(1, &pcrs[i][j], "", "", true);
+			charra_print_hex(level, 1, &pcrs[i][j], "", "", true);
 		}
-		printf("\n");
+		charra_log_log_raw(level, "\n");
 	}
 }
 

@@ -325,7 +325,7 @@ CHARRA_RC compute_and_check_PCR_digest(uint8_t** pcr_values,
 	}
 	bool matching = charra_verify_tpm2_quote_pcr_composite_digest(
 		attest_struct, pcr_composite_digest, TPM2_SHA256_DIGEST_SIZE);
-	charra_print_hex(sizeof(pcr_composite_digest),
+	charra_print_hex(CHARRA_LOG_DEBUG, sizeof(pcr_composite_digest),
 		pcr_composite_digest,
 		"                                              0x", "\n", false);
 	if (matching) {
