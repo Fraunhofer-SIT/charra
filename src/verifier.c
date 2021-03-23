@@ -543,66 +543,25 @@ static coap_response_t coap_attest_handler(
 	{
 		charra_log_info("[" LOG_NAME "] Verifying PCRs ...");
 
-		/* allocate reference PCR values */
-		uint8_t** reference_pcrs =
-			malloc(tpm_pcr_selection_len * sizeof(uint8_t*));
-		for (uint32_t i = 0; i < tpm_pcr_selection_len; i++) {
-			reference_pcrs[i] =
-				malloc(TPM2_SHA256_DIGEST_SIZE * sizeof(uint8_t));
-		}
-
-		/* get reference PCRs */
-		if ((charra_r = charra_get_reference_pcrs_sha256(
-				 reference_pcr_file_path, tpm_pcr_selection,
-				 tpm_pcr_selection_len, reference_pcrs)) != CHARRA_RC_SUCCESS) {
-			charra_log_error("[" LOG_NAME "] Error getting reference PCRs.");
-			charra_free_reference_pcrs_sha256(
-				reference_pcrs, tpm_pcr_selection_len);
-			goto error;
-		}
-
-		if (charra_log_level <= CHARRA_LOG_DEBUG) {
-			charra_log_debug("[" LOG_NAME "] Reference PCR content:");
-			charra_print_pcr_content(
-				tpm_pcr_selection, tpm_pcr_selection_len, reference_pcrs);
-		}
-
-		/* compute PCR composite digest from reference PCRs */
-		uint8_t pcr_composite_digest[TPM2_SHA256_DIGEST_SIZE] = {0};
-		/* TODO use crypto-agile (generic) version
-		 * charra_compute_pcr_composite_digest_from_ptr_array(), once
-		 * implemented, instead of hash_sha256_array() (then maybe remove
-		 * hash_sha256_array() function) */
-		charra_r = hash_sha256_array(
-			reference_pcrs, tpm_pcr_selection_len, pcr_composite_digest);
-		charra_log_info(
-			"[" LOG_NAME
-			"] Computed PCR composite digest from reference PCRs is:");
-		charra_print_hex(sizeof(pcr_composite_digest), pcr_composite_digest,
-			"                                              0x", "\n", false);
 		charra_log_info(
 			"[" LOG_NAME "] Actual PCR composite digest from TPM Quote is:");
 		charra_print_hex(attest_struct.attested.quote.pcrDigest.size,
 			attest_struct.attested.quote.pcrDigest.buffer,
 			"                                              0x", "\n", false);
 
-		/* compare reference PCR composite with actual PCR composite */
-		attestation_result_pcrs = charra_verify_tpm2_quote_pcr_composite_digest(
-			&attest_struct, pcr_composite_digest, TPM2_SHA256_DIGEST_SIZE);
-		if (attestation_result_pcrs == true) {
+		CHARRA_RC pcr_check =
+			charra_check_pcr_digest_against_reference(reference_pcr_file_path,
+				tpm_pcr_selection, tpm_pcr_selection_len, &attest_struct);
+		if (pcr_check == CHARRA_RC_SUCCESS) {
 			charra_log_info(
-				"[" LOG_NAME
-				"]     => PCR composite digest is valid! (matches the "
-				"one from reference PCRs)");
+				"[" LOG_NAME "]     => PCR composite digest is valid!");
+			attestation_result_pcrs = true;
 		} else {
 			charra_log_error(
 				"[" LOG_NAME
 				"]     => PCR composite digest is NOT valid! (does "
-				"not match the one from reference PCRs)");
+				"not match any of the digests from the set of reference PCRs)");
 		}
-
-		charra_free_reference_pcrs_sha256(
-			reference_pcrs, tpm_pcr_selection_len);
 	}
 
 	/* verify event log */

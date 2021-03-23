@@ -28,11 +28,10 @@
 #include "../common/charra_error.h"
 
 /**
- * @brief Read reference PCRs from filename. Put those that we need for the
- * attestation into the refernce_pcrs buffer. The set of PCRs that we need is
- * defined by the reference PCR selection.
+ * @brief Read all sets of reference PCRs from filename. Check if any of the
+ * sets produces the same digest as the digest passed as attester_pcr_digest.
  *
- * filename is expected to be formatted in the same way as the
+ * the reference pcr file is expected to be formatted in the same way as the
  * output of tpm2_pcrread, e.g.:
  * 0 : 0x0000000000000000000000000000000000000000000000000000000000000000
  * ...
@@ -40,24 +39,21 @@
  * Entries are identified by the number at the start of the line.
  * Entries are allowed to be missing if they are not in the
  * reference_pcr_selection. Entries are expected to be in order.
+ * Multiple sets of PCR states are seperated by an empty newline.
  *
  * @param[in] filename The path of the file which holds the reference PCR values
  * @param[in] reference_pcr_selection An array of PCRs indexes that we need.
  * @param[in] reference_pcr_selection_len The number of PCRs indexes that we
  * need.
- * @param[out] reference_pcrs An array of arrays which will hold the PCR values
- * after the call.
+ * @param[in] attest_struct The struct holding the attestation data from the
+ * attester, including the PCR digest.
+ * @returns CHARRA_RC_SUCCESS on success, CHARRA_RC_VERIFICATION_FAILED when
+ * none of the reference PCR states matched the attestation state,
+ * CHARRA_RC_ERROR on errors.
  */
-CHARRA_RC charra_get_reference_pcrs_sha256(const char* filename,
+CHARRA_RC charra_check_pcr_digest_against_reference(const char* filename,
 	const uint8_t* reference_pcr_selection,
-	const uint32_t reference_pcr_selection_len, uint8_t** reference_pcrs);
-
-/**
- * @brief free reference PCR arrays
- *
- * @param reference_pcrs Array of arrays holding the PCR values
- */
-void charra_free_reference_pcrs_sha256(
-	uint8_t** reference_pcrs, uint32_t reference_pcr_selection_len);
+	const uint32_t reference_pcr_selection_len,
+	const TPMS_ATTEST* const attest_struct);
 
 #endif /* CHARRA_RIM_MGR_H */
