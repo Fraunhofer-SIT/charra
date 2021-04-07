@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: fraunhofer-sit/charra-dev-env:1.5.0
+    image: fraunhofer-sit/charra-dev-env:1.5.1
     restart: unless-stopped
     container_name: charra-dev-env
     volumes:
@@ -18,7 +18,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.app
-    image: fraunhofer-sit/charra:1.5.0
+    image: fraunhofer-sit/charra:1.5.1
     restart: unless-stopped
     container_name: charra-attester
     ports:
@@ -29,7 +29,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.app
-    image: fraunhofer-sit/charra:1.5.0
+    image: fraunhofer-sit/charra:1.5.1
     restart: unless-stopped
     container_name: charra-verifier
     #ports:
