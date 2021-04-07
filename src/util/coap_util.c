@@ -102,7 +102,7 @@ coap_pdu_t* charra_coap_new_request(coap_session_t* session,
 
 	/* set up PDU */
 	pdu->type = msg_type;
-	pdu->tid = msg_id;
+	pdu->mid = msg_id;
 	pdu->code = method;
 
 	/* generate new token */
