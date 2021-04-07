@@ -86,7 +86,7 @@ static CHARRA_RC create_attestation_request(
 
 static coap_response_t coap_attest_handler(struct coap_context_t* context,
 	coap_session_t* session, coap_pdu_t* sent, coap_pdu_t* received,
-	const coap_tid_t id);
+	const coap_mid_t mid);
 
 /* --- static variables --------------------------------------------------- */
 
@@ -168,7 +168,7 @@ int main(int argc, char** argv) {
 	uint8_t* req_buf = NULL; // TODO make dynamic
 	coap_optlist_t* coap_options = NULL;
 	coap_pdu_t* pdu = NULL;
-	coap_tid_t tid = COAP_INVALID_TID;
+	coap_mid_t mid = COAP_INVALID_MID;
 	int coap_io_process_time = -1;
 
 	/* create CoAP option for content type */
@@ -244,7 +244,7 @@ int main(int argc, char** argv) {
 
 	/* send CoAP PDU */
 	charra_log_info("[" LOG_NAME "] Sending CoAP message.");
-	if ((tid = coap_send_large(coap_session, pdu)) == COAP_INVALID_TID) {
+	if ((mid = coap_send_large(coap_session, pdu)) == COAP_INVALID_MID) {
 		charra_log_error("[" LOG_NAME "] Cannot send CoAP message.");
 		goto error;
 	}
@@ -358,7 +358,7 @@ static CHARRA_RC create_attestation_request(
 static coap_response_t coap_attest_handler(
 	struct coap_context_t* context CHARRA_UNUSED,
 	coap_session_t* session CHARRA_UNUSED, coap_pdu_t* sent CHARRA_UNUSED,
-	coap_pdu_t* in, const coap_tid_t id CHARRA_UNUSED) {
+	coap_pdu_t* in, const coap_mid_t mid CHARRA_UNUSED) {
 	CHARRA_RC charra_r = CHARRA_RC_SUCCESS;
 	int coap_r = 0;
 	CHARRA_RC charra_err = CHARRA_RC_SUCCESS;
