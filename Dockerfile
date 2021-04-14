@@ -28,6 +28,7 @@ RUN apt-get update \
 	man-db \
 	bash-completion \
 	&& rm -rf /var/lib/apt/lists/*
+RUN yes | unminimize
 
 ## TPM2 TSS
 RUN git clone --depth=1 -b '3.0.3' \
