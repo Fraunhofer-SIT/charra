@@ -86,7 +86,7 @@ typedef struct {
 typedef struct {
 	// TODO Use tpms_attest_dto attestation_data;
 	uint32_t attestation_data_len;
-	uint8_t attestation_data[sizeof(TPMS_ATTEST)];
+	uint8_t attestation_data[sizeof(TPM2B_ATTEST)];
 	uint32_t tpm2_signature_len;
 	uint8_t tpm2_signature[sizeof(TPMT_SIGNATURE)];
 	uint32_t tpm2_public_key_len;
