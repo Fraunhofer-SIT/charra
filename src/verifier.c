@@ -357,7 +357,7 @@ static CHARRA_RC create_attestation_request(
 		.pcr_selections_len = 1,
 		.pcr_selections = {{
 			.tcg_hash_alg_id = TPM2_ALG_SHA256,
-			.pcrs_len = 9,
+			.pcrs_len = tpm_pcr_selection_len,
 			.pcrs = {0} // must be memcpy'd, see below
 		}}};
 	memcpy(req.sig_key_id, TPM_SIG_KEY_ID, TPM_SIG_KEY_ID_LEN);
