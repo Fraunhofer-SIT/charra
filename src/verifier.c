@@ -73,6 +73,9 @@ static uint32_t tpm_pcr_selection_len = 9;
 uint16_t attestation_response_timeout =
 	30; // timeout when waiting for attestation answer in seconds
 char* reference_pcr_file_path = "reference-pcrs.txt";
+bool use_ima_event_log = false;
+char* ima_event_log_path =
+	"/sys/kernel/security/ima/binary_runtime_measurements";
 
 /* --- function forward declarations -------------------------------------- */
 
@@ -125,6 +128,8 @@ int main(int argc, char** argv) {
 				.reference_pcr_file_path = &reference_pcr_file_path,
 				.tpm_pcr_selection = tpm_pcr_selection,
 				.tpm_pcr_selection_len = &tpm_pcr_selection_len,
+				.use_ima_event_log = &use_ima_event_log,
+				.ima_event_log_path = &ima_event_log_path,
 			},
 	};
 
@@ -157,6 +162,12 @@ int main(int argc, char** argv) {
 			printf("%d ", tpm_pcr_selection[i]);
 		}
 		printf("\n");
+	}
+	charra_log_debug("[" LOG_NAME "]     IMA event log attestation enabled: %s",
+		(use_ima_event_log == true) ? "true" : "false");
+	if (use_ima_event_log) {
+		charra_log_debug(
+			"[" LOG_NAME "]     IMA event log path '%s'", ima_event_log_path);
 	}
 
 	/* create CoAP context */
@@ -354,7 +365,8 @@ static CHARRA_RC create_attestation_request(
 		"                                   0x", "\n", false);
 
 	/* build attestation request */
-	msg_attestation_request_dto req = {.hello = false,
+	msg_attestation_request_dto req = {
+		.hello = false,
 		.sig_key_id_len = TPM_SIG_KEY_ID_LEN,
 		.sig_key_id = {0}, // must be memcpy'd, see below
 		.nonce_len = nonce_len,
@@ -364,7 +376,12 @@ static CHARRA_RC create_attestation_request(
 			.tcg_hash_alg_id = TPM2_ALG_SHA256,
 			.pcrs_len = tpm_pcr_selection_len,
 			.pcrs = {0} // must be memcpy'd, see below
-		}}};
+		}},
+		.event_log_path_len =
+			(use_ima_event_log) ? strlen(ima_event_log_path) : 0,
+		.event_log_path =
+			(use_ima_event_log) ? (uint8_t*)ima_event_log_path : NULL,
+	};
 	memcpy(req.sig_key_id, TPM_SIG_KEY_ID, TPM_SIG_KEY_ID_LEN);
 	memcpy(req.nonce, nonce, nonce_len);
 	memcpy(req.pcr_selections->pcrs, tpm_pcr_selection, tpm_pcr_selection_len);
@@ -460,8 +477,8 @@ static coap_response_t coap_attest_handler(
 	/* load TPM key */
 	TPM2B_PUBLIC* tpm2_public_key = (TPM2B_PUBLIC*)res.tpm2_public_key;
 	charra_log_info("[" LOG_NAME "] Loading TPM key.");
-	if ((attestation_rc = charra_load_external_public_key(esys_ctx, tpm2_public_key,
-			 &sig_key_handle)) != CHARRA_RC_SUCCESS) {
+	if ((attestation_rc = charra_load_external_public_key(esys_ctx,
+			 tpm2_public_key, &sig_key_handle)) != CHARRA_RC_SUCCESS) {
 		charra_log_error("[" LOG_NAME "] Loading external public key failed.");
 		goto cleanup;
 	} else {
@@ -483,8 +500,8 @@ static coap_response_t coap_attest_handler(
 		charra_log_info(
 			"[" LOG_NAME "] Verifying TPM Quote signature with TPM ...");
 		/* verify attestation signature with TPM */
-		if ((attestation_rc = charra_verify_tpm2_quote_signature_with_tpm(esys_ctx,
-				 sig_key_handle, TPM2_ALG_SHA256, &attest, &signature,
+		if ((attestation_rc = charra_verify_tpm2_quote_signature_with_tpm(
+				 esys_ctx, sig_key_handle, TPM2_ALG_SHA256, &attest, &signature,
 				 &validation)) == CHARRA_RC_SUCCESS) {
 			charra_log_info(
 				"[" LOG_NAME "]     => TPM Quote signature is valid!");
@@ -509,8 +526,8 @@ static coap_response_t coap_attest_handler(
 		/* verify attestation signature with mbedTLS */
 		charra_log_info(
 			"[" LOG_NAME "] Verifying TPM Quote signature with mbedTLS ...");
-		if ((attestation_rc = charra_crypto_rsa_verify_signature(&mbedtls_rsa_pub_key,
-				 MBEDTLS_MD_SHA256, res.attestation_data,
+		if ((attestation_rc = charra_crypto_rsa_verify_signature(
+				 &mbedtls_rsa_pub_key, MBEDTLS_MD_SHA256, res.attestation_data,
 				 (size_t)res.attestation_data_len,
 				 signature.signature.rsapss.sig.buffer)) == CHARRA_RC_SUCCESS) {
 			charra_log_info(
@@ -579,26 +596,34 @@ static coap_response_t coap_attest_handler(
 	/* verify event log */
 	// TODO: Implement real verification
 	bool attestation_event_log = true;
-	{
+	if (use_ima_event_log) {
 		charra_log_info("[" LOG_NAME "] Verifying event log ...");
-		charra_log_info(
-			"[" LOG_NAME "]     <<< This is to be implemented. >>>");
-		charra_log_info("[" LOG_NAME "]     IMA Event Log size is %d bytes.",
-			res.event_log_len);
-		charra_log_debug("[" LOG_NAME "]     IMA Event Log:");
-
-		if (res.event_log_len > 20) {
-			charra_print_hex(CHARRA_LOG_DEBUG, 10, res.event_log,
-				"                                                  0x", "...",
-				false);
-			charra_print_hex(CHARRA_LOG_DEBUG, 10,
-				(res.event_log + res.event_log_len - 10), "", "\n", false);
-		} else if ((res.event_log_len > 0)) {
-			charra_print_hex(CHARRA_LOG_DEBUG, res.event_log_len, res.event_log,
-				"                                                  0x", "\n",
-				false);
+		if (res.event_log_len == 0) {
+			charra_log_error("[" LOG_NAME "] Received no event log altough IMA "
+										  "event log verification is on.");
+			attestation_event_log = false;
 		} else {
-			charra_log_debug("[" LOG_NAME "]     <none>");
+			charra_log_info(
+				"[" LOG_NAME "]     <<< This is to be implemented. >>>");
+			charra_log_info("[" LOG_NAME
+							"]     IMA Event Log size is %d bytes.",
+				res.event_log_len);
+			charra_log_debug("[" LOG_NAME "]     IMA Event Log:");
+
+			if (res.event_log_len > 20) {
+				charra_print_hex(CHARRA_LOG_DEBUG, 10, res.event_log,
+					"                                                  0x",
+					"...", false);
+				charra_print_hex(CHARRA_LOG_DEBUG, 10,
+					(res.event_log + res.event_log_len - 10), "", "\n", false);
+			} else if ((res.event_log_len > 0)) {
+				charra_print_hex(CHARRA_LOG_DEBUG, res.event_log_len,
+					res.event_log,
+					"                                                  0x",
+					"\n", false);
+			} else {
+				charra_log_debug("[" LOG_NAME "]     <none>");
+			}
 		}
 	}
 

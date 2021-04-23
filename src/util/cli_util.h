@@ -38,15 +38,6 @@ typedef struct {
 } cli_config_common;
 
 /**
- * A structure holding pointers to variables of the attester
- * which might geht modified by the CLI parser
- */
-typedef struct {
-	bool* use_ima_event_log;
-	char** ima_event_log_path;
-} cli_config_attester;
-
-/**
  * A structure holding pointers to variables of the verifier
  * which might geht modified by the CLI parser
  */
@@ -56,6 +47,8 @@ typedef struct {
 	char** reference_pcr_file_path;
 	uint8_t* tpm_pcr_selection;
 	uint32_t* tpm_pcr_selection_len;
+	bool* use_ima_event_log;
+	char** ima_event_log_path;
 } cli_config_verifier;
 
 /**
@@ -65,7 +58,6 @@ typedef struct {
 typedef struct {
 	cli_parser_caller caller;
 	cli_config_common common_config;
-	cli_config_attester attester_config;
 	cli_config_verifier verifier_config;
 } cli_config;
 

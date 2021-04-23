@@ -58,9 +58,6 @@ charra_log_t charra_log_level = CHARRA_LOG_INFO;
 static const char LISTEN_ADDRESS[] = "0.0.0.0";
 static unsigned int port = COAP_DEFAULT_PORT; // default port 5683
 #define CBOR_ENCODER_BUFFER_LENGTH 20480	  // 20 KiB should be sufficient
-bool use_ima_event_log = false;
-char* ima_event_log_path =
-	"/sys/kernel/security/ima/binary_runtime_measurements";
 // TODO allocate memory for CBOR buffer using malloc() since logs can be huge
 
 /**
@@ -101,11 +98,6 @@ int main(int argc, char** argv) {
 				.coap_log_level = &coap_log_level,
 				.port = &port,
 			},
-		.attester_config =
-			{
-				.use_ima_event_log = &use_ima_event_log,
-				.ima_event_log_path = &ima_event_log_path,
-			},
 	};
 
 	/* parse CLI arguments */
@@ -120,12 +112,6 @@ int main(int argc, char** argv) {
 
 	charra_log_debug("[" LOG_NAME "] Attester Configuration:");
 	charra_log_debug("[" LOG_NAME "]     Used local port: %d", port);
-	charra_log_debug("[" LOG_NAME "]     IMA event log attestation enabled: %s",
-		(use_ima_event_log == true) ? "true" : "false");
-	if (use_ima_event_log) {
-		charra_log_debug(
-			"[" LOG_NAME "]     IMA event log path %s", ima_event_log_path);
-	}
 
 	/* create CoAP context */
 	coap_context_t* coap_context = NULL;
@@ -289,18 +275,26 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
 
 	/* --- send response data --- */
 
-	/* read IMA event log if configured */
+	/* read IMA event log if requested */
 	uint8_t* ima_event_log = NULL;
 	size_t ima_event_log_len = 0;
-	if (use_ima_event_log == true) {
+	if (req.event_log_path_len != 0) {
 		charra_log_info("[" LOG_NAME "] Reading IMA event log.");
+		char* path = malloc(sizeof(char) * (req.event_log_path_len + 1));
+		memcpy(path, req.event_log_path, req.event_log_path_len);
+		path[req.event_log_path_len + 1] = '\n';
 		CHARRA_RC rc = charra_io_read_continuous_binary_file(
-			ima_event_log_path, &ima_event_log, &ima_event_log_len);
+			path, &ima_event_log, &ima_event_log_len);
 		if (rc != CHARRA_RC_SUCCESS) {
-			goto error;
+			charra_log_error("[" LOG_NAME "] Error while reading IMA event "
+										  "log. Sending empty event log!");
+			ima_event_log_len = 0;
+			ima_event_log = NULL;
+		} else {
+			charra_log_info("[" LOG_NAME
+							"] IMA event log has a size of %d bytes.",
+				ima_event_log_len);
 		}
-		charra_log_info("[" LOG_NAME "] IMA event log has a size of %d bytes.",
-			ima_event_log_len);
 	}
 
 	/* prepare response */

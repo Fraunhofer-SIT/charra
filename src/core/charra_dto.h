@@ -81,6 +81,8 @@ typedef struct {
 	uint8_t nonce[sizeof(TPMU_HA)];
 	uint32_t pcr_selections_len;
 	pcr_selection_dto pcr_selections[TPM2_NUM_PCR_BANKS];
+	uint32_t event_log_path_len;
+	uint8_t* event_log_path;
 } msg_attestation_request_dto;
 
 typedef struct {

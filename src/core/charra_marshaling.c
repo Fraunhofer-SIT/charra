@@ -48,6 +48,9 @@ static CHARRA_RC charra_marshal_attestation_request_internal(
 	assert(attestation_request->pcr_selections->pcrs != NULL);
 	assert(attestation_request->nonce_len <= sizeof(TPMU_HA));
 	assert(attestation_request->nonce != NULL);
+	if (attestation_request->event_log_path_len != 0) {
+		assert(attestation_request->event_log_path != NULL);
+	}
 
 	QCBOREncodeContext ec = {0};
 
@@ -94,6 +97,11 @@ static CHARRA_RC charra_marshal_attestation_request_internal(
 	/* close array: pcr_selections_array_encoder */
 	QCBOREncode_CloseArray(&ec);
 
+	/* encode "event_log_path" */
+	UsefulBufC event_log_path = {.ptr = attestation_request->event_log_path,
+		.len = attestation_request->event_log_path_len};
+	QCBOREncode_AddBytes(&ec, event_log_path);
+
 	/* close array: root_array_encoder */
 	QCBOREncode_CloseArray(&ec);
 
@@ -139,6 +147,9 @@ CHARRA_RC charra_marshal_attestation_request(
 	assert(attestation_request->pcr_selections->pcrs != NULL);
 	assert(attestation_request->nonce_len <= sizeof(TPMU_HA));
 	assert(attestation_request->nonce != NULL);
+	if (attestation_request->event_log_path_len != 0) {
+		assert(attestation_request->event_log_path != NULL);
+	}
 
 	/* compute size of marshaled data */
 	UsefulBuf buf_in = {.len = 0, .ptr = NULL};
@@ -234,6 +245,23 @@ CHARRA_RC charra_unmarshal_attestation_request(
 			if ((cborerr = charra_cbor_get_next(&dc, &item, QCBOR_TYPE_INT64)))
 				goto cbor_parse_error;
 			req.pcr_selections[i].pcrs[j] = (uint8_t)item.val.uint64;
+		}
+	}
+
+	/* parse "event-log-path" (bytes) */
+	if ((cborerr = charra_cbor_get_next(&dc, &item, QCBOR_TYPE_BYTE_STRING)))
+		goto cbor_parse_error;
+	req.event_log_path_len = item.val.string.len;
+	if (req.event_log_path_len != 0) {
+		uint8_t* event_log_path = (uint8_t*)malloc(req.event_log_path_len);
+		if (event_log_path == NULL) {
+			goto cbor_parse_error;
+		} else {
+			req.event_log_path = event_log_path;
+			if (memcpy(req.event_log_path, item.val.string.ptr,
+					req.event_log_path_len) == NULL) {
+				goto cbor_parse_error;
+			}
 		}
 	}
 

@@ -34,13 +34,13 @@ static const struct option verifier_options[] = {{"help", no_argument, 0, 'h'},
 	{"port", required_argument, 0, 'p'}, {"ip", required_argument, 0, 'i'},
 	{"timeout", required_argument, 0, 't'},
 	{"pcr-file", required_argument, 0, 'f'},
-	{"pcr-selection", required_argument, 0, 's'}, {0}};
+	{"pcr-selection", required_argument, 0, 's'},
+	{"ima", optional_argument, 0, 'm'}, {0}};
 
 static const struct option attester_options[] = {{"help", no_argument, 0, 'h'},
 	{"verbose", no_argument, 0, 'v'}, {"log-level", required_argument, 0, 'l'},
 	{"coap-log-level", required_argument, 0, 'c'},
-	{"port", required_argument, 0, 'p'}, {"ima", optional_argument, 0, 'i'},
-	{0}};
+	{"port", required_argument, 0, 'p'}, {0}};
 
 int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 	cli_parser_caller caller = variables->caller;
@@ -52,14 +52,15 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 	}
 	for (;;) {
 		int index = -1;
-		int identifier = getopt_long(argc, argv, ((caller == VERIFIER) ? "hvl:c:p:i:t:f:s:" : "hvl:c:p:i::"),
+		int identifier = getopt_long(argc, argv,
+			((caller == VERIFIER) ? "hvl:c:p:i:t:f:s:m::" : "hvl:c:p:"),
 			((caller == VERIFIER) ? verifier_options : attester_options),
 			&index);
 
 		if (identifier == -1)
 			return 0; // end of command line arguments reached
 
-		else if (identifier == 'h' || identifier =='?') {
+		else if (identifier == 'h' || identifier == '?') {
 			// print help message
 			printf("\nUsage: %s [OPTIONS]\n", log_name);
 			printf(
@@ -81,7 +82,7 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 					"doing the attestation on localhost.\n");
 				printf(
 					" -p, --port=PORT:                Connect to PORT instead "
-					"of port %d.\n",
+					"of default port %d.\n",
 					*(variables->common_config.port));
 				printf(
 					" -t, --timeout=SECONDS:          Wait up to SECONDS for "
@@ -94,8 +95,8 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 				printf(" -s, --pcr-selection=X1[,X2...]: Specifies which "
 					   "PCRs to check on the attester. Each X references one "
 					   "PCR. PCR numbers shall be ordered from smallest to "
-					   "biggest, comma-seperated and without whitespace. If this option is not "
-					   "given, these PCRs are checked: ");
+					   "biggest, comma-seperated and without whitespace. By "
+					   "default these PCRs are checked: ");
 				for (uint32_t i = 0;
 					 i < *variables->verifier_config.tpm_pcr_selection_len;
 					 i++) {
@@ -107,17 +108,18 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 					}
 				}
 				printf("\n");
+				printf(
+					" -m, --ima[=PATH]:               Request the attester to "
+					"include an IMA event log in the attestation response. "
+					"By default IMA requests the file '%s'. Alternatives can "
+					"be "
+					"passed.\n",
+					*(variables->verifier_config.ima_event_log_path));
 			} else {
 				printf(" -p, --port=PORT:                Open PORT instead of "
-					   "port "
+					   "default port "
 					   "%d.\n",
 					*(variables->common_config.port));
-				printf(" -i, --ima[=PATH]:               Enable attestation of "
-					   "ima "
-					   "event logs. "
-					   "By default IMA uses the file '%s'. Alternatives can be "
-					   "passed.\n",
-					*(variables->attester_config.ima_event_log_path));
 			}
 			printf("\nTo specify TCTI commands for the TPM, set the "
 				   "'CHARRA_TCTI' environment variable accordingly.\n");
@@ -146,8 +148,9 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 			int result = charra_coap_log_level_from_str(
 				optarg, variables->common_config.coap_log_level);
 			if (result != 0) {
-				charra_log_error("[%s] Error while parsing '-c/--coap-log-level': "
-								 "Unrecognized argument %s",
+				charra_log_error(
+					"[%s] Error while parsing '-c/--coap-log-level': "
+					"Unrecognized argument %s",
 					log_name, optarg);
 				return -1;
 			}
@@ -259,17 +262,12 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 				continue;
 			}
 
-			goto undefined;
-		}
-
-		else if (caller == ATTESTER) {
-
-			if (identifier == 'i') { // set IMA event log on
-				*(variables->attester_config.use_ima_event_log) = true;
+			if (identifier == 'm') { // enable request for IMA event log
+				*(variables->verifier_config.use_ima_event_log) = true;
 				if (optarg != NULL) {
-					*(variables->attester_config.ima_event_log_path) =
+					*(variables->verifier_config.ima_event_log_path) =
 						malloc(strlen(optarg) + 1);
-					strncpy(*(variables->attester_config.ima_event_log_path),
+					strncpy(*(variables->verifier_config.ima_event_log_path),
 						optarg, strlen(optarg));
 				}
 				continue;
@@ -278,9 +276,13 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 			goto undefined;
 		}
 
+		else if (caller == ATTESTER) {
+			goto undefined;
+		}
+
 		// undefined behaviour, probably because getopt_long returned an
 		// identifier which is not checked here
-undefined:
+	undefined:
 		charra_log_error(
 			"[%s] Error: Undefined behaviour while parsing command line",
 			log_name);
