@@ -34,13 +34,16 @@ static const struct option verifier_options[] = {{"help", no_argument, 0, 'h'},
 	{"port", required_argument, 0, 'p'}, {"ip", required_argument, 0, 'i'},
 	{"timeout", required_argument, 0, 't'},
 	{"pcr-file", required_argument, 0, 'f'},
-	{"pcr-selection", required_argument, 0, 's'}, {0}};
+	{"pcr-selection", required_argument, 0, 's'}, {"dtls", no_argument, 0, 'd'},
+	{"key", required_argument, 0, 'k'}, {"identity", required_argument, 0, 'e'},
+	{0}};
 
 static const struct option attester_options[] = {{"help", no_argument, 0, 'h'},
 	{"verbose", no_argument, 0, 'v'}, {"log-level", required_argument, 0, 'l'},
 	{"coap-log-level", required_argument, 0, 'c'},
 	{"port", required_argument, 0, 'p'}, {"ima", optional_argument, 0, 'i'},
-	{0}};
+	{"dtls", no_argument, 0, 'd'}, {"key", required_argument, 0, 'k'},
+	{"hint", required_argument, 0, 'n'}, {0}};
 
 int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 	cli_parser_caller caller = variables->caller;
@@ -52,14 +55,15 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 	}
 	for (;;) {
 		int index = -1;
-		int identifier = getopt_long(argc, argv, ((caller == VERIFIER) ? "hvl:c:p:i:t:f:s:" : "hvl:c:p:i::"),
+		int identifier = getopt_long(argc, argv,
+			((caller == VERIFIER) ? "hvl:c:p:i:t:f:s:dk:" : "hvl:c:p:i::dk:"),
 			((caller == VERIFIER) ? verifier_options : attester_options),
 			&index);
 
 		if (identifier == -1)
 			return 0; // end of command line arguments reached
 
-		else if (identifier == 'h' || identifier =='?') {
+		else if (identifier == 'h' || identifier == '?') {
 			// print help message
 			printf("\nUsage: %s [OPTIONS]\n", log_name);
 			printf(
@@ -94,7 +98,8 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 				printf(" -s, --pcr-selection=X1[,X2...]: Specifies which "
 					   "PCRs to check on the attester. Each X references one "
 					   "PCR. PCR numbers shall be ordered from smallest to "
-					   "biggest, comma-seperated and without whitespace. If this option is not "
+					   "biggest, comma-seperated and without whitespace. If "
+					   "this option is not "
 					   "given, these PCRs are checked: ");
 				for (uint32_t i = 0;
 					 i < *variables->verifier_config.tpm_pcr_selection_len;
@@ -107,6 +112,18 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 					}
 				}
 				printf("\n");
+				printf(
+					" -d, --dtls:                     Enable DTLS protocol "
+					"with PSK. "
+					"By default the key \"%s\" and identity \"%s\" are used.\n",
+					*variables->common_config.dtls_key,
+					*variables->verifier_config.dtls_identity);
+				printf(
+					" -k, --key=KEY:                  Use KEY as pre-shared "
+					"key for DTLS. Implicitly enables DTLS (argument '-d').\n");
+				printf(
+					" --identity=IDENTITY:            Use IDENTITY as identity "
+					"for DTLS. Implicitly enables DTLS (argument '-d').\n");
 			} else {
 				printf(" -p, --port=PORT:                Open PORT instead of "
 					   "port "
@@ -118,7 +135,18 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 					   "By default IMA uses the file '%s'. Alternatives can be "
 					   "passed.\n",
 					*(variables->attester_config.ima_event_log_path));
+				printf(" -d, --dtls:                     Enable DTLS protocol "
+					   "with PSK. "
+					   "By default the key \"%s\" and hint \"%s\" are used.\n",
+					*variables->common_config.dtls_key,
+					*variables->attester_config.dtls_hint);
+				printf(
+					" -k, --key=KEY:                  Use KEY as pre-shared "
+					"key for DTLS. Implicitly enables DTLS (argument '-d').\n");
+				printf(" --hint=HINT:                    Use HINT as hint for "
+					   "DTLS. Implicitly enables DTLS (argument '-d').\n");
 			}
+
 			printf("\nTo specify TCTI commands for the TPM, set the "
 				   "'CHARRA_TCTI' environment variable accordingly.\n");
 			return (identifier == '?') ? -1 : 1;
@@ -146,8 +174,9 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 			int result = charra_coap_log_level_from_str(
 				optarg, variables->common_config.coap_log_level);
 			if (result != 0) {
-				charra_log_error("[%s] Error while parsing '-c/--coap-log-level': "
-								 "Unrecognized argument %s",
+				charra_log_error(
+					"[%s] Error while parsing '-c/--coap-log-level': "
+					"Unrecognized argument %s",
 					log_name, optarg);
 				return -1;
 			}
@@ -165,6 +194,20 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 					log_name);
 				return -1;
 			}
+			continue;
+		}
+
+		else if (identifier == 'd') {
+			*variables->common_config.use_dtls = true;
+			continue;
+		}
+
+		else if (identifier == 'k') {
+			*variables->common_config.use_dtls = true;
+			uint32_t length = strlen(optarg);
+			char* key = malloc(length * sizeof(char));
+			strcpy(key, optarg);
+			*(variables->common_config.dtls_key) = key;
 			continue;
 		}
 
@@ -259,6 +302,15 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 				continue;
 			}
 
+			else if (identifier == 'e') {
+				*variables->common_config.use_dtls = true;
+				uint32_t length = strlen(optarg);
+				char* identity = malloc(length * sizeof(char));
+				strcpy(identity, optarg);
+				*(variables->verifier_config.dtls_identity) = identity;
+				continue;
+			}
+
 			goto undefined;
 		}
 
@@ -275,12 +327,21 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 				continue;
 			}
 
+			else if (identifier == 'n') {
+				*variables->common_config.use_dtls = true;
+				uint32_t length = strlen(optarg);
+				char* hint = malloc(length * sizeof(char));
+				strcpy(hint, optarg);
+				*(variables->attester_config.dtls_hint) = hint;
+				continue;
+			}
+
 			goto undefined;
 		}
 
 		// undefined behaviour, probably because getopt_long returned an
 		// identifier which is not checked here
-undefined:
+	undefined:
 		charra_log_error(
 			"[%s] Error: Undefined behaviour while parsing command line",
 			log_name);

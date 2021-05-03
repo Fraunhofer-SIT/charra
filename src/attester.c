@@ -61,6 +61,9 @@ static unsigned int port = COAP_DEFAULT_PORT; // default port 5683
 bool use_ima_event_log = false;
 char* ima_event_log_path =
 	"/sys/kernel/security/ima/binary_runtime_measurements";
+bool use_dtls = false;
+char* dtls_key = "Charra DTLS Key";
+char* dtls_hint = "Charra Attester";
 // TODO allocate memory for CBOR buffer using malloc() since logs can be huge
 
 /**
@@ -100,11 +103,14 @@ int main(int argc, char** argv) {
 				.charra_log_level = &charra_log_level,
 				.coap_log_level = &coap_log_level,
 				.port = &port,
+				.use_dtls = &use_dtls,
+				.dtls_key = &dtls_key,
 			},
 		.attester_config =
 			{
 				.use_ima_event_log = &use_ima_event_log,
 				.ima_event_log_path = &ima_event_log_path,
+				.dtls_hint = &dtls_hint,
 			},
 	};
 
@@ -126,6 +132,22 @@ int main(int argc, char** argv) {
 		charra_log_debug(
 			"[" LOG_NAME "]     IMA event log path %s", ima_event_log_path);
 	}
+	charra_log_debug("[" LOG_NAME "]     DTLS with PSK enabled: %s",
+		(use_dtls == true) ? "true" : "false");
+	if (use_dtls) {
+		charra_log_debug(
+			"[" LOG_NAME "]     Pre-shared key for DTLS: '%s'", dtls_key);
+		charra_log_debug("[" LOG_NAME "]     Hint for DTLS: '%s'", dtls_hint);
+	}
+
+	// print TLS version when in debug mode
+	coap_show_tls_version(LOG_DEBUG);
+
+	if (use_dtls && !coap_dtls_is_supported()) {
+		charra_log_error("[" LOG_NAME "] CoAP does not support DTLS but the "
+									  "configuration enables DTLS. Aborting!");
+		goto error;
+	}
 
 	/* create CoAP context */
 	coap_context_t* coap_context = NULL;
@@ -137,12 +159,32 @@ int main(int argc, char** argv) {
 
 	/* create CoAP server endpoint */
 	coap_endpoint_t* coap_endpoint = NULL;
-	charra_log_info("[" LOG_NAME "] Creating CoAP server endpoint.");
-	if ((coap_endpoint = charra_coap_new_endpoint(
-			 coap_context, LISTEN_ADDRESS, port, COAP_PROTO_UDP)) == NULL) {
-		charra_log_error(
-			"[" LOG_NAME "] Cannot create CoAP server endpoint.\n");
-		goto error;
+	if (use_dtls) {
+		charra_log_info("[" LOG_NAME
+						"] Creating CoAP server endpoint using DTLS with PSK.");
+		if (!coap_context_set_psk(coap_context, dtls_hint, (uint8_t*)dtls_key,
+				strlen(dtls_key))) {
+			charra_log_error(
+				"[" LOG_NAME
+				"] Error while configuring CoAP to use DTLS with PSK.");
+			goto error;
+		}
+
+		if ((coap_endpoint = charra_coap_new_endpoint(coap_context,
+				 LISTEN_ADDRESS, port, COAP_PROTO_DTLS)) == NULL) {
+			charra_log_error(
+				"[" LOG_NAME "] Cannot create CoAP server endpoint.\n");
+			goto error;
+		}
+	} else {
+		charra_log_info(
+			"[" LOG_NAME "] Creating CoAP server endpoint using UDP.");
+		if ((coap_endpoint = charra_coap_new_endpoint(
+				 coap_context, LISTEN_ADDRESS, port, COAP_PROTO_UDP)) == NULL) {
+			charra_log_error(
+				"[" LOG_NAME "] Cannot create CoAP server endpoint.\n");
+			goto error;
+		}
 	}
 
 	/* register CoAP resource and resource handler */

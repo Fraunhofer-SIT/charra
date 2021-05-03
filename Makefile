@@ -26,7 +26,7 @@ LIBINCLUDE = -I/usr/include \
 LDPATH =     -L/usr/local/lib/ \
              -L/usr/lib/x86_64-linux-gnu
 
-LIBS =       coap-2 \
+LIBS =       coap-2-tinydtls \
              qcbor m \
              crypto ssl \
              mbedcrypto \

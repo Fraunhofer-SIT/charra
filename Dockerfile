@@ -65,7 +65,7 @@ RUN git clone --depth=1 --recursive -b 'develop' \
 	'https://github.com/obgm/libcoap.git' /tmp/libcoap
 WORKDIR /tmp/libcoap
 RUN ./autogen.sh \
-	&& ./configure --disable-tests --disable-documentation --disable-manpages --disable-dtls --disable-shared --enable-fast-install \
+	&& ./configure --disable-tests --disable-documentation --disable-manpages --enable-dtls --with-tinydtls --enable-fast-install \
 	&& make -j \
 	&& make install
 RUN rm -rfv /tmp/libcoap

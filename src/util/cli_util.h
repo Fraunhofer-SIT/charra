@@ -35,6 +35,8 @@ typedef struct {
 	charra_log_t* charra_log_level;
 	coap_log_t* coap_log_level;
 	unsigned int* port;
+	bool* use_dtls;
+	char** dtls_key;
 } cli_config_common;
 
 /**
@@ -44,6 +46,7 @@ typedef struct {
 typedef struct {
 	bool* use_ima_event_log;
 	char** ima_event_log_path;
+	char** dtls_hint;
 } cli_config_attester;
 
 /**
@@ -56,6 +59,7 @@ typedef struct {
 	char** reference_pcr_file_path;
 	uint8_t* tpm_pcr_selection;
 	uint32_t* tpm_pcr_selection_len;
+	char** dtls_identity;
 } cli_config_verifier;
 
 /**

@@ -104,6 +104,24 @@ coap_session_t* charra_coap_new_client_session(coap_context_t* coap_context,
 	const coap_proto_t coap_protocol);
 
 /**
+ * @brief Creates a CoAP client session with PSK.
+ *
+ * @param[inout] coap_context the CoAP context.
+ * @param[in] dest_address the destination IP address.
+ * @param[in] port the port (default CoAP UDP port is 5683).
+ * @param[in] coap_protocol the CoAP protocol.
+ * @param[in] identity the identity used for PSK.
+ * @param[in] key the pre-shared key.
+ * @param[in] key_length the length of the pre-shared key.
+ * @return coap_session_t* the CoAP session.
+ * @return NULL if an error occurred.
+ */
+coap_session_t* charra_coap_new_client_session_psk(coap_context_t* coap_context,
+	const char* dest_address, const uint16_t port,
+	const coap_proto_t coap_protocol, const char* identity, const uint8_t* key,
+	unsigned key_length);
+
+/**
  * @brief Creates a new CoAP request with large data, using CoAP block-wise
  * transfers.
  *

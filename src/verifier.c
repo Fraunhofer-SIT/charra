@@ -72,6 +72,9 @@ static uint32_t tpm_pcr_selection_len = 9;
 uint16_t attestation_response_timeout =
 	30; // timeout when waiting for attestation answer in seconds
 char* reference_pcr_file_path = "reference-pcrs.txt";
+bool use_dtls = false;
+char* dtls_key = "Charra DTLS Key";
+char* dtls_identity = "Charra Verifier";
 
 /* --- function forward declarations -------------------------------------- */
 
@@ -116,6 +119,8 @@ int main(int argc, char** argv) {
 				.charra_log_level = &charra_log_level,
 				.coap_log_level = &coap_log_level,
 				.port = &dst_port,
+				.use_dtls = &use_dtls,
+				.dtls_key = &dtls_key,
 			},
 		.verifier_config =
 			{
@@ -124,6 +129,7 @@ int main(int argc, char** argv) {
 				.reference_pcr_file_path = &reference_pcr_file_path,
 				.tpm_pcr_selection = tpm_pcr_selection,
 				.tpm_pcr_selection_len = &tpm_pcr_selection_len,
+				.dtls_identity = &dtls_identity,
 			},
 	};
 
@@ -157,6 +163,23 @@ int main(int argc, char** argv) {
 		}
 		printf("\n");
 	}
+	charra_log_debug("[" LOG_NAME "]     DTLS with PSK enabled: %s",
+		(use_dtls == true) ? "true" : "false");
+	if (use_dtls) {
+		charra_log_debug(
+			"[" LOG_NAME "]     Pre-shared key for DTLS: '%s'", dtls_key);
+		charra_log_debug(
+			"[" LOG_NAME "]     Identity for DTLS: '%s'", dtls_identity);
+	}
+
+	// print tls version when in debug mode
+	coap_show_tls_version(LOG_DEBUG);
+
+	if (use_dtls && !coap_dtls_is_supported()) {
+		charra_log_error("[" LOG_NAME "] CoAP does not support DTLS but the "
+									  "configuration enables DTLS. Aborting!");
+		goto error;
+	}
 
 	/* create CoAP context */
 	coap_context_t* coap_context = NULL;
@@ -172,11 +195,23 @@ int main(int argc, char** argv) {
 
 	/* create CoAP client session */
 	coap_session_t* coap_session = NULL;
-	charra_log_info("[" LOG_NAME "] Creating CoAP client session.");
-	if ((coap_session = charra_coap_new_client_session(
-			 coap_context, dst_host, dst_port, COAP_PROTO_UDP)) == NULL) {
-		charra_log_error("[" LOG_NAME "] Cannot create client session.");
-		goto finish;
+	if (use_dtls) {
+		charra_log_info(
+			"[" LOG_NAME "] Creating CoAP client session using DTLS with PSK.");
+		if ((coap_session = charra_coap_new_client_session_psk(coap_context,
+				 dst_host, dst_port, COAP_PROTO_DTLS, dtls_identity,
+				 (uint8_t*)dtls_key, strlen(dtls_key))) == NULL) {
+			charra_log_error("[" LOG_NAME "] Cannot create client session.");
+			goto finish;
+		}
+	} else {
+		charra_log_info(
+			"[" LOG_NAME "] Creating CoAP client session using UDP.");
+		if ((coap_session = charra_coap_new_client_session(
+				 coap_context, dst_host, dst_port, COAP_PROTO_UDP)) == NULL) {
+			charra_log_error("[" LOG_NAME "] Cannot create client session.");
+			goto finish;
+		}
 	}
 
 	/* define needed variables */

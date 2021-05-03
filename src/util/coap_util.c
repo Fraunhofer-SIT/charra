@@ -86,6 +86,22 @@ coap_session_t* charra_coap_new_client_session(coap_context_t* coap_context,
 	return coap_new_client_session(coap_context, NULL, &addr, coap_protocol);
 }
 
+coap_session_t* charra_coap_new_client_session_psk(coap_context_t* coap_context,
+	const char* dest_address, const uint16_t port,
+	const coap_proto_t coap_protocol, const char* identity, const uint8_t* key,
+	unsigned key_length) {
+	/* prepare address */
+	coap_address_t addr = {0};
+	coap_address_init(&addr);
+	addr.addr.sin.sin_family = AF_INET;
+	inet_pton(AF_INET, dest_address, &addr.addr.sin.sin_addr);
+	addr.addr.sin.sin_port = htons(port);
+
+	/* create session */
+	return coap_new_client_session_psk(
+		coap_context, NULL, &addr, coap_protocol, identity, key, key_length);
+}
+
 coap_pdu_t* charra_coap_new_request(coap_session_t* session,
 	coap_message_t msg_type, coap_request_t method, coap_optlist_t** options,
 	const uint8_t* data, const size_t data_len) {
