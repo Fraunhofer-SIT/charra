@@ -141,22 +141,22 @@ int main(int argc, char** argv) {
 	charra_log_debug("[" LOG_NAME "]     DTLS-PSK enabled: %s",
 		(use_dtls_psk == true) ? "true" : "false");
 	if (use_dtls_psk) {
-		charra_log_debug("[" LOG_NAME "]         Pre-shared key for DTLS: '%s'",
+		charra_log_debug("[" LOG_NAME "]         Pre-shared key: '%s'",
 			dtls_psk_key);
 		charra_log_debug(
-			"[" LOG_NAME "]         Hint for DTLS: '%s'", dtls_psk_hint);
+			"[" LOG_NAME "]         Hint: '%s'", dtls_psk_hint);
 	}
 	charra_log_debug("[" LOG_NAME "]     DTLS-RPK enabled: %s",
 		(use_dtls_rpk == true) ? "true" : "false");
 	if (use_dtls_rpk) {
 		charra_log_debug("[" LOG_NAME
-						 "]         DTLS-RPK private key path: '%s'",
+						 "]         Private key path: '%s'",
 			dtls_rpk_private_key_path);
 		charra_log_debug("[" LOG_NAME
-						 "]         DTLS-RPK public key path: '%s'",
+						 "]         Public key path: '%s'",
 			dtls_rpk_public_key_path);
 		charra_log_debug("[" LOG_NAME
-						 "]         DTLS-RPK peers' public key path: '%s'",
+						 "]         Peers' public key path: '%s'",
 			dtls_rpk_peer_public_key_path);
 	}
 

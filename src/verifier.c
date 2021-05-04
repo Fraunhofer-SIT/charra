@@ -178,11 +178,13 @@ int main(int argc, char** argv) {
 		reference_pcr_file_path);
 	charra_log_debug("[" LOG_NAME "]     PCR selection with length %d:",
 		tpm_pcr_selection_len);
-	if (charra_log_level <= CHARRA_LOG_DEBUG) {
-		for (uint32_t i = 0; i < tpm_pcr_selection_len; i++) {
-			printf("%d ", tpm_pcr_selection[i]);
+	charra_log_log_raw(CHARRA_LOG_DEBUG, "                                                      ");
+	for (uint32_t i = 0; i < tpm_pcr_selection_len; i++) {
+		if (i != tpm_pcr_selection_len - 1) {
+			charra_log_log_raw(CHARRA_LOG_DEBUG, "%d, ", tpm_pcr_selection[i]);
+		} else {
+			charra_log_log_raw(CHARRA_LOG_DEBUG, "%d\n", tpm_pcr_selection[i]);
 		}
-		printf("\n");
 	}
 	charra_log_debug("[" LOG_NAME "]     IMA event log attestation enabled: %s",
 		(use_ima_event_log == true) ? "true" : "false");
@@ -193,22 +195,22 @@ int main(int argc, char** argv) {
 	charra_log_debug("[" LOG_NAME "]     DTLS with PSK enabled: %s",
 		(use_dtls_psk == true) ? "true" : "false");
 	if (use_dtls_psk) {
-		charra_log_debug("[" LOG_NAME "]         Pre-shared key for DTLS: '%s'",
+		charra_log_debug("[" LOG_NAME "]         Pre-shared key: '%s'",
 			dtls_psk_key);
-		charra_log_debug("[" LOG_NAME "]         Identity for DTLS: '%s'",
+		charra_log_debug("[" LOG_NAME "]         Identity: '%s'",
 			dtls_psk_identity);
 	}
 	charra_log_debug("[" LOG_NAME "]     DTLS-RPK enabled: %s",
 		(use_dtls_rpk == true) ? "true" : "false");
 	if (use_dtls_rpk) {
 		charra_log_debug("[" LOG_NAME
-						 "]         DTLS-RPK private key path: '%s'",
+						 "]         Private key path: '%s'",
 			dtls_rpk_private_key_path);
 		charra_log_debug("[" LOG_NAME
-						 "]         DTLS-RPK public key path: '%s'",
+						 "]         Public key path: '%s'",
 			dtls_rpk_public_key_path);
 		charra_log_debug("[" LOG_NAME
-						 "]         DTLS-RPK peers' public key path: '%s'",
+						 "]         Peers' public key path: '%s'",
 			dtls_rpk_peer_public_key_path);
 	}
 
@@ -462,9 +464,9 @@ static CHARRA_RC create_attestation_request(
 			return err;
 		}
 	}
-	charra_log_info("Generated nonce of length %d:", nonce_len);
+	charra_log_info("[" LOG_NAME "] Generated nonce of length %d:", nonce_len);
 	charra_print_hex(CHARRA_LOG_INFO, nonce_len, nonce,
-		"                                   0x", "\n", false);
+		"                                                  0x", "\n", false);
 
 	/* build attestation request */
 	msg_attestation_request_dto req = {

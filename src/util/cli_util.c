@@ -134,15 +134,14 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 				printf(
 					" -p, --psk:                      Enable DTLS protocol "
 					"with PSK. "
-					"By default the key \"%s\" and identity \"%s\" are used.\n",
+					"By default the key '%s' and identity '%s' are used.\n",
 					*variables->common_config.dtls_psk_key,
 					*variables->verifier_config.dtls_psk_identity);
 				printf(" -k, --key=KEY:                  Use KEY as pre-shared "
-					   "key for DTLS-PSK. Implicitly enables DTLS-PSK "
-					   "(argument '-p').\n");
+					   "key for DTLS-PSK. Implicitly enables DTLS-PSK.\n");
 				printf(
 					" -i, --identity=IDENTITY:        Use IDENTITY as identity "
-					"for DTLS. Implicitly enables DTLS-PSK (argument '-d').\n");
+					"for DTLS. Implicitly enables DTLS-PSK.\n");
 			} else {
 				printf("     --port=PORT:                Open PORT instead of "
 					   "port "
@@ -151,7 +150,7 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 				printf("DTLS-PSK Options:\n");
 				printf(" -p, --psk:                      Enable DTLS protocol "
 					   "with PSK. "
-					   "By default the key \"%s\" and hint \"%s\" are used.\n",
+					   "By default the key '%s' and hint '%s' are used.\n",
 					*variables->common_config.dtls_psk_key,
 					*variables->attester_config.dtls_psk_hint);
 				printf(" -k, --key=KEY:                  Use KEY as pre-shared "
@@ -169,20 +168,20 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 				   "scenarios in which public keys of either attester or "
 				   "verifier or both of them are pre-shared.\n");
 			printf(
-				"     --private-key:              Specify the path of the "
+				"     --private-key=PATH:         Specify the path of the "
 				"private key used for RPK. Currently only supports DER (ASN.1) "
 				"format.\n");
 			printf("                                 By default '%s' is used. "
 				   "Implicitly enables DTLS-RPK.\n",
 				*variables->common_config.dtls_rpk_private_key_path);
 			printf(
-				"     --public-key:               Specify the path of the "
+				"     --public-key=PATH:          Specify the path of the "
 				"public key used for RPK. Currently only supports DER (ASN.1) "
 				"format.\n");
 			printf("                                 By default '%s' is used. "
 				   "Implicitly enables DTLS-RPK.\n",
 				*variables->common_config.dtls_rpk_public_key_path);
-			printf("     --peer-public-key:          Specify the path of the "
+			printf("     --peer-public-key=PATH:     Specify the path of the "
 				   "reference public key of the peer, used for RPK. Currently "
 				   "only supports DER (ASN.1) format.\n");
 			printf("                                 By default '%s' is used. "
