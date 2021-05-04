@@ -49,8 +49,6 @@ typedef struct {
  * which might geht modified by the CLI parser
  */
 typedef struct {
-	bool* use_ima_event_log;
-	char** ima_event_log_path;
 	char** dtls_psk_hint;
 } cli_config_attester;
 
@@ -64,6 +62,8 @@ typedef struct {
 	char** reference_pcr_file_path;
 	uint8_t* tpm_pcr_selection;
 	uint32_t* tpm_pcr_selection_len;
+	bool* use_ima_event_log;
+	char** ima_event_log_path;
 	char** dtls_psk_identity;
 } cli_config_verifier;
 

@@ -41,7 +41,7 @@ static const struct option verifier_options[] = {
 	{"peer-public-key", required_argument, 0, '3'},
 	{"verify-peer", required_argument, 0, '4'},
 	{"ip", required_argument, 0, 'a'}, {"port", required_argument, 0, 'b'},
-	{0}};
+	{"ima", optional_argument, 0, 'm'}, {0}};
 
 static const struct option attester_options[] = {
 	{"verbose", no_argument, 0, 'v'}, {"log-level", required_argument, 0, 'l'},
@@ -52,8 +52,7 @@ static const struct option attester_options[] = {
 	{"public-key", required_argument, 0, '2'},
 	{"peer-public-key", required_argument, 0, '3'},
 	{"verify-peer", required_argument, 0, '4'},
-	{"ima", optional_argument, 0, 'a'}, {"port", required_argument, 0, 'b'},
-	{0}};
+	{"port", required_argument, 0, 'b'}, {0}};
 
 int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 	cli_parser_caller caller = variables->caller;
@@ -66,7 +65,7 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 	for (;;) {
 		int index = -1;
 		int identifier = getopt_long(argc, argv,
-			((caller == VERIFIER) ? "vl:c:t:f:s:pk:i:rv:" : "vl:c:pk:h:rv:"),
+			((caller == VERIFIER) ? "vl:c:t:f:s:pk:i:r" : "vl:c:pk:h:r"),
 			((caller == VERIFIER) ? verifier_options : attester_options),
 			&index);
 
@@ -95,7 +94,7 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 					"doing the attestation on localhost.\n");
 				printf(
 					"     --port=PORT:                Connect to PORT instead "
-					"of port %d.\n",
+					"of default port %d.\n",
 					*(variables->common_config.port));
 				printf(
 					" -t, --timeout=SECONDS:          Wait up to SECONDS for "
@@ -110,8 +109,7 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 					   "PCR. PCR numbers shall be ordered from smallest to "
 					   "biggest, comma-seperated\n");
 				printf("                                 and without "
-					   "whitespace. If "
-					   "this option is not given, these PCRs are checked: ");
+					   "whitespace. By default these PCRs are checked: ");
 				for (uint32_t i = 0;
 					 i < *variables->verifier_config.tpm_pcr_selection_len;
 					 i++) {
@@ -123,6 +121,15 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 					}
 				}
 				printf("\n");
+				printf(
+					"     --ima[=PATH]:               Request the attester to "
+					"include an IMA event log in the attestation response. "
+					"By default IMA requests the file\n");
+				printf(
+					"                                 '%s'. Alternatives can "
+					"be "
+					"passed.\n",
+					*(variables->verifier_config.ima_event_log_path));
 				printf("DTLS-PSK Options:\n");
 				printf(
 					" -p, --psk:                      Enable DTLS protocol "
@@ -141,12 +148,6 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 					   "port "
 					   "%d.\n",
 					*(variables->common_config.port));
-				printf("     --ima[=PATH]:               Enable attestation of "
-					   "ima "
-					   "event logs. "
-					   "By default IMA uses the file '%s'. Alternatives can be "
-					   "passed.\n",
-					*(variables->attester_config.ima_event_log_path));
 				printf("DTLS-PSK Options:\n");
 				printf(" -p, --psk:                      Enable DTLS protocol "
 					   "with PSK. "
@@ -427,15 +428,15 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 			continue;
 		}
 
-		if (caller == ATTESTER && identifier == 'b') { // set IMA event log on
-			*(variables->attester_config.use_ima_event_log) = true;
+		else if (caller == VERIFIER &&
+				 identifier == 'm') { // enable request for IMA event log
+			*(variables->verifier_config.use_ima_event_log) = true;
 			if (optarg != NULL) {
-				*(variables->attester_config.ima_event_log_path) =
-					malloc(strlen(optarg));
-				strcpy(
-					*(variables->attester_config.ima_event_log_path), optarg);
+				*(variables->verifier_config.ima_event_log_path) =
+					malloc(strlen(optarg) + 1);
+				strncpy(*(variables->verifier_config.ima_event_log_path),
+					optarg, strlen(optarg));
 			}
-			continue;
 		}
 
 		else if (caller == ATTESTER && identifier == 'n') {

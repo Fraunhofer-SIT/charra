@@ -49,6 +49,7 @@
 /* quit signal */
 static bool quit = false;
 static bool processing_response = false;
+static CHARRA_RC attestation_rc = CHARRA_RC_ERROR;
 
 /* logging */
 #define LOG_NAME "verifier"
@@ -72,6 +73,11 @@ static uint32_t tpm_pcr_selection_len = 9;
 uint16_t attestation_response_timeout =
 	30; // timeout when waiting for attestation answer in seconds
 char* reference_pcr_file_path = "reference-pcrs.txt";
+bool use_ima_event_log = false;
+char* ima_event_log_path =
+	"/sys/kernel/security/ima/binary_runtime_measurements";
+
+// for DTLS-PSK
 bool use_dtls_psk = false;
 char* dtls_psk_key = "Charra DTLS Key";
 char* dtls_psk_identity = "Charra Verifier";
@@ -107,7 +113,7 @@ static msg_attestation_response_dto last_response = {0};
 /* --- main --------------------------------------------------------------- */
 
 int main(int argc, char** argv) {
-	int result = EXIT_FAILURE;
+	CHARRA_RC result = EXIT_FAILURE;
 
 	/* handle SIGINT */
 	signal(SIGINT, handle_sigint);
@@ -142,6 +148,8 @@ int main(int argc, char** argv) {
 				.reference_pcr_file_path = &reference_pcr_file_path,
 				.tpm_pcr_selection = tpm_pcr_selection,
 				.tpm_pcr_selection_len = &tpm_pcr_selection_len,
+				.use_ima_event_log = &use_ima_event_log,
+				.ima_event_log_path = &ima_event_log_path,
 				.dtls_psk_identity = &dtls_psk_identity,
 			},
 	};
@@ -153,7 +161,7 @@ int main(int argc, char** argv) {
 	/* parse CLI arguments */
 	if ((result = parse_command_line_arguments(argc, argv, &cli_config)) != 0) {
 		// 1 means help message was displayed (thus exit), -1 means error
-		return (result == 1) ? EXIT_SUCCESS : EXIT_FAILURE;
+		return (result == 1) ? CHARRA_RC_SUCCESS : CHARRA_RC_CLI_ERROR;
 	}
 
 	/* set CHARRA and libcoap log levels again in case CLI changed these */
@@ -175,6 +183,12 @@ int main(int argc, char** argv) {
 			printf("%d ", tpm_pcr_selection[i]);
 		}
 		printf("\n");
+	}
+	charra_log_debug("[" LOG_NAME "]     IMA event log attestation enabled: %s",
+		(use_ima_event_log == true) ? "true" : "false");
+	if (use_ima_event_log) {
+		charra_log_debug(
+			"[" LOG_NAME "]         IMA event log path: '%s'", ima_event_log_path);
 	}
 	charra_log_debug("[" LOG_NAME "]     DTLS with PSK enabled: %s",
 		(use_dtls_psk == true) ? "true" : "false");
@@ -198,7 +212,8 @@ int main(int argc, char** argv) {
 			dtls_rpk_peer_public_key_path);
 	}
 
-	/* set varaibles here such that they are valid in case of an 'goto error' */
+	/* set varaibles here such that they are valid in case of an 'goto cleanup'
+	 */
 	coap_context_t* coap_context = NULL;
 	coap_session_t* coap_session = NULL;
 	coap_optlist_t* coap_options = NULL;
@@ -208,7 +223,7 @@ int main(int argc, char** argv) {
 		charra_log_error(
 			"[" LOG_NAME "] Configuration enables both DTSL with PSK "
 			"and DTSL with PKI. Aborting!");
-		goto error;
+		goto cleanup;
 	}
 
 	if (use_dtls_psk || use_dtls_rpk) {
@@ -219,7 +234,7 @@ int main(int argc, char** argv) {
 	if (use_dtls_psk && !coap_dtls_is_supported()) {
 		charra_log_error("[" LOG_NAME "] CoAP does not support DTLS but the "
 						 "configuration enables DTLS. Aborting!");
-		goto error;
+		goto cleanup;
 	}
 
 	/* create CoAP context */
@@ -227,7 +242,8 @@ int main(int argc, char** argv) {
 	charra_log_info("[" LOG_NAME "] Initializing CoAP in block-wise mode.");
 	if ((coap_context = charra_coap_new_context(true)) == NULL) {
 		charra_log_error("[" LOG_NAME "] Cannot create CoAP context.");
-		goto error;
+		result = CHARRA_RC_COAP_ERROR;
+		goto cleanup;
 	}
 
 	/* register CoAP response handler */
@@ -243,20 +259,21 @@ int main(int argc, char** argv) {
 			charra_log_error(
 				"[" LOG_NAME
 				"] Cannot create client session based on DTLS-PSK.");
-			goto error;
+			result = CHARRA_RC_ERROR;
+			goto cleanup;
 		}
 	} else if (use_dtls_rpk) {
 		charra_log_info(
 			"[" LOG_NAME "] Creating CoAP client session using DTLS-RPK.");
 		coap_dtls_pki_t dtls_pki = {0};
 
-		CHARRA_RC rc = charra_coap_setup_dtls_pki_for_rpk(&dtls_pki,
+		result = charra_coap_setup_dtls_pki_for_rpk(&dtls_pki,
 			dtls_rpk_private_key_path, dtls_rpk_public_key_path,
 			dtls_rpk_peer_public_key_path, dtls_rpk_verify_peer_public_key);
-		if (rc != CHARRA_RC_SUCCESS) {
+		if (result != CHARRA_RC_SUCCESS) {
 			charra_log_error(
 				"[" LOG_NAME "] Error while setting up DTLS-RPK structure.");
-			goto error;
+			goto cleanup;
 		}
 
 		if ((coap_session = charra_coap_new_client_session_pki(coap_context,
@@ -264,7 +281,8 @@ int main(int argc, char** argv) {
 			charra_log_error(
 				"[" LOG_NAME
 				"] Cannot create client session based on DTLS-RPK.");
-			goto error;
+			result = CHARRA_RC_ERROR;
+			goto cleanup;
 		}
 	} else {
 		charra_log_info(
@@ -273,12 +291,12 @@ int main(int argc, char** argv) {
 				 coap_context, dst_host, dst_port, COAP_PROTO_UDP)) == NULL) {
 			charra_log_error(
 				"[" LOG_NAME "] Cannot create client session based on UDP.");
-			goto error;
+			result = CHARRA_RC_COAP_ERROR;
+			goto cleanup;
 		}
 	}
 
 	/* define needed variables */
-	CHARRA_RC charra_r = CHARRA_RC_SUCCESS;
 	msg_attestation_request_dto req = {0};
 	uint32_t req_buf_len = 0;
 	coap_pdu_t* pdu = NULL;
@@ -293,7 +311,8 @@ int main(int argc, char** argv) {
 			 COAP_MEDIATYPE_APPLICATION_CBOR)) == 0) {
 		charra_log_error(
 			"[" LOG_NAME "] Cannot create option for CONTENT_TYPE.");
-		goto error;
+		result = CHARRA_RC_COAP_ERROR;
+		goto cleanup;
 	}
 
 	/* enter  periodic attestation loop */
@@ -309,9 +328,9 @@ int main(int argc, char** argv) {
 
 	/* create attestation request */
 	charra_log_info("[" LOG_NAME "] Creating attestation request.");
-	if (create_attestation_request(&req) != CHARRA_RC_SUCCESS) {
+	if ((result = create_attestation_request(&req)) != CHARRA_RC_SUCCESS) {
 		charra_log_error("[" LOG_NAME "] Cannot create attestation request.");
-		goto error;
+		goto cleanup;
 	} else {
 		/* store request data */
 		last_request = req;
@@ -320,11 +339,11 @@ int main(int argc, char** argv) {
 	/* marshal attestation request */
 	charra_log_info(
 		"[" LOG_NAME "] Marshaling attestation request data to CBOR.");
-	if ((charra_r = charra_marshal_attestation_request(
+	if ((result = charra_marshal_attestation_request(
 			 &req, &req_buf_len, &req_buf)) != CHARRA_RC_SUCCESS) {
 		charra_log_error(
 			"[" LOG_NAME "] Marshaling attestation request data failed.");
-		goto error;
+		goto cleanup;
 	}
 
 	/* CoAP options */
@@ -333,14 +352,16 @@ int main(int argc, char** argv) {
 			&coap_options, coap_new_optlist(COAP_OPTION_URI_PATH, 6,
 							   (const uint8_t*)"attest")) != 1) {
 		charra_log_error("[" LOG_NAME "] Cannot add CoAP option URI_PATH.");
-		goto error;
+		result = CHARRA_RC_COAP_ERROR;
+		goto cleanup;
 	}
 	charra_log_info("[" LOG_NAME "] Adding CoAP option CONTENT_TYPE.");
 	if (coap_insert_optlist(&coap_options,
 			coap_new_optlist(COAP_OPTION_CONTENT_TYPE,
 				coap_mediatype_cbor_buf_len, coap_mediatype_cbor_buf)) != 1) {
 		charra_log_error("[" LOG_NAME "] Cannot add CoAP option CONTENT_TYPE.");
-		goto error;
+		result = CHARRA_RC_COAP_ERROR;
+		goto cleanup;
 	}
 
 	/* new CoAP request PDU */
@@ -349,7 +370,8 @@ int main(int argc, char** argv) {
 			 COAP_REQUEST_FETCH, &coap_options, req_buf, req_buf_len)) ==
 		NULL) {
 		charra_log_error("[" LOG_NAME "] Cannot create request PDU.");
-		goto error;
+		result = CHARRA_RC_ERROR;
+		goto cleanup;
 	}
 
 	/* set timeout length */
@@ -360,7 +382,8 @@ int main(int argc, char** argv) {
 	charra_log_info("[" LOG_NAME "] Sending CoAP message.");
 	if ((mid = coap_send_large(coap_session, pdu)) == COAP_INVALID_MID) {
 		charra_log_error("[" LOG_NAME "] Cannot send CoAP message.");
-		goto error;
+		result = CHARRA_RC_COAP_ERROR;
+		goto cleanup;
 	}
 
 	/* processing and waiting for response */
@@ -372,7 +395,8 @@ int main(int argc, char** argv) {
 				 coap_context, COAP_IO_PROCESS_TIME_MS)) == -1) {
 			charra_log_error(
 				"[" LOG_NAME "] Error during CoAP I/O processing.");
-			goto error;
+			result = CHARRA_RC_COAP_ERROR;
+			goto cleanup;
 		}
 		/* This wait time is not 100% accurate, it only includes the elapsed
 		 * time inside the coap_io_process function. But should be good enough.
@@ -383,9 +407,13 @@ int main(int argc, char** argv) {
 							 "] Timeout after %d ms while waiting for or "
 							 "processing attestation response.",
 				response_wait_time);
-			goto error;
+			result = CHARRA_RC_TIMEOUT;
+			goto cleanup;
 		}
 	}
+
+	// normal exit from processing loop, set result to result of attestation
+	result = attestation_rc;
 
 	/* wait until next attestation */
 	// TODO enable periodic attestations
@@ -396,13 +424,7 @@ int main(int argc, char** argv) {
 	// sleep(PERIODIC_ATTESTATION_WAIT_TIME_S);
 	// }
 
-	result = EXIT_SUCCESS;
-	goto finish;
-
-error:
-	result = EXIT_FAILURE;
-
-finish:
+cleanup:
 	/* free CoAP memory */
 	charra_free_if_not_null_ex(coap_options, coap_delete_optlist);
 	charra_free_if_not_null_ex(coap_session, coap_session_release);
@@ -445,7 +467,8 @@ static CHARRA_RC create_attestation_request(
 		"                                   0x", "\n", false);
 
 	/* build attestation request */
-	msg_attestation_request_dto req = {.hello = false,
+	msg_attestation_request_dto req = {
+		.hello = false,
 		.sig_key_id_len = TPM_SIG_KEY_ID_LEN,
 		.sig_key_id = {0}, // must be memcpy'd, see below
 		.nonce_len = nonce_len,
@@ -455,7 +478,12 @@ static CHARRA_RC create_attestation_request(
 			.tcg_hash_alg_id = TPM2_ALG_SHA256,
 			.pcrs_len = tpm_pcr_selection_len,
 			.pcrs = {0} // must be memcpy'd, see below
-		}}};
+		}},
+		.event_log_path_len =
+			(use_ima_event_log) ? strlen(ima_event_log_path) : 0,
+		.event_log_path =
+			(use_ima_event_log) ? (uint8_t*)ima_event_log_path : NULL,
+	};
 	memcpy(req.sig_key_id, TPM_SIG_KEY_ID, TPM_SIG_KEY_ID_LEN);
 	memcpy(req.nonce, nonce, nonce_len);
 	memcpy(req.pcr_selections->pcrs, tpm_pcr_selection, tpm_pcr_selection_len);
@@ -473,9 +501,7 @@ static coap_response_t coap_attest_handler(
 	struct coap_context_t* context CHARRA_UNUSED,
 	coap_session_t* session CHARRA_UNUSED, coap_pdu_t* sent CHARRA_UNUSED,
 	coap_pdu_t* in, const coap_mid_t mid CHARRA_UNUSED) {
-	CHARRA_RC charra_r = CHARRA_RC_SUCCESS;
 	int coap_r = 0;
-	CHARRA_RC charra_err = CHARRA_RC_SUCCESS;
 	TSS2_RC tss_r = 0;
 
 	ESYS_TR sig_key_handle = ESYS_TR_NONE;
@@ -497,7 +523,8 @@ static coap_response_t coap_attest_handler(
 	if ((coap_r = coap_get_data_large(
 			 in, &data_len, &data, &data_offset, &data_total_len)) == 0) {
 		charra_log_error("[" LOG_NAME "] Could not get CoAP PDU data.");
-		goto error;
+		attestation_rc = CHARRA_RC_ERROR;
+		goto cleanup;
 	} else {
 		charra_log_info(
 			"[" LOG_NAME "] Received data of length %zu.", data_len);
@@ -508,10 +535,10 @@ static coap_response_t coap_attest_handler(
 	/* unmarshal data */
 	charra_log_info("[" LOG_NAME "] Parsing received CBOR data.");
 	msg_attestation_response_dto res = {0};
-	if ((charra_err = charra_unmarshal_attestation_response(
+	if ((attestation_rc = charra_unmarshal_attestation_response(
 			 data_len, data, &res)) != CHARRA_RC_SUCCESS) {
 		charra_log_error("[" LOG_NAME "] Could not parse CBOR data.");
-		goto error;
+		goto cleanup;
 	}
 
 	/* store last response */
@@ -522,12 +549,14 @@ static coap_response_t coap_attest_handler(
 		charra_log_error(
 			"[" LOG_NAME
 			"] Length of attestation data exceeds maximum allowed size.");
-		goto error;
+		attestation_rc = CHARRA_RC_ERROR;
+		goto cleanup;
 	}
 	if (res.tpm2_signature_len > sizeof(TPMT_SIGNATURE)) {
 		charra_log_error(
 			"[" LOG_NAME "] Length of signature exceeds maximum allowed size.");
-		goto error;
+		attestation_rc = CHARRA_RC_ERROR;
+		goto cleanup;
 	}
 
 	/* --- verify TPM Quote --- */
@@ -539,21 +568,23 @@ static coap_response_t coap_attest_handler(
 	if ((tss_r = Tss2_TctiLdr_Initialize(getenv("CHARRA_TCTI"), &tcti_ctx)) !=
 		TSS2_RC_SUCCESS) {
 		charra_log_error("[" LOG_NAME "] Tss2_TctiLdr_Initialize.");
-		goto error;
+		attestation_rc = CHARRA_RC_ERROR;
+		goto cleanup;
 	}
 	if ((tss_r = Esys_Initialize(&esys_ctx, tcti_ctx, NULL)) !=
 		TSS2_RC_SUCCESS) {
 		charra_log_error("[" LOG_NAME "] Esys_Initialize.");
-		goto error;
+		attestation_rc = CHARRA_RC_ERROR;
+		goto cleanup;
 	}
 
 	/* load TPM key */
 	TPM2B_PUBLIC* tpm2_public_key = (TPM2B_PUBLIC*)res.tpm2_public_key;
 	charra_log_info("[" LOG_NAME "] Loading TPM key.");
-	if ((charra_r = charra_load_external_public_key(esys_ctx, tpm2_public_key,
-			 &sig_key_handle)) != CHARRA_RC_SUCCESS) {
+	if ((attestation_rc = charra_load_external_public_key(esys_ctx,
+			 tpm2_public_key, &sig_key_handle)) != CHARRA_RC_SUCCESS) {
 		charra_log_error("[" LOG_NAME "] Loading external public key failed.");
-		goto error;
+		goto cleanup;
 	} else {
 		charra_log_info("[" LOG_NAME "] External public key loaded.");
 	}
@@ -573,8 +604,8 @@ static coap_response_t coap_attest_handler(
 		charra_log_info(
 			"[" LOG_NAME "] Verifying TPM Quote signature with TPM ...");
 		/* verify attestation signature with TPM */
-		if ((charra_r = charra_verify_tpm2_quote_signature_with_tpm(esys_ctx,
-				 sig_key_handle, TPM2_ALG_SHA256, &attest, &signature,
+		if ((attestation_rc = charra_verify_tpm2_quote_signature_with_tpm(
+				 esys_ctx, sig_key_handle, TPM2_ALG_SHA256, &attest, &signature,
 				 &validation)) == CHARRA_RC_SUCCESS) {
 			charra_log_info(
 				"[" LOG_NAME "]     => TPM Quote signature is valid!");
@@ -590,22 +621,21 @@ static coap_response_t coap_attest_handler(
 			"[" LOG_NAME
 			"] Converting TPM public key to mbedTLS public key ...");
 		mbedtls_rsa_context mbedtls_rsa_pub_key = {0};
-		if ((charra_r = charra_crypto_tpm_pub_key_to_mbedtls_pub_key(
+		if ((attestation_rc = charra_crypto_tpm_pub_key_to_mbedtls_pub_key(
 				 tpm2_public_key, &mbedtls_rsa_pub_key)) != CHARRA_RC_SUCCESS) {
 			charra_log_error("[" LOG_NAME "] mbedTLS RSA error");
-			goto error;
+			goto cleanup;
 		}
 
 		/* verify attestation signature with mbedTLS */
 		charra_log_info(
 			"[" LOG_NAME "] Verifying TPM Quote signature with mbedTLS ...");
-		if ((charra_r = charra_crypto_rsa_verify_signature(&mbedtls_rsa_pub_key,
-				 MBEDTLS_MD_SHA256, res.attestation_data,
+		if ((attestation_rc = charra_crypto_rsa_verify_signature(
+				 &mbedtls_rsa_pub_key, MBEDTLS_MD_SHA256, res.attestation_data,
 				 (size_t)res.attestation_data_len,
 				 signature.signature.rsapss.sig.buffer)) == CHARRA_RC_SUCCESS) {
 			charra_log_info(
 				"[" LOG_NAME "]     => TPM Quote signature is valid!");
-			attestation_result_signature = true;
 		} else {
 			charra_log_error(
 				"[" LOG_NAME "]     => TPM Quote signature is NOT valid!");
@@ -615,8 +645,12 @@ static coap_response_t coap_attest_handler(
 
 	/* unmarshal attestation data */
 	TPMS_ATTEST attest_struct = {0};
-	charra_r = charra_unmarshal_tpm2_quote(
+	attestation_rc = charra_unmarshal_tpm2_quote(
 		res.attestation_data_len, res.attestation_data, &attest_struct);
+	if (attestation_rc != CHARRA_RC_SUCCESS) {
+		charra_log_error("[" LOG_NAME "] Error while unmarshaling TPM2 Quote.");
+		goto cleanup;
+	}
 
 	/* --- verify nonce --- */
 	bool attestation_result_nonce = false;
@@ -666,26 +700,34 @@ static coap_response_t coap_attest_handler(
 	/* verify event log */
 	// TODO: Implement real verification
 	bool attestation_event_log = true;
-	{
+	if (use_ima_event_log) {
 		charra_log_info("[" LOG_NAME "] Verifying event log ...");
-		charra_log_info(
-			"[" LOG_NAME "]     <<< This is to be implemented. >>>");
-		charra_log_info("[" LOG_NAME "]     IMA Event Log size is %d bytes.",
-			res.event_log_len);
-		charra_log_debug("[" LOG_NAME "]     IMA Event Log:");
-
-		if (res.event_log_len > 20) {
-			charra_print_hex(CHARRA_LOG_DEBUG, 10, res.event_log,
-				"                                                  0x", "...",
-				false);
-			charra_print_hex(CHARRA_LOG_DEBUG, 10,
-				(res.event_log + res.event_log_len - 10), "", "\n", false);
-		} else if ((res.event_log_len > 0)) {
-			charra_print_hex(CHARRA_LOG_DEBUG, res.event_log_len, res.event_log,
-				"                                                  0x", "\n",
-				false);
+		if (res.event_log_len == 0) {
+			charra_log_error("[" LOG_NAME "] Received no event log altough IMA "
+							 "event log verification is on.");
+			attestation_event_log = false;
 		} else {
-			charra_log_debug("[" LOG_NAME "]     <none>");
+			charra_log_info(
+				"[" LOG_NAME "]     <<< This is to be implemented. >>>");
+			charra_log_info("[" LOG_NAME
+							"]     IMA Event Log size is %d bytes.",
+				res.event_log_len);
+			charra_log_debug("[" LOG_NAME "]     IMA Event Log:");
+
+			if (res.event_log_len > 20) {
+				charra_print_hex(CHARRA_LOG_DEBUG, 10, res.event_log,
+					"                                                  0x",
+					"...", false);
+				charra_print_hex(CHARRA_LOG_DEBUG, 10,
+					(res.event_log + res.event_log_len - 10), "", "\n", false);
+			} else if ((res.event_log_len > 0)) {
+				charra_print_hex(CHARRA_LOG_DEBUG, res.event_log_len,
+					res.event_log,
+					"                                                  0x",
+					"\n", false);
+			} else {
+				charra_log_debug("[" LOG_NAME "]     <none>");
+			}
 		}
 	}
 
@@ -698,13 +740,15 @@ static coap_response_t coap_attest_handler(
 	/* print attestation result */
 	charra_log_info("[" LOG_NAME "] +----------------------------+");
 	if (attestation_result) {
+		attestation_rc = CHARRA_RC_SUCCESS;
 		charra_log_info("[" LOG_NAME "] |   ATTESTATION SUCCESSFUL   |");
 	} else {
+		attestation_rc = CHARRA_RC_VERIFICATION_FAILED;
 		charra_log_info("[" LOG_NAME "] |     ATTESTATION FAILED     |");
 	}
 	charra_log_info("[" LOG_NAME "] +----------------------------+");
 
-error:
+cleanup:
 	/* flush handles */
 	if (sig_key_handle != ESYS_TR_NONE) {
 		if (Esys_FlushContext(esys_ctx, sig_key_handle) != TSS2_RC_SUCCESS) {
