@@ -48,7 +48,7 @@
 
 /* quit signal */
 static bool quit = false;
-static bool attestation_finished = false;
+static bool processing_response = false;
 
 /* logging */
 #define LOG_NAME "verifier"
@@ -72,9 +72,16 @@ static uint32_t tpm_pcr_selection_len = 9;
 uint16_t attestation_response_timeout =
 	30; // timeout when waiting for attestation answer in seconds
 char* reference_pcr_file_path = "reference-pcrs.txt";
-bool use_dtls = false;
-char* dtls_key = "Charra DTLS Key";
-char* dtls_identity = "Charra Verifier";
+bool use_dtls_psk = false;
+char* dtls_psk_key = "Charra DTLS Key";
+char* dtls_psk_identity = "Charra Verifier";
+
+// for DTLS-RPK
+bool use_dtls_rpk = false;
+char* dtls_rpk_private_key_path = "keys/verifier.der";
+char* dtls_rpk_public_key_path = "keys/verifier.pub.der";
+char* dtls_rpk_peer_public_key_path = "keys/attester.pub.der";
+bool dtls_rpk_verify_peer_public_key = true;
 
 /* --- function forward declarations -------------------------------------- */
 
@@ -119,8 +126,14 @@ int main(int argc, char** argv) {
 				.charra_log_level = &charra_log_level,
 				.coap_log_level = &coap_log_level,
 				.port = &dst_port,
-				.use_dtls = &use_dtls,
-				.dtls_key = &dtls_key,
+				.use_dtls_psk = &use_dtls_psk,
+				.dtls_psk_key = &dtls_psk_key,
+				.use_dtls_rpk = &use_dtls_rpk,
+				.dtls_rpk_private_key_path = &dtls_rpk_private_key_path,
+				.dtls_rpk_public_key_path = &dtls_rpk_public_key_path,
+				.dtls_rpk_peer_public_key_path = &dtls_rpk_peer_public_key_path,
+				.dtls_rpk_verify_peer_public_key =
+					&dtls_rpk_verify_peer_public_key,
 			},
 		.verifier_config =
 			{
@@ -129,7 +142,7 @@ int main(int argc, char** argv) {
 				.reference_pcr_file_path = &reference_pcr_file_path,
 				.tpm_pcr_selection = tpm_pcr_selection,
 				.tpm_pcr_selection_len = &tpm_pcr_selection_len,
-				.dtls_identity = &dtls_identity,
+				.dtls_psk_identity = &dtls_psk_identity,
 			},
 	};
 
@@ -164,53 +177,103 @@ int main(int argc, char** argv) {
 		printf("\n");
 	}
 	charra_log_debug("[" LOG_NAME "]     DTLS with PSK enabled: %s",
-		(use_dtls == true) ? "true" : "false");
-	if (use_dtls) {
-		charra_log_debug(
-			"[" LOG_NAME "]     Pre-shared key for DTLS: '%s'", dtls_key);
-		charra_log_debug(
-			"[" LOG_NAME "]     Identity for DTLS: '%s'", dtls_identity);
+		(use_dtls_psk == true) ? "true" : "false");
+	if (use_dtls_psk) {
+		charra_log_debug("[" LOG_NAME "]         Pre-shared key for DTLS: '%s'",
+			dtls_psk_key);
+		charra_log_debug("[" LOG_NAME "]         Identity for DTLS: '%s'",
+			dtls_psk_identity);
+	}
+	charra_log_debug("[" LOG_NAME "]     DTLS-RPK enabled: %s",
+		(use_dtls_rpk == true) ? "true" : "false");
+	if (use_dtls_rpk) {
+		charra_log_debug("[" LOG_NAME
+						 "]         DTLS-RPK private key path: '%s'",
+			dtls_rpk_private_key_path);
+		charra_log_debug("[" LOG_NAME
+						 "]         DTLS-RPK public key path: '%s'",
+			dtls_rpk_public_key_path);
+		charra_log_debug("[" LOG_NAME
+						 "]         DTLS-RPK peers' public key path: '%s'",
+			dtls_rpk_peer_public_key_path);
 	}
 
-	// print tls version when in debug mode
-	coap_show_tls_version(LOG_DEBUG);
+	/* set varaibles here such that they are valid in case of an 'goto error' */
+	coap_context_t* coap_context = NULL;
+	coap_session_t* coap_session = NULL;
+	coap_optlist_t* coap_options = NULL;
+	uint8_t* req_buf = NULL; // TODO make dynamic
 
-	if (use_dtls && !coap_dtls_is_supported()) {
+	if (use_dtls_psk && use_dtls_rpk) {
+		charra_log_error(
+			"[" LOG_NAME "] Configuration enables both DTSL with PSK "
+			"and DTSL with PKI. Aborting!");
+		goto error;
+	}
+
+	if (use_dtls_psk || use_dtls_rpk) {
+		// print TLS version when in debug mode
+		coap_show_tls_version(LOG_DEBUG);
+	}
+
+	if (use_dtls_psk && !coap_dtls_is_supported()) {
 		charra_log_error("[" LOG_NAME "] CoAP does not support DTLS but the "
-									  "configuration enables DTLS. Aborting!");
+						 "configuration enables DTLS. Aborting!");
 		goto error;
 	}
 
 	/* create CoAP context */
-	coap_context_t* coap_context = NULL;
+
 	charra_log_info("[" LOG_NAME "] Initializing CoAP in block-wise mode.");
 	if ((coap_context = charra_coap_new_context(true)) == NULL) {
 		charra_log_error("[" LOG_NAME "] Cannot create CoAP context.");
-		goto finish;
+		goto error;
 	}
 
 	/* register CoAP response handler */
 	charra_log_info("[" LOG_NAME "] Registering CoAP response handler.");
 	coap_register_response_handler(coap_context, coap_attest_handler);
 
-	/* create CoAP client session */
-	coap_session_t* coap_session = NULL;
-	if (use_dtls) {
+	if (use_dtls_psk) {
 		charra_log_info(
 			"[" LOG_NAME "] Creating CoAP client session using DTLS with PSK.");
 		if ((coap_session = charra_coap_new_client_session_psk(coap_context,
-				 dst_host, dst_port, COAP_PROTO_DTLS, dtls_identity,
-				 (uint8_t*)dtls_key, strlen(dtls_key))) == NULL) {
-			charra_log_error("[" LOG_NAME "] Cannot create client session.");
-			goto finish;
+				 dst_host, dst_port, COAP_PROTO_DTLS, dtls_psk_identity,
+				 (uint8_t*)dtls_psk_key, strlen(dtls_psk_key))) == NULL) {
+			charra_log_error(
+				"[" LOG_NAME
+				"] Cannot create client session based on DTLS-PSK.");
+			goto error;
+		}
+	} else if (use_dtls_rpk) {
+		charra_log_info(
+			"[" LOG_NAME "] Creating CoAP client session using DTLS-RPK.");
+		coap_dtls_pki_t dtls_pki = {0};
+
+		CHARRA_RC rc = charra_coap_setup_dtls_pki_for_rpk(&dtls_pki,
+			dtls_rpk_private_key_path, dtls_rpk_public_key_path,
+			dtls_rpk_peer_public_key_path, dtls_rpk_verify_peer_public_key);
+		if (rc != CHARRA_RC_SUCCESS) {
+			charra_log_error(
+				"[" LOG_NAME "] Error while setting up DTLS-RPK structure.");
+			goto error;
+		}
+
+		if ((coap_session = charra_coap_new_client_session_pki(coap_context,
+				 dst_host, dst_port, COAP_PROTO_DTLS, &dtls_pki)) == NULL) {
+			charra_log_error(
+				"[" LOG_NAME
+				"] Cannot create client session based on DTLS-RPK.");
+			goto error;
 		}
 	} else {
 		charra_log_info(
 			"[" LOG_NAME "] Creating CoAP client session using UDP.");
 		if ((coap_session = charra_coap_new_client_session(
 				 coap_context, dst_host, dst_port, COAP_PROTO_UDP)) == NULL) {
-			charra_log_error("[" LOG_NAME "] Cannot create client session.");
-			goto finish;
+			charra_log_error(
+				"[" LOG_NAME "] Cannot create client session based on UDP.");
+			goto error;
 		}
 	}
 
@@ -218,8 +281,6 @@ int main(int argc, char** argv) {
 	CHARRA_RC charra_r = CHARRA_RC_SUCCESS;
 	msg_attestation_request_dto req = {0};
 	uint32_t req_buf_len = 0;
-	uint8_t* req_buf = NULL; // TODO make dynamic
-	coap_optlist_t* coap_options = NULL;
 	coap_pdu_t* pdu = NULL;
 	coap_mid_t mid = COAP_INVALID_MID;
 	int coap_io_process_time = -1;
@@ -305,7 +366,7 @@ int main(int argc, char** argv) {
 	/* processing and waiting for response */
 	charra_log_info("[" LOG_NAME "] Processing and waiting for response ...");
 	uint16_t response_wait_time = 0;
-	while (attestation_finished != true) {
+	while (!processing_response && !coap_can_exit(coap_context)) {
 		/* process CoAP I/O */
 		if ((coap_io_process_time = coap_io_process(
 				 coap_context, COAP_IO_PROCESS_TIME_MS)) == -1) {
@@ -419,6 +480,8 @@ static coap_response_t coap_attest_handler(
 
 	ESYS_TR sig_key_handle = ESYS_TR_NONE;
 	TPMT_TK_VERIFIED* validation = NULL;
+
+	processing_response = true;
 
 	charra_log_info(
 		"[" LOG_NAME "] Resource '%s': Received message.", "attest");
@@ -667,6 +730,6 @@ error:
 		Tss2_TctiLdr_Finalize(&tcti_ctx);
 	}
 
-	attestation_finished = true;
+	processing_response = false;
 	return COAP_RESPONSE_OK;
 }

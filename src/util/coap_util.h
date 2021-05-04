@@ -21,6 +21,7 @@
 #ifndef COAP_UTIL_H
 #define COAP_UTIL_H
 
+#include "../common/charra_error.h"
 #include <coap2/coap.h>
 #include <stdbool.h>
 
@@ -122,6 +123,22 @@ coap_session_t* charra_coap_new_client_session_psk(coap_context_t* coap_context,
 	unsigned key_length);
 
 /**
+ * @brief Creates a CoAP client session with PKI.
+ *
+ * @param[inout] coap_context the CoAP context.
+ * @param[in] dest_address the destination IP address.
+ * @param[in] port the port (default CoAP UDP port is 5683).
+ * @param[in] coap_protocol the CoAP protocol.
+ * @param[in] dtls_pki structure holding configuration data for PKI mode of
+ * CoAP.
+ * @return coap_session_t* the CoAP session.
+ * @return NULL if an error occurred.
+ */
+coap_session_t* charra_coap_new_client_session_pki(coap_context_t* coap_context,
+	const char* dest_address, const uint16_t port,
+	const coap_proto_t coap_protocol, coap_dtls_pki_t* dtls_pki);
+
+/**
  * @brief Creates a new CoAP request with large data, using CoAP block-wise
  * transfers.
  *
@@ -151,6 +168,20 @@ coap_pdu_t* charra_coap_new_request(coap_session_t* session,
 void charra_coap_add_resource(struct coap_context_t* coap_context,
 	const coap_request_t method, const char* resource_name,
 	const coap_method_handler_t handler);
+
+/**
+ * @brief: Setup the dtls_pki structure for DTLS-RPK.
+ *
+ * @param dtls_pki the strcture to setup
+ * @param private_key_path the path of the private key to use
+ * @param public_key_path the path of the public key to use
+ * @param peer_public_key_path the path of the peers' public key to use
+ * @param verify_peer_public_key true if the structure shall be setup to
+ * validate the peers' public key, false otherwise
+ */
+CHARRA_RC charra_coap_setup_dtls_pki_for_rpk(coap_dtls_pki_t* dtls_pki,
+	char* private_key_path, char* public_key_path, char* peer_public_key_path,
+	bool verify_peer_public_key);
 
 /**
  * @brief Parses the libcoap log level from string and writes the result into

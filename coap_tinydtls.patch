@@ -1,0 +1,14 @@
+diff --git a/src/coap_tinydtls.c b/src/coap_tinydtls.c
+index 62a321c..e4ab509 100644
+--- a/src/coap_tinydtls.c
++++ b/src/coap_tinydtls.c
+@@ -375,10 +375,6 @@ verify_ecdsa_key(struct dtls_context_t *dtls_context COAP_UNUSED,
+      * Start message construction at beginning of buffer. */
+     p = buf;
+
+-    /* length of this certificate */
+-    dtls_int_to_uint24(p, DTLS_EC_SUBJECTPUBLICKEY_SIZE);
+-    p += sizeof(uint24);
+-
+     memcpy(p, &cert_asn1_header, sizeof(cert_asn1_header));
+     p += sizeof(cert_asn1_header);

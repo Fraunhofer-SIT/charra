@@ -61,9 +61,12 @@ RUN ./bootstrap \
 RUN rm -rfv /tmp/tpm2-tools
 
 ## libcoap
-RUN git clone --depth=1 --recursive -b 'develop' \
+RUN git clone --recursive -b 'develop' \
 	'https://github.com/obgm/libcoap.git' /tmp/libcoap
 WORKDIR /tmp/libcoap
+RUN git checkout --recurse-submodules ea1deffa6b3997eea02635579a4b7fb7af4915e5
+COPY coap_tinydtls.patch .
+RUN patch -p 1 < coap_tinydtls.patch
 RUN ./autogen.sh \
 	&& ./configure --disable-tests --disable-documentation --disable-manpages --enable-dtls --with-tinydtls --enable-fast-install \
 	&& make -j \
@@ -71,9 +74,10 @@ RUN ./autogen.sh \
 RUN rm -rfv /tmp/libcoap
 
 ## mbedtls
-RUN git clone --depth=1 --recursive -b 'development' \
+RUN git clone --recursive -b 'development' \
 	'https://github.com/ARMmbed/mbedtls.git' /tmp/mbedtls
 WORKDIR /tmp/mbedtls
+RUN git checkout 70c68dac45df992137ea48e87c9db473266ea1cb
 RUN make -j lib SHARED=true \
 	&& make install
 RUN rm -rfv /tmp/mbedtls
