@@ -332,7 +332,7 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 			continue;
 		}
 
-		if (caller == VERIFIER && identifier == 'b') { // set IP address
+		if (caller == VERIFIER && identifier == 'a') { // set IP address
 			int argument_length = strlen(optarg);
 			if (argument_length > 15) {
 				charra_log_error(
