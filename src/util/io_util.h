@@ -39,6 +39,7 @@
 /**
  * @brief
  *
+ * @param level the log level to print at
  * @param buf_len Length of the buffer to be printed.
  * @param buf The buffer to be printed.
  * @param prefix A prefix to the output, e.g. "0x", or leave it empty ("").
@@ -53,6 +54,7 @@ void charra_print_hex(const charra_log_t level, const size_t buf_len,
 /**
  * @brief
  *
+ * @param level the log level to print at
  * @param buf_len Length of the buffer to be printed.
  * @param buf The buffer to be printed.
  * @param prefix A prefix to the output, e.g. an indentation ("  "), or leave it
@@ -65,6 +67,7 @@ void charra_print_str(const charra_log_t level, const size_t buf_len,
 /**
  * @brief Print PCR content of selected PCRs.
  *
+ * @param level the log level to print at
  * @param pcr_selection the indexes of selected PCRs
  * @param pcr_selection_len the number of PCRs to print
  * @param pcrs the content of the PCRs

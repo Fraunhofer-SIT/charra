@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <tinydtls/session.h>
 #include <tss2/tss2_mu.h>
 #include <tss2/tss2_tctildr.h>
 #include <tss2/tss2_tpm2_types.h>
@@ -61,7 +62,17 @@ static unsigned int port = COAP_DEFAULT_PORT; // default port 5683
 bool use_ima_event_log = false;
 char* ima_event_log_path =
 	"/sys/kernel/security/ima/binary_runtime_measurements";
+bool use_dtls_psk = false;
+char* dtls_psk_key = "Charra DTLS Key";
+char* dtls_psk_hint = "Charra Attester";
 // TODO allocate memory for CBOR buffer using malloc() since logs can be huge
+
+// for DTLS-RPK
+bool use_dtls_rpk = false;
+char* dtls_rpk_private_key_path = "keys/attester.der";
+char* dtls_rpk_public_key_path = "keys/attester.pub.der";
+char* dtls_rpk_peer_public_key_path = "keys/verifier.pub.der";
+bool dtls_rpk_verify_peer_public_key = true;
 
 /**
  * @brief SIGINT handler: set quit to 1 for graceful termination.
@@ -100,11 +111,18 @@ int main(int argc, char** argv) {
 				.charra_log_level = &charra_log_level,
 				.coap_log_level = &coap_log_level,
 				.port = &port,
+				.use_dtls_psk = &use_dtls_psk,
+				.dtls_psk_key = &dtls_psk_key,
+				.use_dtls_rpk = &use_dtls_rpk,
+				.dtls_rpk_private_key_path = &dtls_rpk_private_key_path,
+				.dtls_rpk_public_key_path = &dtls_rpk_public_key_path,
+				.dtls_rpk_peer_public_key_path = &dtls_rpk_peer_public_key_path,
+				.dtls_rpk_verify_peer_public_key =
+					&dtls_rpk_verify_peer_public_key,
 			},
 		.attester_config =
 			{
-				.use_ima_event_log = &use_ima_event_log,
-				.ima_event_log_path = &ima_event_log_path,
+				.dtls_psk_hint = &dtls_psk_hint,
 			},
 	};
 
@@ -120,29 +138,110 @@ int main(int argc, char** argv) {
 
 	charra_log_debug("[" LOG_NAME "] Attester Configuration:");
 	charra_log_debug("[" LOG_NAME "]     Used local port: %d", port);
-	charra_log_debug("[" LOG_NAME "]     IMA event log attestation enabled: %s",
-		(use_ima_event_log == true) ? "true" : "false");
-	if (use_ima_event_log) {
+	charra_log_debug("[" LOG_NAME "]     DTLS-PSK enabled: %s",
+		(use_dtls_psk == true) ? "true" : "false");
+	if (use_dtls_psk) {
+		charra_log_debug("[" LOG_NAME "]         Pre-shared key: '%s'",
+			dtls_psk_key);
 		charra_log_debug(
-			"[" LOG_NAME "]     IMA event log path %s", ima_event_log_path);
+			"[" LOG_NAME "]         Hint: '%s'", dtls_psk_hint);
+	}
+	charra_log_debug("[" LOG_NAME "]     DTLS-RPK enabled: %s",
+		(use_dtls_rpk == true) ? "true" : "false");
+	if (use_dtls_rpk) {
+		charra_log_debug("[" LOG_NAME
+						 "]         Private key path: '%s'",
+			dtls_rpk_private_key_path);
+		charra_log_debug("[" LOG_NAME
+						 "]         Public key path: '%s'",
+			dtls_rpk_public_key_path);
+		charra_log_debug("[" LOG_NAME
+						 "]         Peers' public key path: '%s'",
+			dtls_rpk_peer_public_key_path);
 	}
 
-	/* create CoAP context */
+	/* set varaibles here such that they are valid in case of an 'goto error' */
 	coap_context_t* coap_context = NULL;
+	coap_endpoint_t* coap_endpoint = NULL;
+
+	if (use_dtls_psk && use_dtls_rpk) {
+		charra_log_error(
+			"[" LOG_NAME "] Configuration enables both DTSL with PSK "
+			"and DTSL with PKI. Aborting!");
+		goto error;
+	}
+
+	if (use_dtls_psk || use_dtls_rpk) {
+		// print TLS version when in debug mode
+		coap_show_tls_version(LOG_DEBUG);
+	}
+
+	if ((use_dtls_psk || use_dtls_psk) && !coap_dtls_is_supported()) {
+		charra_log_error("[" LOG_NAME "] CoAP does not support DTLS but the "
+						 "configuration enables DTLS. Aborting!");
+		goto error;
+	}
+
 	charra_log_info("[" LOG_NAME "] Initializing CoAP in block-wise mode.");
 	if ((coap_context = charra_coap_new_context(true)) == NULL) {
 		charra_log_error("[" LOG_NAME "] Cannot create CoAP context.");
 		goto error;
 	}
 
-	/* create CoAP server endpoint */
-	coap_endpoint_t* coap_endpoint = NULL;
-	charra_log_info("[" LOG_NAME "] Creating CoAP server endpoint.");
-	if ((coap_endpoint = charra_coap_new_endpoint(
-			 coap_context, LISTEN_ADDRESS, port, COAP_PROTO_UDP)) == NULL) {
-		charra_log_error(
-			"[" LOG_NAME "] Cannot create CoAP server endpoint.\n");
-		goto error;
+	if (use_dtls_psk) {
+		charra_log_info(
+			"[" LOG_NAME "] Creating CoAP server endpoint using DTLS-PSK.");
+		if (!coap_context_set_psk(coap_context, dtls_psk_hint,
+				(uint8_t*)dtls_psk_key, strlen(dtls_psk_key))) {
+			charra_log_error(
+				"[" LOG_NAME "] Error while configuring CoAP to use DTLS-PSK.");
+			goto error;
+		}
+
+		if ((coap_endpoint = charra_coap_new_endpoint(coap_context,
+				 LISTEN_ADDRESS, port, COAP_PROTO_DTLS)) == NULL) {
+			charra_log_error(
+				"[" LOG_NAME
+				"] Cannot create CoAP server endpoint based on DTLS-PSK.\n");
+			goto error;
+		}
+	} else if (use_dtls_rpk) {
+		charra_log_info(
+			"[" LOG_NAME "] Creating CoAP server endpoint using DTLS-RPK.");
+		coap_dtls_pki_t dtls_pki = {0};
+
+		CHARRA_RC rc = charra_coap_setup_dtls_pki_for_rpk(&dtls_pki,
+			dtls_rpk_private_key_path, dtls_rpk_public_key_path,
+			dtls_rpk_peer_public_key_path, dtls_rpk_verify_peer_public_key);
+		if (rc != CHARRA_RC_SUCCESS) {
+			charra_log_error(
+				"[" LOG_NAME "] Error while setting up DTLS-RPK structure.");
+			goto error;
+		}
+
+		if (!coap_context_set_pki(coap_context, &dtls_pki)) {
+			charra_log_error(
+				"[" LOG_NAME "] Error while configuring CoAP to use DTLS-RPK.");
+			goto error;
+		}
+
+		if ((coap_endpoint = charra_coap_new_endpoint(coap_context,
+				 LISTEN_ADDRESS, port, COAP_PROTO_DTLS)) == NULL) {
+			charra_log_error(
+				"[" LOG_NAME
+				"] Cannot create CoAP server endpoint based on DTLS-RPK.\n");
+			goto error;
+		}
+	} else {
+		charra_log_info(
+			"[" LOG_NAME "] Creating CoAP server endpoint using UDP.");
+		if ((coap_endpoint = charra_coap_new_endpoint(
+				 coap_context, LISTEN_ADDRESS, port, COAP_PROTO_UDP)) == NULL) {
+			charra_log_error(
+				"[" LOG_NAME
+				"] Cannot create CoAP server endpoint based on UDP.\n");
+			goto error;
+		}
 	}
 
 	/* register CoAP resource and resource handler */
@@ -289,18 +388,26 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
 
 	/* --- send response data --- */
 
-	/* read IMA event log if configured */
+	/* read IMA event log if requested */
 	uint8_t* ima_event_log = NULL;
 	size_t ima_event_log_len = 0;
-	if (use_ima_event_log == true) {
+	if (req.event_log_path_len != 0) {
 		charra_log_info("[" LOG_NAME "] Reading IMA event log.");
+		char* path = malloc(sizeof(char) * (req.event_log_path_len + 1));
+		memcpy(path, req.event_log_path, req.event_log_path_len);
+		path[req.event_log_path_len + 1] = '\n';
 		CHARRA_RC rc = charra_io_read_continuous_binary_file(
-			ima_event_log_path, &ima_event_log, &ima_event_log_len);
+			path, &ima_event_log, &ima_event_log_len);
 		if (rc != CHARRA_RC_SUCCESS) {
-			goto error;
+			charra_log_error("[" LOG_NAME "] Error while reading IMA event "
+							 "log. Sending empty event log!");
+			ima_event_log_len = 0;
+			ima_event_log = NULL;
+		} else {
+			charra_log_info("[" LOG_NAME
+							"] IMA event log has a size of %d bytes.",
+				ima_event_log_len);
 		}
-		charra_log_info("[" LOG_NAME "] IMA event log has a size of %d bytes.",
-			ima_event_log_len);
 	}
 
 	/* prepare response */
