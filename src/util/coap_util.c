@@ -342,6 +342,10 @@ static int verify_rpk_peer_callback(const char* cn,
 							 "] DTLS-RPK: The public key of the peer could not "
 							 "be verified with the reference key at path '%s'.",
 				(char*)arg);
+			charra_print_hex(CHARRA_LOG_DEBUG, reference_length, (uint8_t*) reference,
+				"Reference public key of peer: ", "\n", false);
+			charra_print_hex(CHARRA_LOG_DEBUG, asn1_length, asn1_public_cert,
+				"Actual public key of peer: ", "\n", false);
 			return 0;
 		}
 		charra_log_error("[" LOG_NAME "] DTLS-RPK: The reference key of the "
