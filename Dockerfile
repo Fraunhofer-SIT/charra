@@ -63,8 +63,13 @@ RUN rm -rfv /tmp/tpm2-tools
 ## libcoap
 RUN git clone --recursive -b 'develop' \
 	'https://github.com/obgm/libcoap.git' /tmp/libcoap
+# Usually the second git checkout should be enough with an added '--recurse-submodules',
+# but for some reason this fails in the default docker build environment.
+# Note: The checkout with submodules works when using Buildkit.
+WORKDIR /tmp/libcoap/ext/tinydtls
+RUN git checkout 290c48d262b6859443bd4b04926146bda3293c98
 WORKDIR /tmp/libcoap
-RUN git checkout --recurse-submodules ea1deffa6b3997eea02635579a4b7fb7af4915e5
+RUN git checkout ea1deffa6b3997eea02635579a4b7fb7af4915e5
 COPY coap_tinydtls.patch .
 RUN patch -p 1 < coap_tinydtls.patch
 RUN ./autogen.sh \
@@ -149,4 +154,3 @@ WORKDIR /home/"$user"
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["/bin/bash"]
-
