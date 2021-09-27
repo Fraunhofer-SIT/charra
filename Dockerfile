@@ -7,7 +7,7 @@
 # Hint: Check your Dockerfile at https://www.fromlatest.io/                  #
 ##############################################################################
 
-FROM tpm2software/tpm2-tss:ubuntu-20.04 AS base
+FROM ghcr.io/tpm2-software/ubuntu-20.04:latest AS base
 LABEL maintainer="Michael Eckel <michael.eckel@sit.fraunhofer.de>"
 
 ## glocal arguments with default values
