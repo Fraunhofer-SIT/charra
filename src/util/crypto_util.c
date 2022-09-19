@@ -20,11 +20,11 @@
 
 #include "crypto_util.h"
 
+/* system includes */
 #include <mbedtls/rsa.h>
 #include <mbedtls/sha1.h>
 #include <mbedtls/sha256.h>
 #include <mbedtls/sha512.h>
-
 #include <tss2/tss2_tpm2_types.h>
 
 #include "../common/charra_error.h"
@@ -42,17 +42,17 @@ CHARRA_RC hash_sha1(const size_t data_len, const uint8_t* const data,
 	mbedtls_sha1_init(&ctx);
 
 	/* hash */
-	if ((mbedtls_sha1_starts_ret(&ctx)) != 0) {
+	if ((mbedtls_sha1_starts(&ctx)) != 0) {
 		r = CHARRA_RC_CRYPTO_ERROR;
 		goto error;
 	}
 
-	if ((mbedtls_sha1_update_ret(&ctx, data, data_len)) != 0) {
+	if ((mbedtls_sha1_update(&ctx, data, data_len)) != 0) {
 		r = CHARRA_RC_CRYPTO_ERROR;
 		goto error;
 	}
 
-	if ((mbedtls_sha1_finish_ret(&ctx, digest)) != 0) {
+	if ((mbedtls_sha1_finish(&ctx, digest)) != 0) {
 		r = CHARRA_RC_CRYPTO_ERROR;
 		goto error;
 	}
@@ -73,17 +73,17 @@ CHARRA_RC hash_sha256(const size_t data_len, const uint8_t* const data,
 	mbedtls_sha256_init(&ctx);
 
 	/* hash */
-	if ((mbedtls_sha256_starts_ret(&ctx, 0)) != 0) {
+	if ((mbedtls_sha256_starts(&ctx, 0)) != 0) {
 		r = CHARRA_RC_CRYPTO_ERROR;
 		goto error;
 	}
 
-	if ((mbedtls_sha256_update_ret(&ctx, data, data_len)) != 0) {
+	if ((mbedtls_sha256_update(&ctx, data, data_len)) != 0) {
 		r = CHARRA_RC_CRYPTO_ERROR;
 		goto error;
 	}
 
-	if ((mbedtls_sha256_finish_ret(&ctx, digest)) != 0) {
+	if ((mbedtls_sha256_finish(&ctx, digest)) != 0) {
 		r = CHARRA_RC_CRYPTO_ERROR;
 		goto error;
 	}
@@ -104,20 +104,20 @@ CHARRA_RC hash_sha256_array(uint8_t* data[TPM2_SHA256_DIGEST_SIZE],
 	mbedtls_sha256_init(&ctx);
 
 	/* hash */
-	if ((mbedtls_sha256_starts_ret(&ctx, 0)) != 0) {
+	if ((mbedtls_sha256_starts(&ctx, 0)) != 0) {
 		r = CHARRA_RC_CRYPTO_ERROR;
 		goto error;
 	}
 
 	for (size_t i = 0; i < data_len; ++i) {
-		if ((mbedtls_sha256_update_ret(
-				&ctx, data[i], TPM2_SHA256_DIGEST_SIZE)) != 0) {
+		if ((mbedtls_sha256_update(&ctx, data[i], TPM2_SHA256_DIGEST_SIZE)) !=
+			0) {
 			r = CHARRA_RC_CRYPTO_ERROR;
 			goto error;
 		}
 	}
 
-	if ((mbedtls_sha256_finish_ret(&ctx, digest)) != 0) {
+	if ((mbedtls_sha256_finish(&ctx, digest)) != 0) {
 		r = CHARRA_RC_CRYPTO_ERROR;
 		goto error;
 	}
@@ -130,7 +130,7 @@ error:
 }
 
 CHARRA_RC hash_sha512(const size_t data_len, const uint8_t* const data,
-	uint8_t digest[TPM2_SM3_256_DIGEST_SIZE]) {
+	uint8_t digest[TPM2_SHA512_DIGEST_SIZE]) {
 	CHARRA_RC r = CHARRA_RC_SUCCESS;
 
 	/* init */
@@ -138,18 +138,17 @@ CHARRA_RC hash_sha512(const size_t data_len, const uint8_t* const data,
 	mbedtls_sha512_init(&ctx);
 
 	/* hash */
-	if ((mbedtls_sha512_starts_ret(&ctx, 0) /* 0 = SHA512 */
-			) != 0) {
+	if ((mbedtls_sha512_starts(&ctx, 0)) != 0) { // 0 = SHA512
 		r = CHARRA_RC_CRYPTO_ERROR;
 		goto error;
 	}
 
-	if ((mbedtls_sha512_update_ret(&ctx, data, data_len)) != 0) {
+	if ((mbedtls_sha512_update(&ctx, data, data_len)) != 0) {
 		r = CHARRA_RC_CRYPTO_ERROR;
 		goto error;
 	}
 
-	if ((mbedtls_sha512_finish_ret(&ctx, digest)) != 0) {
+	if ((mbedtls_sha512_finish(&ctx, digest)) != 0) {
 		r = CHARRA_RC_CRYPTO_ERROR;
 		goto error;
 	}
@@ -166,10 +165,11 @@ CHARRA_RC charra_crypto_hash(mbedtls_md_type_t hash_algo,
 	uint8_t digest[MBEDTLS_MD_MAX_SIZE]) {
 	CHARRA_RC r = CHARRA_RC_SUCCESS;
 
-	/* init */
+	/* init and setup */
 	const mbedtls_md_info_t* hash_info = mbedtls_md_info_from_type(hash_algo);
 	mbedtls_md_context_t ctx = {0};
-	if ((mbedtls_md_init_ctx(&ctx, hash_info)) != 0) {
+	mbedtls_md_init(&ctx);
+	if ((mbedtls_md_setup(&ctx, hash_info, 0)) != 0) { // 0 = do not use HMAC
 		r = CHARRA_RC_CRYPTO_ERROR;
 		goto error;
 	}
@@ -207,22 +207,28 @@ CHARRA_RC charra_crypto_tpm_pub_key_to_mbedtls_pub_key(
 	mbedtls_mpi n = {0}; /* modulus */
 	mbedtls_mpi e = {0}; /* exponent */
 
-	/* init mbedTLS structures */
-	mbedtls_rsa_init(mbedtls_rsa_pub_key, MBEDTLS_RSA_PKCS_V15, 0);
+	/* init mbed TLS structures */
+	mbedtls_rsa_init(mbedtls_rsa_pub_key);
+	if (mbedtls_rsa_set_padding(
+			mbedtls_rsa_pub_key, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_NONE) != 0) {
+		r = CHARRA_RC_CRYPTO_ERROR;
+		charra_log_error("mbedtls_rsa_set_padding");
+		goto error;
+	}
 	mbedtls_mpi_init(&n);
 	mbedtls_mpi_init(&e);
 
+	/* set modulus */
 	if ((mbedtls_r = mbedtls_mpi_read_binary(&n,
 			 (const unsigned char*)
 				 tpm_rsa_pub_key->publicArea.unique.rsa.buffer,
 			 (size_t)tpm_rsa_pub_key->publicArea.unique.rsa.size)) != 0) {
 		r = CHARRA_RC_CRYPTO_ERROR;
-		printf("Error mbedtls_mpi_read_binary\n");
+		charra_log_error("mbedtls_mpi_read_binary");
 		goto error;
 	}
 
-	/* set exponent from TPM public key (if 0 set it to 65537) */
-	{
+	{ /* set exponent from TPM public key (if 0 set it to 65537) */
 		uint32_t exp = 65537; /* set default exponent */
 		if (tpm_rsa_pub_key->publicArea.parameters.rsaDetail.exponent != 0) {
 			exp = tpm_rsa_pub_key->publicArea.parameters.rsaDetail.exponent;
@@ -230,7 +236,7 @@ CHARRA_RC charra_crypto_tpm_pub_key_to_mbedtls_pub_key(
 
 		if ((mbedtls_r = mbedtls_mpi_lset(&e, (mbedtls_mpi_sint)exp)) != 0) {
 			r = CHARRA_RC_CRYPTO_ERROR;
-			printf("Error mbedtls_mpi_lset\n");
+			charra_log_error("mbedtls_mpi_lset");
 			goto error;
 		}
 	}
@@ -238,19 +244,19 @@ CHARRA_RC charra_crypto_tpm_pub_key_to_mbedtls_pub_key(
 	if ((mbedtls_r = mbedtls_rsa_import(
 			 mbedtls_rsa_pub_key, &n, NULL, NULL, NULL, &e)) != 0) {
 		r = CHARRA_RC_CRYPTO_ERROR;
-		printf("Error mbedtls_rsa_import\n");
+		charra_log_error("mbedtls_rsa_import");
 		goto error;
 	}
 
 	if ((mbedtls_r = mbedtls_rsa_complete(mbedtls_rsa_pub_key)) != 0) {
 		r = CHARRA_RC_CRYPTO_ERROR;
-		printf("Error mbedtls_rsa_complete\n");
+		charra_log_error("mbedtls_rsa_complete");
 		goto error;
 	}
 
 	if ((mbedtls_r = mbedtls_rsa_check_pubkey(mbedtls_rsa_pub_key)) != 0) {
 		r = CHARRA_RC_CRYPTO_ERROR;
-		printf("Error mbedtls_rsa_check_pubkey\n");
+		charra_log_error("mbedtls_rsa_check_pubkey");
 		goto error;
 	}
 
@@ -275,10 +281,18 @@ CHARRA_RC charra_crypto_rsa_verify_signature_hashed(
 	CHARRA_RC charra_r = CHARRA_RC_SUCCESS;
 	int mbedtls_r = 0;
 
+	/* get hash digest size */
+	const mbedtls_md_info_t* md_info = mbedtls_md_info_from_type(hash_algo);
+	if (md_info == NULL) {
+		charra_r = CHARRA_RC_CRYPTO_ERROR;
+		charra_log_error("mbedtls_md_info_from_type");
+		goto error;
+	}
+	uint8_t hash_digest_size = mbedtls_md_get_size(md_info);
+
 	/* verify signature */
-	if ((mbedtls_r = mbedtls_rsa_rsassa_pss_verify(mbedtls_rsa_pub_key, NULL,
-			 NULL, MBEDTLS_RSA_PUBLIC, hash_algo, 0, data_digest, signature)) !=
-		0) {
+	if ((mbedtls_r = mbedtls_rsa_rsassa_pss_verify(mbedtls_rsa_pub_key,
+			 hash_algo, hash_digest_size, data_digest, signature)) != 0) {
 		charra_r = CHARRA_RC_CRYPTO_ERROR;
 		goto error;
 	}
