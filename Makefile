@@ -1,9 +1,10 @@
 
 # main Makefile
 
-CFLAGS = -std=c99 -g -pedantic -Wall -Wextra \
-         -Wno-missing-field-initializers \
-         -fdata-sections -ffunction-sections
+CFLAGS = -std=c99 -g -pedantic -Wall -Wextra -Wimplicit-fallthrough \
+         -Wno-missing-field-initializers -Wl,--gc-sections \
+		 -fdata-sections -ffunction-sections \
+		 -fPIC
 
 ifdef disable-log
 	CFLAGS += -DCHARRA_LOG_DISABLE
@@ -21,7 +22,7 @@ BINDIR = bin
 
 LIBINCLUDE = -I/usr/include \
              -I/usr/local/include
-             
+
 
 LDPATH =     -L/usr/local/lib/ \
              -L/usr/lib/x86_64-linux-gnu
@@ -116,16 +117,16 @@ $(OBJDIR)/util/%.o: $(SRCDIR)/util/%.c
 
 ## --- libraries ---------------------------------------------------------- ##
 
-libs: 
+libs:
 	$(MAKE) -C lib/
 
-libs.static: 
+libs.static:
 	$(MAKE) -C lib/ all.static
 
-libs.install: 
+libs.install:
 	$(MAKE) -C lib/ install
 
-libs.uninstall: 
+libs.uninstall:
 	$(MAKE) -C lib/ uninstall
 
 

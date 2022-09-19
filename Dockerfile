@@ -8,16 +8,12 @@
 ##############################################################################
 
 FROM ghcr.io/tpm2-software/ubuntu-20.04:latest AS base
-LABEL maintainer="Michael Eckel <michael.eckel@sit.fraunhofer.de>"
+LABEL org.opencontainers.image.authors="michael.eckel@sit.fraunhofer.de"
 
-## glocal arguments with default values
+## global arguments with default values
 ARG user=bob
 ARG uid=1000
 ARG gid=1000
-
-RUN echo "BUILD ARG 'user': $user"
-RUN echo "BUILD ARG 'uid':  $uid"
-RUN echo "BUILD ARG 'gid':  $gid"
 
 ## copy configs
 COPY "./docker/dist/etc/default/keyboard" "/etc/default/keyboard"
@@ -31,7 +27,7 @@ RUN apt-get update \
 RUN yes | unminimize
 
 ## TPM2 TSS
-RUN git clone --depth=1 -b '3.0.3' \
+RUN git clone --depth=1 -b '3.2.0' \
 	'https://github.com/tpm2-software/tpm2-tss.git' /tmp/tpm2-tss
 WORKDIR /tmp/tpm2-tss
 ENV LD_LIBRARY_PATH /usr/local/lib
@@ -51,7 +47,7 @@ RUN ln -sf 'libtss2-tcti-mssim.so' '/usr/local/lib/libtss2-tcti-default.so'
 RUN rm -rf /tmp/tpm2-tss
 
 ## TPM2 tools
-RUN git clone --depth=1 -b '5.0' \
+RUN git clone --depth=1 -b '5.2' \
 	'https://github.com/tpm2-software/tpm2-tools.git' /tmp/tpm2-tools
 WORKDIR /tmp/tpm2-tools
 RUN ./bootstrap \
@@ -61,10 +57,11 @@ RUN ./bootstrap \
 RUN rm -rfv /tmp/tpm2-tools
 
 ## libcoap
-RUN git clone --recursive -b 'develop' \
+RUN git clone --recursive -b 'v4.3.0' \
 	'https://github.com/obgm/libcoap.git' /tmp/libcoap
-# Usually the second git checkout should be enough with an added '--recurse-submodules',
-# but for some reason this fails in the default docker build environment.
+# Usually the second git checkout should be enough with an added
+# '--recurse-submodules', but for some reason this fails in the
+# default docker build environment.
 # Note: The checkout with submodules works when using Buildkit.
 WORKDIR /tmp/libcoap/ext/tinydtls
 RUN git checkout 290c48d262b6859443bd4b04926146bda3293c98
@@ -78,17 +75,16 @@ RUN ./autogen.sh \
 	&& make install
 RUN rm -rfv /tmp/libcoap
 
-## mbedtls
-RUN git clone --recursive -b 'development' \
+## mbed TLS
+RUN git clone --recursive -b 'v3.2.1' \
 	'https://github.com/ARMmbed/mbedtls.git' /tmp/mbedtls
 WORKDIR /tmp/mbedtls
-RUN git checkout 70c68dac45df992137ea48e87c9db473266ea1cb
 RUN make -j lib SHARED=true \
 	&& make install
 RUN rm -rfv /tmp/mbedtls
 
 ## QCBOR
-RUN git clone --depth=1 --recursive -b 'master' \
+RUN git clone --depth=1 --recursive -b 'v1.1' \
 	'https://github.com/laurencelundblade/QCBOR.git' /tmp/qcbor
 WORKDIR /tmp/qcbor
 RUN make -j all so \
@@ -96,7 +92,7 @@ RUN make -j all so \
 RUN rm -rfv /tmp/qcbor
 
 ## t_cose
-RUN git clone --depth=1 --recursive -b 'master' \
+RUN git clone --depth=1 --recursive -b 'v1.0.1' \
 	'https://github.com/laurencelundblade/t_cose.git' /tmp/t_cose
 WORKDIR /tmp/t_cose
 RUN make -j -f Makefile.psa libt_cose.a libt_cose.so \
