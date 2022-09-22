@@ -467,7 +467,7 @@ error:
 	charra_free_if_not_null(signature);
 	charra_free_if_not_null(attest_buf);
 	charra_free_if_not_null(public_key);
-	charra_free_continous_file_buffer(&ima_event_log);
+	charra_io_free_continuous_file_buffer(&ima_event_log);
 
 	/* flush handles */
 	if (sig_key_handle != ESYS_TR_NONE) {

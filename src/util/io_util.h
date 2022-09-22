@@ -48,8 +48,8 @@
  * in lowercase (e.g. "012..abcdef").
  */
 void charra_print_hex(const charra_log_t level, const size_t buf_len,
-	const uint8_t* const buf, const char* prefix, const char* postfix,
-	const bool upper_case);
+	const uint8_t* const buf, const char* const prefix,
+	const char* const postfix, const bool upper_case);
 
 /**
  * @brief
@@ -62,7 +62,8 @@ void charra_print_hex(const charra_log_t level, const size_t buf_len,
  * @param postfix  A postfix to the output, e.g. "\n", or leave it empty ("").
  */
 void charra_print_str(const charra_log_t level, const size_t buf_len,
-	const uint8_t* const buf, const char* prefix, const char* postfix);
+	const uint8_t* const buf, const char* const prefix,
+	const char* const postfix);
 
 /**
  * @brief Print PCR content of selected PCRs.
@@ -73,15 +74,15 @@ void charra_print_str(const charra_log_t level, const size_t buf_len,
  * @param pcrs the content of the PCRs
  */
 void charra_print_pcr_content(const charra_log_t level,
-	const uint8_t* pcr_selection, const uint32_t pcr_selection_len,
-	uint8_t** pcrs);
+	const uint8_t* const pcr_selection, const uint32_t pcr_selection_len,
+	const uint8_t** const pcrs);
 
 /**
  * @brief Checks if file is existing.
  *
  * @param filename the path of the file
  */
-CHARRA_RC check_file_existence(const char* filename);
+CHARRA_RC charra_io_file_exists(const char* const filename);
 
 /**
  * @brief read file into a buffer. The buffer will be initialized in this
@@ -94,8 +95,8 @@ CHARRA_RC check_file_existence(const char* filename);
  * file_content).
  * @return CHARRA_RC CHARRA_RC_SUCCESS on success, otherwise CHARRA_RC_ERROR
  */
-CHARRA_RC charra_io_read_file(
-	const char* filename, char** file_content, size_t* file_content_len);
+CHARRA_RC charra_io_read_file(const char* filename, char** const file_content,
+	size_t* const file_content_len);
 
 /**
  * @brief free buffer holding the file content. Alternatively
@@ -103,7 +104,7 @@ CHARRA_RC charra_io_read_file(
  *
  * @param[in] file_content A pointer to the buffer.
  */
-void charra_free_file_buffer(char** file_content);
+void charra_io_free_file_buffer(char** const file_content);
 
 /**
  * @brief read binary file of unknown length into a cvector. Used for IMA event
@@ -117,14 +118,14 @@ void charra_free_file_buffer(char** file_content);
  * file_content).
  * @return CHARRA_RC CHARRA_RC_SUCCESS on success, otherwise CHARRA_RC_ERROR
  */
-CHARRA_RC charra_io_read_continuous_binary_file(
-	const char* filename, uint8_t** file_content, size_t* file_content_len);
+CHARRA_RC charra_io_read_continuous_binary_file(const char* const filename,
+	uint8_t** const file_content, size_t* const file_content_len);
 
 /**
  * @brief free cvector holding the file content.
  *
  * @param[in] file_content A pointer to the cvector.
  */
-void charra_free_continous_file_buffer(uint8_t** file_content);
+void charra_io_free_continuous_file_buffer(uint8_t** const file_content);
 
 #endif /* IO_UTIL_H */
