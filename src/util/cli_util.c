@@ -274,7 +274,7 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 			*variables->common_config.use_dtls_rpk = true;
 			char* path = malloc(strlen(optarg));
 			strcpy(path, optarg);
-			if (check_file_existence(path) == CHARRA_RC_SUCCESS) {
+			if (charra_io_file_exists(path) == CHARRA_RC_SUCCESS) {
 				*(variables->common_config.dtls_rpk_private_key_path) = path;
 				continue;
 			} else {
@@ -289,7 +289,7 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 			*variables->common_config.use_dtls_rpk = true;
 			char* path = malloc(strlen(optarg));
 			strcpy(path, optarg);
-			if (check_file_existence(path) == CHARRA_RC_SUCCESS) {
+			if (charra_io_file_exists(path) == CHARRA_RC_SUCCESS) {
 				*(variables->common_config.dtls_rpk_public_key_path) = path;
 				continue;
 			} else {
@@ -304,7 +304,7 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 			*variables->common_config.use_dtls_rpk = true;
 			char* path = malloc(strlen(optarg));
 			strcpy(path, optarg);
-			if (check_file_existence(path) == CHARRA_RC_SUCCESS) {
+			if (charra_io_file_exists(path) == CHARRA_RC_SUCCESS) {
 				*(variables->common_config.dtls_rpk_peer_public_key_path) =
 					path;
 				continue;
@@ -363,7 +363,7 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
 			uint32_t length = strlen(optarg);
 			char* path = malloc(length * sizeof(char));
 			strcpy(path, optarg);
-			if (check_file_existence(path) == CHARRA_RC_SUCCESS) {
+			if (charra_io_file_exists(path) == CHARRA_RC_SUCCESS) {
 				*(variables->verifier_config.reference_pcr_file_path) = path;
 				continue;
 			} else {
