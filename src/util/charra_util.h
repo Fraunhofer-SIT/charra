@@ -48,7 +48,7 @@ CHARRA_RC charra_random_bytes(const uint32_t len, uint8_t* random_bytes);
  * @return CHARRA_RC_ERROR on error.
  */
 CHARRA_RC charra_random_bytes_from_tpm(
-	const uint32_t len, uint8_t* random_bytes);
+        const uint32_t len, uint8_t* random_bytes);
 
 /**
  * @brief Verifies a TPM 2.0 quote using the TPM.
@@ -62,23 +62,23 @@ CHARRA_RC charra_random_bytes_from_tpm(
  * @return TSS2_RC The TSS return code.
  */
 CHARRA_RC charra_verify_tpm2_quote_signature_with_tpm(ESYS_CONTEXT* ctx,
-	const ESYS_TR sig_key_handle, const TPM2_ALG_ID hash_algo_id,
-	const TPM2B_ATTEST* attest_buf, TPMT_SIGNATURE* signature,
-	TPMT_TK_VERIFIED** validation);
+        const ESYS_TR sig_key_handle, const TPM2_ALG_ID hash_algo_id,
+        const TPM2B_ATTEST* attest_buf, TPMT_SIGNATURE* signature,
+        TPMT_TK_VERIFIED** validation);
 
 CHARRA_RC charra_unmarshal_tpm2_quote(size_t attest_buf_len,
-	const uint8_t* attest_buf, TPMS_ATTEST* attest_struct);
+        const uint8_t* attest_buf, TPMS_ATTEST* attest_struct);
 
 bool charra_verify_tpm2_quote_qualifying_data(uint16_t qualifying_data_len,
-	const uint8_t* const qualifying_data,
-	const TPMS_ATTEST* const attest_struct);
+        const uint8_t* const qualifying_data,
+        const TPMS_ATTEST* const attest_struct);
 
 bool charra_verify_tpm2_quote_pcrs(TPM2_ALG_ID hash_algo_id,
-	const uint8_t* const qualifying_data,
-	const TPMS_ATTEST* const attest_struct);
+        const uint8_t* const qualifying_data,
+        const TPMS_ATTEST* const attest_struct);
 
 bool charra_verify_tpm2_quote_pcr_composite_digest(
-	const TPMS_ATTEST* const attest_struct, const uint8_t* const pcr_composite,
-	const uint16_t pcr_composite_len);
+        const TPMS_ATTEST* const attest_struct,
+        const uint8_t* const pcr_composite, const uint16_t pcr_composite_len);
 
 #endif /* CHARRA_UTIL_H */

@@ -28,9 +28,9 @@
 #include "../common/charra_error.h"
 
 CHARRA_RC charra_load_tpm2_key(ESYS_CONTEXT* ctx, const uint32_t key_len,
-	const uint8_t* key, ESYS_TR* key_handle, TPM2B_PUBLIC** out_public);
+        const uint8_t* key, ESYS_TR* key_handle, TPM2B_PUBLIC** out_public);
 
-CHARRA_RC charra_load_external_public_key(
-	ESYS_CONTEXT* ctx, TPM2B_PUBLIC* external_public_key, ESYS_TR* key_handle);
+CHARRA_RC charra_load_external_public_key(ESYS_CONTEXT* ctx,
+        TPM2B_PUBLIC* external_public_key, ESYS_TR* key_handle);
 
 #endif /* CHARRA_KEY_MGR_H */

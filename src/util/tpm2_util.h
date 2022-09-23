@@ -34,7 +34,7 @@
  * @return TSS2_RC The TSS return code.
  */
 TSS2_RC tpm2_create_primary_key_rsa2048(
-	ESYS_CONTEXT* ctx, ESYS_TR* primary_handle, TPM2B_PUBLIC** out_public);
+        ESYS_CONTEXT* ctx, ESYS_TR* primary_handle, TPM2B_PUBLIC** out_public);
 
 /**
  * @brief Stores a key in the TPM NVRAM under the first available NV index.
@@ -54,7 +54,7 @@ TSS2_RC tpm2_store_key_in_nvram(ESYS_CONTEXT* ctx, const ESYS_TR* key_handle);
  * @return TSS2_RC The TSS return code.
  */
 TSS2_RC tpm2_pcr_extend(ESYS_CONTEXT* ctx, const uint32_t pcr_idx,
-	const TPML_DIGEST_VALUES* digests);
+        const TPML_DIGEST_VALUES* digests);
 
 /**
  * @brief Generates random bytes using the TPM 2.0.
@@ -65,7 +65,7 @@ TSS2_RC tpm2_pcr_extend(ESYS_CONTEXT* ctx, const uint32_t pcr_idx,
  * @return TSS2_RC The TSS return code.
  */
 TSS2_RC tpm2_get_random(
-	ESYS_CONTEXT* ctx, const uint32_t len, TPM2B_DIGEST** random_bytes);
+        ESYS_CONTEXT* ctx, const uint32_t len, TPM2B_DIGEST** random_bytes);
 
 /**
  * @brief Executes a TPM quote operation.
@@ -80,7 +80,8 @@ TSS2_RC tpm2_get_random(
  * @return TSS2_RC The TSS return code.
  */
 TSS2_RC tpm2_quote(ESYS_CONTEXT* ctx, const ESYS_TR sign_key_handle,
-	const TPML_PCR_SELECTION* pcr_selection, const TPM2B_DATA* qualifyingData,
-	TPM2B_ATTEST** attest, TPMT_SIGNATURE** signature);
+        const TPML_PCR_SELECTION* pcr_selection,
+        const TPM2B_DATA* qualifyingData, TPM2B_ATTEST** attest,
+        TPMT_SIGNATURE** signature);
 
 #endif /* TPM2_UTIL_H */

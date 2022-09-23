@@ -23,8 +23,8 @@
 #include <stdbool.h>
 
 typedef enum {
-	VERIFIER,
-	ATTESTER,
+    VERIFIER,
+    ATTESTER,
 } cli_parser_caller;
 
 /**
@@ -32,16 +32,16 @@ typedef enum {
  * which might geht modified by the CLI parser
  */
 typedef struct {
-	charra_log_t* charra_log_level;
-	coap_log_t* coap_log_level;
-	unsigned int* port;
-	bool* use_dtls_psk;
-	char** dtls_psk_key;
-	bool* use_dtls_rpk;
-	char** dtls_rpk_private_key_path;
-	char** dtls_rpk_public_key_path;
-	char** dtls_rpk_peer_public_key_path;
-	bool* dtls_rpk_verify_peer_public_key;
+    charra_log_t* charra_log_level;
+    coap_log_t* coap_log_level;
+    unsigned int* port;
+    bool* use_dtls_psk;
+    char** dtls_psk_key;
+    bool* use_dtls_rpk;
+    char** dtls_rpk_private_key_path;
+    char** dtls_rpk_public_key_path;
+    char** dtls_rpk_peer_public_key_path;
+    bool* dtls_rpk_verify_peer_public_key;
 } cli_config_common;
 
 /**
@@ -49,7 +49,7 @@ typedef struct {
  * which might geht modified by the CLI parser
  */
 typedef struct {
-	char** dtls_psk_hint;
+    char** dtls_psk_hint;
 } cli_config_attester;
 
 /**
@@ -57,14 +57,14 @@ typedef struct {
  * which might geht modified by the CLI parser
  */
 typedef struct {
-	char* dst_host;
-	uint16_t* timeout;
-	char** reference_pcr_file_path;
-	uint8_t* tpm_pcr_selection;
-	uint32_t* tpm_pcr_selection_len;
-	bool* use_ima_event_log;
-	char** ima_event_log_path;
-	char** dtls_psk_identity;
+    char* dst_host;
+    uint16_t* timeout;
+    char** reference_pcr_file_path;
+    uint8_t* tpm_pcr_selection;
+    uint32_t* tpm_pcr_selection_len;
+    bool* use_ima_event_log;
+    char** ima_event_log_path;
+    char** dtls_psk_identity;
 } cli_config_verifier;
 
 /**
@@ -72,10 +72,10 @@ typedef struct {
  * modified by the CLI parser
  */
 typedef struct {
-	cli_parser_caller caller;
-	cli_config_common common_config;
-	cli_config_attester attester_config;
-	cli_config_verifier verifier_config;
+    cli_parser_caller caller;
+    cli_config_common common_config;
+    cli_config_attester attester_config;
+    cli_config_verifier verifier_config;
 } cli_config;
 
 /**
@@ -84,7 +84,7 @@ typedef struct {
 * @param argc The number of arguments which were given to the CLI.
 * @param argv The arguments which were given to the CLI.
 * @param variables A struct holding a caller identifier and pointers to config
-				   variables which might get modified depending on the CLI
+                   variables which might get modified depending on the CLI
 arguments.
 * @return 0 on success, -1 on parse error, 1 when help message was displayed
 */
