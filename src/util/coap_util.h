@@ -32,17 +32,17 @@
  *
  */
 typedef struct coap_token_t {
-	/**
-	 * @brief (Real) length of the token (max. 8).
-	 *
-	 */
-	size_t length;
+    /**
+     * @brief (Real) length of the token (max. 8).
+     *
+     */
+    size_t length;
 
-	/**
-	 * @brief The token (max. 8 bytes)
-	 *
-	 */
-	uint8_t data[8];
+    /**
+     * @brief The token (max. 8 bytes)
+     *
+     */
+    uint8_t data[8];
 } coap_token_t;
 
 /**
@@ -87,8 +87,8 @@ coap_context_t* charra_coap_new_context(const bool enable_coap_block_mode);
  * @return NULL if an error occurred.
  */
 coap_endpoint_t* charra_coap_new_endpoint(coap_context_t* coap_context,
-	const char* listen_address, const uint16_t port,
-	const coap_proto_t coap_protocol);
+        const char* listen_address, const uint16_t port,
+        const coap_proto_t coap_protocol);
 
 /**
  * @brief Creates a CoAP client session.
@@ -101,8 +101,8 @@ coap_endpoint_t* charra_coap_new_endpoint(coap_context_t* coap_context,
  * @return NULL if an error occurred.
  */
 coap_session_t* charra_coap_new_client_session(coap_context_t* coap_context,
-	const char* dest_address, const uint16_t port,
-	const coap_proto_t coap_protocol);
+        const char* dest_address, const uint16_t port,
+        const coap_proto_t coap_protocol);
 
 /**
  * @brief Creates a CoAP client session with PSK.
@@ -118,9 +118,9 @@ coap_session_t* charra_coap_new_client_session(coap_context_t* coap_context,
  * @return NULL if an error occurred.
  */
 coap_session_t* charra_coap_new_client_session_psk(coap_context_t* coap_context,
-	const char* dest_address, const uint16_t port,
-	const coap_proto_t coap_protocol, const char* identity, const uint8_t* key,
-	unsigned key_length);
+        const char* dest_address, const uint16_t port,
+        const coap_proto_t coap_protocol, const char* identity,
+        const uint8_t* key, unsigned key_length);
 
 /**
  * @brief Creates a CoAP client session with PKI.
@@ -135,8 +135,8 @@ coap_session_t* charra_coap_new_client_session_psk(coap_context_t* coap_context,
  * @return NULL if an error occurred.
  */
 coap_session_t* charra_coap_new_client_session_pki(coap_context_t* coap_context,
-	const char* dest_address, const uint16_t port,
-	const coap_proto_t coap_protocol, coap_dtls_pki_t* dtls_pki);
+        const char* dest_address, const uint16_t port,
+        const coap_proto_t coap_protocol, coap_dtls_pki_t* dtls_pki);
 
 /**
  * @brief Creates a new CoAP request with large data, using CoAP block-wise
@@ -154,8 +154,8 @@ coap_session_t* charra_coap_new_client_session_pki(coap_context_t* coap_context,
  * @return NULL in case of an error.
  */
 coap_pdu_t* charra_coap_new_request(coap_session_t* session,
-	coap_message_t msg_type, coap_request_t method, coap_optlist_t** options,
-	const uint8_t* data, const size_t data_len);
+        coap_message_t msg_type, coap_request_t method,
+        coap_optlist_t** options, const uint8_t* data, const size_t data_len);
 
 /**
  * @brief Adds a CoAP resource.
@@ -166,8 +166,8 @@ coap_pdu_t* charra_coap_new_request(coap_session_t* session,
  * @param handler the method handler function.
  */
 void charra_coap_add_resource(struct coap_context_t* coap_context,
-	const coap_request_t method, const char* resource_name,
-	const coap_method_handler_t handler);
+        const coap_request_t method, const char* resource_name,
+        const coap_method_handler_t handler);
 
 /**
  * @brief: Setup the dtls_pki structure for DTLS-RPK.
@@ -180,8 +180,8 @@ void charra_coap_add_resource(struct coap_context_t* coap_context,
  * validate the peers' public key, false otherwise
  */
 CHARRA_RC charra_coap_setup_dtls_pki_for_rpk(coap_dtls_pki_t* dtls_pki,
-	char* private_key_path, char* public_key_path, char* peer_public_key_path,
-	bool verify_peer_public_key);
+        char* private_key_path, char* public_key_path,
+        char* peer_public_key_path, bool verify_peer_public_key);
 
 /**
  * @brief Parses the libcoap log level from string and writes the result into
@@ -193,7 +193,7 @@ CHARRA_RC charra_coap_setup_dtls_pki_for_rpk(coap_dtls_pki_t* dtls_pki,
  * @return 0 on success, -1 on error.
  */
 int charra_coap_log_level_from_str(
-	const char* log_level_str, coap_log_t* log_level);
+        const char* log_level_str, coap_log_t* log_level);
 
 /**
  * @brief Returns the string representation of a CoAP request method.

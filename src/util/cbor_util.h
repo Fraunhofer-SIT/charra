@@ -45,8 +45,8 @@ const char* cbor_type_string(const uint8_t type);
  * @return CHARRA_RC_SUCCESS in case of success
  * @return CHARRA_RC_MARSHALING_ERROR in case an error occurred
  */
-CHARRA_RC charra_cbor_get_next(
-	QCBORDecodeContext* ctx, QCBORItem* decoded_item, uint8_t expected_type);
+CHARRA_RC charra_cbor_get_next(QCBORDecodeContext* ctx, QCBORItem* decoded_item,
+        uint8_t expected_type);
 
 /**
  * @brief Reads a boolean value from a CBOR item.

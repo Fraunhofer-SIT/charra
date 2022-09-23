@@ -31,10 +31,10 @@
 
 #define CHARRA_BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
 #define CHARRA_BYTE_TO_BINARY(byte)                                            \
-	(byte & 0x80 ? '1' : '0'), (byte & 0x40 ? '1' : '0'),                      \
-		(byte & 0x20 ? '1' : '0'), (byte & 0x10 ? '1' : '0'),                  \
-		(byte & 0x08 ? '1' : '0'), (byte & 0x04 ? '1' : '0'),                  \
-		(byte & 0x02 ? '1' : '0'), (byte & 0x01 ? '1' : '0')
+    (byte & 0x80 ? '1' : '0'), (byte & 0x40 ? '1' : '0'),                      \
+            (byte & 0x20 ? '1' : '0'), (byte & 0x10 ? '1' : '0'),              \
+            (byte & 0x08 ? '1' : '0'), (byte & 0x04 ? '1' : '0'),              \
+            (byte & 0x02 ? '1' : '0'), (byte & 0x01 ? '1' : '0')
 
 /**
  * @brief
@@ -48,8 +48,8 @@
  * in lowercase (e.g. "012..abcdef").
  */
 void charra_print_hex(const charra_log_t level, const size_t buf_len,
-	const uint8_t* const buf, const char* const prefix,
-	const char* const postfix, const bool upper_case);
+        const uint8_t* const buf, const char* const prefix,
+        const char* const postfix, const bool upper_case);
 
 /**
  * @brief
@@ -62,8 +62,8 @@ void charra_print_hex(const charra_log_t level, const size_t buf_len,
  * @param postfix  A postfix to the output, e.g. "\n", or leave it empty ("").
  */
 void charra_print_str(const charra_log_t level, const size_t buf_len,
-	const uint8_t* const buf, const char* const prefix,
-	const char* const postfix);
+        const uint8_t* const buf, const char* const prefix,
+        const char* const postfix);
 
 /**
  * @brief Print PCR content of selected PCRs.
@@ -74,8 +74,8 @@ void charra_print_str(const charra_log_t level, const size_t buf_len,
  * @param pcrs the content of the PCRs
  */
 void charra_print_pcr_content(const charra_log_t level,
-	const uint8_t* const pcr_selection, const uint32_t pcr_selection_len,
-	const uint8_t** const pcrs);
+        const uint8_t* const pcr_selection, const uint32_t pcr_selection_len,
+        const uint8_t** const pcrs);
 
 /**
  * @brief Checks if file is existing.
@@ -96,7 +96,7 @@ CHARRA_RC charra_io_file_exists(const char* const filename);
  * @return CHARRA_RC CHARRA_RC_SUCCESS on success, otherwise CHARRA_RC_ERROR
  */
 CHARRA_RC charra_io_read_file(const char* filename, char** const file_content,
-	size_t* const file_content_len);
+        size_t* const file_content_len);
 
 /**
  * @brief free buffer holding the file content. Alternatively
@@ -119,7 +119,7 @@ void charra_io_free_file_buffer(char** const file_content);
  * @return CHARRA_RC CHARRA_RC_SUCCESS on success, otherwise CHARRA_RC_ERROR
  */
 CHARRA_RC charra_io_read_continuous_binary_file(const char* const filename,
-	uint8_t** const file_content, size_t* const file_content_len);
+        uint8_t** const file_content, size_t* const file_content_len);
 
 /**
  * @brief free cvector holding the file content.
