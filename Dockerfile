@@ -27,6 +27,10 @@ RUN apt-get update \
 RUN yes | unminimize
 
 ## TPM2 TSS
+RUN apt-get update \
+	&& apt-get install --no-install-recommends -y \
+	python3-jinja2 \
+	&& rm -rf /var/lib/apt/lists/*
 RUN git clone --depth=1 -b '3.2.0' \
 	'https://github.com/tpm2-software/tpm2-tss.git' /tmp/tpm2-tss
 WORKDIR /tmp/tpm2-tss
