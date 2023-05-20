@@ -1,8 +1,11 @@
 ################################################################################
+# Copyright 2023, Fraunhofer Institute for Secure Information Technology SIT.  #
+# All rights reserved.                                                         #
+# ---------------------------------------------------------------------------- #
 # Main Dockerfile for CHARRA.                                                  #
 # ---------------------------------------------------------------------------- #
 # Author:        Michael Eckel <michael.eckel@sit.fraunhofer.de>               #
-# Date Modified: 2023-04-03T13:37:42+02:00                                     #
+# Date Modified: 2023-05-20T13:37:42+02:00                                     #
 # Date Created:  2019-06-26T09:23:15+02:00                                     #
 # ---------------------------------------------------------------------------- #
 # Hint: Check your Dockerfile at https://www.fromlatest.io/                    #
@@ -26,7 +29,7 @@ LABEL org.opencontainers.image.authors="michael.eckel@sit.fraunhofer.de"
 
 ## --- image specific arguments ------------------------------------------------
 
-ARG user=charra
+ARG user=bob
 ARG uid=1000
 ARG gid=1000
 

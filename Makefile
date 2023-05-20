@@ -1,18 +1,73 @@
+################################################################################
+# Copyright 2023, Fraunhofer Institute for Secure Information Technology SIT.  #
+# All rights reserved.                                                         #
+# ---------------------------------------------------------------------------- #
+# Main Makefile for CHARRA.                                                    #
+# ---------------------------------------------------------------------------- #
+# Author:        Michael Eckel <michael.eckel@sit.fraunhofer.de>               #
+# Date Modified: 2023-04-03T13:37:42+02:00                                     #
+# Date Created:  2019-06-26T09:23:15+02:00                                     #
+################################################################################
 
-# main Makefile
 
-CFLAGS = -std=c99 -g -pedantic -Wall -Wextra -Wimplicit-fallthrough \
-         -Wno-missing-field-initializers -Wl,--gc-sections \
-		 -fdata-sections -ffunction-sections \
-		 -fPIC
+# ------------------------------------------------------------------------------
+# --- arguments + variables ----------------------------------------------------
+# ------------------------------------------------------------------------------
 
-ifdef disable-log
-	CFLAGS += -DCHARRA_LOG_DISABLE
+## link mode
+LINK_MODE ?= dynamic
+link_mode := $(if $(filter static,$(LINK_MODE)), -static)
+
+## TCTI module
+## (typically, TCTI implementations are stored at /usr/local/lib/libtss2-*.so*)
+TCTI_MODULE ?= tctildr
+tcti_module := tss2-$(TCTI_MODULE)
+
+## logging
+enable_pic := 1
+flags_pic := -fPIC
+ifeq ($(ENABLE_PIC),0)
+	enable_pic := 0
+	flags_pic :=
 endif
-ifdef disable-log-color
-	CFLAGS += -DCHARRA_LOG_DISABLE_COLOR
+
+## address sanitizer
+enable_address_sanitizer := 0
+flags_address_sanitizer :=
+ifeq ($(ENABLE_ADDRESS_SANITIZER),)
+	enable_address_sanitizer := 0
+	flags_address_sanitizer :=
+else ifneq ($(ENABLE_ADDRESS_SANITIZER),0)
+	enable_address_sanitizer := 1
+	flags_address_sanitizer := -fsanitize=address
 endif
 
+## strip unneeded
+enable_stripping := 1
+ifeq ($(ENABLE_STRIPPING),0)
+	enable_stripping := 0
+endif
+
+## logging
+enable_logging := 1
+flags_logging :=
+ifeq ($(ENABLE_LOGGING),0)
+	enable_logging := 0
+	flags_logging := -DCHARRA_LOG_DISABLE
+endif
+
+## colored logging
+enable_logging_color := 1
+flags_logging_color :=
+ifeq ($(ENABLE_LOGGING_COLOR),0)
+	enable_logging_color := 0
+	flags_logging_color := -DCHARRA_LOG_DISABLE_COLOR
+endif
+
+
+# ------------------------------------------------------------------------------
+# --- directories --------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 SRCDIR = src
 INCDIR = include
@@ -20,9 +75,20 @@ OBJDIR = obj
 BINDIR = bin
 
 
+# ------------------------------------------------------------------------------
+# --- arguments + flags --------------------------------------------------------
+# ------------------------------------------------------------------------------
+
+CFLAGS =     -std=c99 -g -pedantic -Wall -Wextra -Wimplicit-fallthrough \
+             -Wno-missing-field-initializers -Wl,--gc-sections \
+             -fdata-sections -ffunction-sections \
+             -fPIC \
+             $(flags_address_sanitizer) \
+             $(flags_logging) \
+             $(flags_logging_color)
+
 LIBINCLUDE = -I/usr/include \
              -I/usr/local/include
-
 
 LDPATH =     -L/usr/local/lib/ \
              -L/usr/lib/x86_64-linux-gnu
@@ -31,28 +97,16 @@ LIBS =       coap-2-tinydtls \
              qcbor m \
              crypto ssl \
              mbedcrypto \
-             util tss2-esys tss2-sys tss2-mu tss2-tctildr
+             util \
+             tss2-esys tss2-sys tss2-mu tss2-tctildr \
+             $(tcti_module)
 
-# TCTI module to use (default is 'mssim')
-TCTI_MODULE=tss2-tcti-mssim
-ifdef with-tcti
-	TCTI_MODULE=tss2-tcti-$(with-tcti)
-	#@echo "Using tss2-tcti-"$(WITH_TCTI)
-endif
-LIBS += $(TCTI_MODULE)
+LDFLAGS =    $(addprefix -l, $(LIBS))
 
 
-LDFLAGS_DYNAMIC = $(addprefix -l, $(LIBS))
-
-LDFLAGS_STATIC = $(addprefix -l:lib, $(addsuffix .a, $(LIBS)))
-
-
-ifdef address-sanitizer
-	CFLAGS += -fsanitize=address
-	LDFLAGS_STATIC += -fsanitize=address
-	LDFLAGS_DYNAMIC += -fsanitize=address
-endif
-
+# ------------------------------------------------------------------------------
+# --- sources + targets --------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 SOURCES = $(shell find $(SRCDIR) -name '*.c')
 
@@ -64,73 +118,50 @@ OBJECTS += $(addsuffix .o, $(addprefix $(OBJDIR)/util/, cbor_util charra_util co
 
 TARGETS = $(addprefix $(BINDIR)/, attester verifier)
 
+.PHONY: all attester verifier clean
 
-
-.PHONY: all all.static libs clean cleanlibs cleanall
-
-## --- targets ------------------------------------------------------------ ##
-
-all: LDFLAGS = $(LDFLAGS_DYNAMIC)
 all: $(TARGETS)
+attester: $(BINDIR)/attester
+verifier: $(BINDIR)/verifier
 
-all.static: LDFLAGS = $(LDFLAGS_STATIC)
-all.static: $(TARGETS)
 
+# ------------------------------------------------------------------------------
+# --- productions --------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
-## address sanitizer
-ifdef address-sanitizer
-	@echo "Enabling address sanitizer."
-	CFLAGS += -fsanitize=address
-	LDFLAGS += -fsanitize=address
-endif
-
+## --- apps --------------------------------------------------------------------
 
 $(BINDIR)/attester: $(SRCDIR)/attester.c $(OBJECTS)
-	$(CC) $^ $(CFLAGS) $(INCLUDE) $(LIBINCLUDE) $(LDPATH) $(LDFLAGS) -g -o $@ -Wl,--gc-sections
-ifdef strip
+	$(CC) $^ $(CFLAGS) $(INCLUDE) $(LIBINCLUDE) $(LDPATH) $(LDFLAGS) -g -o $@ -Wl,--gc-sections $(link_mode)
+ifeq ($(enable_stripping),1)
 	strip --strip-unneeded $@
 endif
 
 $(BINDIR)/verifier: $(SRCDIR)/verifier.c $(OBJECTS)
-	$(CC) $^ $(CFLAGS) $(INCLUDE) $(LIBINCLUDE) $(LDPATH) $(LDFLAGS) -g -o $@ -Wl,--gc-sections
-ifdef strip
+	$(CC) $^ $(CFLAGS) $(INCLUDE) $(LIBINCLUDE) $(LDPATH) $(LDFLAGS) -g -o $@ -Wl,--gc-sections $(link_mode)
+ifeq ($(enable_stripping),1)
 	strip --strip-unneeded $@
 endif
 
 
-
-## --- objects ------------------------------------------------------------ ##
+## --- objects -----------------------------------------------------------------
 
 $(OBJDIR)/common/%.o: $(SRCDIR)/common/%.c
 	@mkdir -p $(@D)
-	$(CC) $< $(INCLUDE) $(LIBINCLUDE) $(LDPATH) $(LDFLAGS) $(CFLAGS) -g -o $@ -c
+	$(CC) $< $(INCLUDE) $(LIBINCLUDE) $(LDPATH) $(LDFLAGS) $(CFLAGS) -g -o $@ -c $(link_mode)
 
 $(OBJDIR)/core/%.o: $(SRCDIR)/core/%.c
 	@mkdir -p $(@D)
-	$(CC) $< $(INCLUDE) $(LIBINCLUDE) $(LDPATH) $(LDFLAGS) $(CFLAGS) -g -o $@ -c
+	$(CC) $< $(INCLUDE) $(LIBINCLUDE) $(LDPATH) $(LDFLAGS) $(CFLAGS) -g -o $@ -c $(link_mode)
 
 $(OBJDIR)/util/%.o: $(SRCDIR)/util/%.c
 	@mkdir -p $(@D)
-	$(CC) $< $(INCLUDE) $(LIBINCLUDE) $(LDPATH) $(LDFLAGS) $(CFLAGS) -g -o $@ -c
+	$(CC) $< $(INCLUDE) $(LIBINCLUDE) $(LDPATH) $(LDFLAGS) $(CFLAGS) -g -o $@ -c $(link_mode)
 
 
-
-## --- libraries ---------------------------------------------------------- ##
-
-libs:
-	$(MAKE) -C lib/
-
-libs.static:
-	$(MAKE) -C lib/ all.static
-
-libs.install:
-	$(MAKE) -C lib/ install
-
-libs.uninstall:
-	$(MAKE) -C lib/ uninstall
-
-
-## --- clean -------------------------------------------------------------- ##
+# ------------------------------------------------------------------------------
+# --- clean --------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 clean:
 	$(RM) bin/*
@@ -139,7 +170,3 @@ clean:
 	$(RM) obj/util/*.*
 	$(RM) obj/*.*
 
-cleanlibs: clean
-	$(MAKE) -C lib/ clean
-
-cleanall: cleanlibs clean
