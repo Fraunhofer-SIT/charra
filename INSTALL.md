@@ -4,7 +4,7 @@
 # All rights reserved.                                                         #
 # ---------------------------------------------------------------------------- #
 # Author:        Michael Eckel <michael.eckel@sit.fraunhofer.de>               #
-# Date Modified: 2023-05-20T13:37:42+02:00                                     #
+# Date Modified: 2023-05-22T13:37:42+02:00                                     #
 # Date Created:  2019-06-26T09:23:15+02:00                                     #
 ################################################################################
 -->
@@ -91,23 +91,24 @@ If you see a message "ATTESTATION SUCCESSFUL", it worked.
 
 CHARRA comes with some build arguments that you find in the following.
 
-| Argument                   | Default          | Available Options                             |
-| -------------------------- | ---------------- | --------------------------------------------- |
-| `LINK_MODE`                | `dynamic`        | `dynamic`, `static` (*currently not working*) |
-| `ENABLE_ADDRESS_SANITIZER` | `0` (disabled)   | `0` (disabled), != `0` (enabled)              |
-| `ENABLE_PIC`               | `1` (enabled)    | `0` (disabled), != `0` (enabled)              |
-| `TCTI_MODULE`              | `tctildr`        | `tcti-default`, `tcti-cmd`, `tcti-device`, `tcti-libtpms`, `tcti-mssim`, `tcti-pcap`, `tcti-swtpm`, `tctildr` (and other implementations ) |
-| `ENABLE_LOGGING`           | `1` (enabled)    | `0` (disabled), != `0` (enabled) |
-| `ENABLE_LOGGING_COLOR`     | `1` (enabled)    | `0` (disabled), != `0` (enabled) |
-| `ENABLE_STRIPPING`         | `1` (enabled)    | `0` (disabled), != `0` (enabled) |
+| Argument                   | Default          | Available Options                             | Description                                                      |
+| -------------------------- | ---------------- | --------------------------------------------- | ---------------------------------------------------------------- |
+| `TCTI_MODULE`              | `tctildr`        | `tcti-default`, `tcti-cmd`, `tcti-device`, `tcti-libtpms`, `tcti-mssim`, `tcti-pcap`, `tcti-swtpm`, `tctildr` (and other implementations ) | Configure the TCTI module for the TPM |
+| `ENABLE_LOGGING`           | `1` (enabled)    | `0` (disabled), `!= 0` (enabled)              | Enable/disable log output                                        |
+| `ENABLE_LOGGING_COLOR`     | `1` (enabled)    | `0` (disabled), `!= 0` (enabled)              | Enable/disable colored log output                                |
+| `ENABLE_ADDRESS_SANITIZER` | `0` (disabled)   | `0` (disabled), `!= 0` (enabled)              | Enable/disable AddressSanitizer (ASan)                           |
+| `ENABLE_LEAK_SANITIZER`    | `0` (disabled)   | `0` (disabled), `!= 0` (enabled)              | Enable/disable LeakSanitizer (LSan)                              |
+| `ENABLE_PIC`               | `1` (enabled)    | `0` (disabled), `!= 0` (enabled)              | Emit position-independent code                                   |
+| `ENABLE_STRIPPING`         | `1` (enabled)    | `0` (disabled), `!= 0` (enabled)              | Remove all symbols that are not needed for relocation processing |
+| `LINK_MODE`                | `dynamic`        | `dynamic`, `static` (*currently not working*) | Link executables statically or dynamically                       |
 
 Example invocation:
 
-    make TCTI_MODULE=mssim ENABLE_LOGGING_COLOR=0 ENABLE_STRIPPING=0
+    make TCTI_MODULE=tcti-mssim ENABLE_LOGGING_COLOR=0 ENABLE_STRIPPING=0
 
 ## Troubleshooting and Advanced Usage
 
-This section contains valuable information in case you want to dig a bit deeper and adjust CHARRA's running conditions.
+If you're interested in delving further and modifying the building and operational conditions of CHARRA, this section provides valuable information.
 
 ### TPM Simulator
 
