@@ -5,7 +5,7 @@
 # Main Makefile for CHARRA.                                                    #
 # ---------------------------------------------------------------------------- #
 # Author:        Michael Eckel <michael.eckel@sit.fraunhofer.de>               #
-# Date Modified: 2023-04-03T13:37:42+02:00                                     #
+# Date Modified: 2023-05-22T13:37:42+02:00                                     #
 # Date Created:  2019-06-26T09:23:15+02:00                                     #
 ################################################################################
 
@@ -14,39 +14,10 @@
 # --- arguments + variables ----------------------------------------------------
 # ------------------------------------------------------------------------------
 
-## link mode
-LINK_MODE ?= dynamic
-link_mode := $(if $(filter static,$(LINK_MODE)), -static)
-
 ## TCTI module
 ## (typically, TCTI implementations are stored at /usr/local/lib/libtss2-*.so*)
 TCTI_MODULE ?= tctildr
 tcti_module := tss2-$(TCTI_MODULE)
-
-## logging
-enable_pic := 1
-flags_pic := -fPIC
-ifeq ($(ENABLE_PIC),0)
-	enable_pic := 0
-	flags_pic :=
-endif
-
-## address sanitizer
-enable_address_sanitizer := 0
-flags_address_sanitizer :=
-ifeq ($(ENABLE_ADDRESS_SANITIZER),)
-	enable_address_sanitizer := 0
-	flags_address_sanitizer :=
-else ifneq ($(ENABLE_ADDRESS_SANITIZER),0)
-	enable_address_sanitizer := 1
-	flags_address_sanitizer := -fsanitize=address
-endif
-
-## strip unneeded
-enable_stripping := 1
-ifeq ($(ENABLE_STRIPPING),0)
-	enable_stripping := 0
-endif
 
 ## logging
 enable_logging := 1
@@ -63,6 +34,46 @@ ifeq ($(ENABLE_LOGGING_COLOR),0)
 	enable_logging_color := 0
 	flags_logging_color := -DCHARRA_LOG_DISABLE_COLOR
 endif
+
+## AddressSanitizer (ASan)
+enable_address_sanitizer := 0
+flags_address_sanitizer :=
+ifeq ($(ENABLE_ADDRESS_SANITIZER),)
+	enable_address_sanitizer := 0
+	flags_address_sanitizer :=
+else ifneq ($(ENABLE_ADDRESS_SANITIZER),0)
+	enable_address_sanitizer := 1
+	flags_address_sanitizer := -fsanitize=address
+endif
+
+## LeakSanitizer (LSan)
+enable_leak_sanitizer := 0
+flags_leak_sanitizer :=
+ifeq ($(ENABLE_LEAK_SANITIZER),)
+	enable_leak_sanitizer := 0
+	flags_leak_sanitizer :=
+else ifneq ($(ENABLE_LEAK_SANITIZER),0)
+	enable_leak_sanitizer := 1
+	flags_leak_sanitizer := -fsanitize=leak
+endif
+
+## position-independent code (PIC)
+enable_pic := 1
+flags_pic := -fPIC
+ifeq ($(ENABLE_PIC),0)
+	enable_pic := 0
+	flags_pic :=
+endif
+
+## strip unneeded
+enable_stripping := 1
+ifeq ($(ENABLE_STRIPPING),0)
+	enable_stripping := 0
+endif
+
+## link mode
+LINK_MODE ?= dynamic
+link_mode := $(if $(filter static,$(LINK_MODE)), -static)
 
 
 # ------------------------------------------------------------------------------
@@ -82,8 +93,9 @@ BINDIR = bin
 CFLAGS =     -std=c99 -g -pedantic -Wall -Wextra -Wimplicit-fallthrough \
              -Wno-missing-field-initializers -Wl,--gc-sections \
              -fdata-sections -ffunction-sections \
-             -fPIC \
+             $(flags_pic) \
              $(flags_address_sanitizer) \
+             $(flags_leak_sanitizer) \
              $(flags_logging) \
              $(flags_logging_color)
 
