@@ -67,16 +67,16 @@ ENV LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/lib"
 
 ## TPM2 TSS
 RUN git clone --depth=1 -b '3.2.1' \
-	'https://github.com/tpm2-software/tpm2-tss.git' /tmp/tpm2-tss
+    'https://github.com/tpm2-software/tpm2-tss.git' /tmp/tpm2-tss
 WORKDIR /tmp/tpm2-tss
 RUN git reset --hard \
-	&& git clean -xdf \
-	&& ./bootstrap \
-	&& ./configure --enable-integration --disable-doxygen-doc \
-	&& make clean \
-	&& make -j \
-	&& make install \
-	&& ldconfig
+    && git clean -xdf \
+    && ./bootstrap \
+    && ./configure --enable-integration --disable-doxygen-doc \
+    && make clean \
+    && make -j \
+    && make install \
+    && ldconfig
 
 ## make TPM simulator the default for TCTI
 RUN ln -sf 'libtss2-tcti-mssim.so' '/usr/local/lib/libtss2-tcti-default.so'
@@ -86,17 +86,17 @@ RUN rm -rf /tmp/tpm2-tss
 
 ## TPM2 tools
 RUN git clone --depth=1 -b '5.2' \
-	'https://github.com/tpm2-software/tpm2-tools.git' /tmp/tpm2-tools
+    'https://github.com/tpm2-software/tpm2-tools.git' /tmp/tpm2-tools
 WORKDIR /tmp/tpm2-tools
 RUN ./bootstrap \
-	&& ./configure \
-	&& make -j \
-	&& make install
+    && ./configure \
+    && make -j \
+    && make install
 RUN rm -rfv /tmp/tpm2-tools
 
 ## libcoap
 RUN git clone --recursive -b 'v4.3.0' \
-	'https://github.com/obgm/libcoap.git' /tmp/libcoap
+    'https://github.com/obgm/libcoap.git' /tmp/libcoap
 # Usually the second git checkout should be enough with an added
 # '--recurse-submodules', but for some reason this fails in the
 # default docker build environment.
@@ -108,37 +108,37 @@ RUN git checkout ea1deffa6b3997eea02635579a4b7fb7af4915e5
 COPY "./docker/dist/coap_tinydtls.patch" .
 RUN patch -p 1 < coap_tinydtls.patch
 RUN ./autogen.sh \
-	&& ./configure --disable-tests --disable-documentation --disable-manpages --enable-dtls --with-tinydtls --enable-fast-install \
-	&& make -j \
-	&& make install
+    && ./configure --disable-tests --disable-documentation --disable-manpages --enable-dtls --with-tinydtls --enable-fast-install \
+    && make -j \
+    && make install
 RUN rm -rfv /tmp/libcoap
 
 ## mbed TLS
 RUN apt-get update \
-	&& apt-get install --no-install-recommends -y \
-	python3-jinja2 \
-	&& rm -rf /var/lib/apt/lists/*
+    && apt-get install --no-install-recommends -y \
+    python3-jinja2 \
+    && rm -rf /var/lib/apt/lists/*
 RUN git clone --recursive -b 'v3.2.1' \
-	'https://github.com/ARMmbed/mbedtls.git' /tmp/mbedtls
+    'https://github.com/ARMmbed/mbedtls.git' /tmp/mbedtls
 WORKDIR /tmp/mbedtls
 RUN make -j lib SHARED=true \
-	&& make install
+    && make install
 RUN rm -rfv /tmp/mbedtls
 
 ## QCBOR
 RUN git clone --depth=1 --recursive -b 'v1.1' \
-	'https://github.com/laurencelundblade/QCBOR.git' /tmp/qcbor
+    'https://github.com/laurencelundblade/QCBOR.git' /tmp/qcbor
 WORKDIR /tmp/qcbor
 RUN make -j all so \
-	&& make install install_so
+    && make install install_so
 RUN rm -rfv /tmp/qcbor
 
 ## t_cose
 RUN git clone --depth=1 --recursive -b 'v1.0.1' \
-	'https://github.com/laurencelundblade/t_cose.git' /tmp/t_cose
+    'https://github.com/laurencelundblade/t_cose.git' /tmp/t_cose
 WORKDIR /tmp/t_cose
 RUN make -j -f Makefile.psa libt_cose.a libt_cose.so \
-	&&  make -f Makefile.psa install install_so
+    &&  make -f Makefile.psa install install_so
 RUN rm -rfv /tmp/t_cose
 
 
@@ -205,20 +205,20 @@ RUN apt-get update \
 
 ## install sudo and gosu
 RUN apt-get update \
-	&& apt-get install --no-install-recommends -y \
-	gosu \
-	sudo \
-	&& rm -rf /var/lib/apt/lists/*
+    && apt-get install --no-install-recommends -y \
+    gosu \
+    sudo \
+    && rm -rf /var/lib/apt/lists/*
 
 ## create non-root user and grant sudo permission
 RUN export user="$user" uid="$uid" gid="$gid" \
-	&& addgroup --gid "$gid" "$user" \
-	&& adduser --home /home/"$user" --uid "$uid" --gid "$gid" \
-	--disabled-password --gecos '' "$user" \
-	&& mkdir -vp /etc/sudoers.d/ \
-	&& echo "$user     ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/"$user" \
-	&& chmod 0440 /etc/sudoers.d/"$user" \
-	&& chown "$uid":"$gid" -R /home/"$user"
+    && addgroup --gid "$gid" "$user" \
+    && adduser --home /home/"$user" --uid "$uid" --gid "$gid" \
+    --disabled-password --gecos '' "$user" \
+    && mkdir -vp /etc/sudoers.d/ \
+    && echo "$user     ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/"$user" \
+    && chmod 0440 /etc/sudoers.d/"$user" \
+    && chown "$uid":"$gid" -R /home/"$user"
 
 
 ## -----------------------------------------------------------------------------
