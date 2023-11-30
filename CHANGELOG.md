@@ -4,7 +4,7 @@
 # All rights reserved.                                                         #
 # ---------------------------------------------------------------------------- #
 # Author:        Michael Eckel <michael.eckel@sit.fraunhofer.de>               #
-# Date Modified: 2023-05-20T13:37:42+02:00                                     #
+# Date Modified: 2023-11-30T13:37:42+02:00                                     #
 # Date Created:  2019-06-26T09:23:15+02:00                                     #
 ################################################################################
 -->
@@ -12,6 +12,24 @@
 # Changelog
 
 The following lists the changes CHARRA received over time.
+
+## Changelog 2023-11-30
+
+* Adjustments to `Dockerfile`:
+
+  * Updated dependencies to latest stable versions
+
+  * Created necessary systems folders for the tpm2-tss Feature API (FAPI)
+
+  * Added tpm2-pytss
+
+  * Disabled TSS2 log messages that were producing (unnecessary and) confusing error messages and warnings
+
+  * Added Bash configuration including aliases and a history (saves time typing the commands to build and run CHARRA by simply using the up/down arrow keys to cycle through the commands)
+
+* Added TPM2 code examples under `~/code-examples`, showcasing the use of the TSS2 ESAPI and FAPI with tpm2-tss (C programming language) and tpm2-pytss (Python programming language)
+
+* Added a script in `~/./test-charra-and-tpm2-tss.sh` for compiling and running CHARRA as well as all code examples.
 
 ## Changelog 2023-05-20
 
@@ -21,14 +39,14 @@ The following lists the changes CHARRA received over time.
 
 * Externalized building and installation instructions into [`INSTALL.md`](INSTALL.md) and the changelog into [`CHANGELOG.md`](CHANGELOG.md).
 
-* Minor adjustments.
+* Minor adjustments
 
 ## Changelog 2021-03-17
 
 * Dynamic memory allocation for QCBOR encoded data using *malloc()*.
   Thanks, @laurencelundblade.
 
-* Fixed some bugs.
+* Fixed some bugs
 
 * Introduced macros for `free()`'ing heap data.
 
@@ -42,16 +60,16 @@ The following lists the changes CHARRA received over time.
 
 ## Changelog 2021-03-16 (v1)
 
-* Updated `README.md` to include building *tpm2software/tpm2-tss* Docker image which CHARRA uses as a basis.
-  Reason: recently, the official *tpm2software/tpm2-tss* Docker images were removed from [Docker Hub](https://hub.docker.com/r/tpm2software/tpm2-tss).
+* Updated `README.md` to include building *tpm2software/tpm2-tss* Docker image which CHARRA uses as a basis
+  Reason: recently, the official *tpm2software/tpm2-tss* Docker images were removed from [Docker Hub](https://hub.docker.com/r/tpm2software/tpm2-tss)
 
-* Added Docker Compose file and description on how to use it to `README.md`.
+* Added Docker Compose file and description on how to use it to `README.md`
 
-* Added `.editorconfig` file.
+* Added `.editorconfig` file
 
-* Using most recent stable versions of *tpm2-tss* and *tpm2-tools*.
+* Using most recent stable versions of *tpm2-tss* and *tpm2-tools*
 
-* Added compressed CHARRA SVG logo (`*.svgz`). See [charra-logo.svgz](./charra-logo.svgz).
+* Added compressed CHARRA SVG logo (`*.svgz`). See [charra-logo.svgz](./charra-logo.svgz)
 
 ## Changelog 2021-03-10
 
