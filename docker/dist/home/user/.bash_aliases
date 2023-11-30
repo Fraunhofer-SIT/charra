@@ -1,0 +1,13 @@
+#!/bin/bash
+alias l='ls -CF'
+#alias ll='ls -alF'
+alias la='ls -A'
+alias ll='ls -l'
+alias lla='ls -lA'
+alias llr='ls -ltr'
+alias lsd='ls -la | grep ^d'
+alias ls1='ls -1'
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
+alias .....='cd ../../../..'

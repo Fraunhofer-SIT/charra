@@ -19,7 +19,7 @@ This proof-of-concept implementation realizes the Attesting Computing Environmen
 
 ## Quickstart
 
-The following assumes that [Docker](https://docs.docker.com/get-docker/) (and [Docker Compose](https://docs.docker.com/compose/install/)) are installed and configured on your system.
+The following assumes that [Docker](https://docs.docker.com/get-docker/) and its *buildx* component (and [Docker Compose](https://docs.docker.com/compose/install/)) are installed and configured on your system.
 Please see [`INSTALL.md`](INSTALL.md) for details, also for manually building CHARRA.
 All commands are to be executed in [Bash](https://www.gnu.org/software/bash/).
 
