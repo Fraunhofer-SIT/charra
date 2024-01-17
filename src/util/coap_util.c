@@ -21,7 +21,7 @@
 #include "coap_util.h"
 
 #include <arpa/inet.h>
-#include <coap2/coap.h>
+#include <coap3/coap.h>
 #include <stdbool.h>
 #include <string.h>
 
@@ -133,7 +133,7 @@ coap_pdu_t* charra_coap_new_request(coap_session_t* session,
     coap_pdu_t* pdu = NULL;
 
     /* create new PDU */
-    if ((pdu = coap_new_pdu(session)) == NULL) {
+    if ((pdu = coap_new_pdu(msg_type, method, session)) == NULL) {
         charra_log_error("[" LOG_NAME "] Cannot create PDU");
         goto error;
     }
@@ -142,17 +142,25 @@ coap_pdu_t* charra_coap_new_request(coap_session_t* session,
     coap_message_id_t msg_id = coap_new_message_id(session);
 
     /* set up PDU */
-    pdu->type = msg_type;
-    pdu->mid = msg_id;
-    pdu->code = method;
+    coap_pdu_set_mid(pdu, msg_id);
 
     /* generate new token */
-    coap_token_t token = {0};
-    coap_session_new_token(session, &(token.length), token.data);
+    static unsigned char _token_data[24]; /* With support for RFC8974 */
+    coap_binary_t the_token = { 0, _token_data };
+
+    uint8_t token[8];
+    size_t tokenlen;
 
     /* add token to PDU */
-    if (coap_add_token(pdu, token.length, token.data) == 0) {
-        charra_log_error("[" LOG_NAME "] Cannot add token to request");
+    if (the_token.length > COAP_TOKEN_DEFAULT_MAX) {
+        coap_session_new_token(session, &tokenlen, token);
+        /* Update the last part 8 bytes of the large token */
+        memcpy(&the_token.s[the_token.length - tokenlen], token, tokenlen);
+    } else {
+        coap_session_new_token(session, &the_token.length, the_token.s);
+    }
+    if (!coap_add_token(pdu, the_token.length, the_token.s)) {
+        charra_log_error("[" LOG_NAME "] cannot add token to request");
         goto error;
     }
 
