@@ -22,7 +22,7 @@
 #define COAP_UTIL_H
 
 #include "../common/charra_error.h"
-#include <coap2/coap.h>
+#include <coap3/coap.h>
 #include <stdbool.h>
 
 /* --- type declarations/definitions -------------------------------------- */

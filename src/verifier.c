@@ -19,7 +19,7 @@
  */
 
 #include <arpa/inet.h>
-#include <coap2/coap.h>
+#include <coap3/coap.h>
 #include <getopt.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -101,9 +101,10 @@ static void handle_sigint(int signum);
 static CHARRA_RC create_attestation_request(
         msg_attestation_request_dto* attestation_request);
 
-static coap_response_t coap_attest_handler(struct coap_context_t* context,
-        coap_session_t* session, coap_pdu_t* sent, coap_pdu_t* received,
-        const coap_mid_t mid);
+static coap_response_t coap_attest_handler(coap_session_t* session,
+                                        const coap_pdu_t* sent,
+                                        const coap_pdu_t* received,
+                                        const coap_mid_t mid);
 
 /* --- static variables --------------------------------------------------- */
 
@@ -393,7 +394,7 @@ int main(int argc, char** argv) {
     /* processing and waiting for response */
     charra_log_info("[" LOG_NAME "] Processing and waiting for response ...");
     uint16_t response_wait_time = 0;
-    while (!processing_response && !coap_can_exit(coap_context)) {
+    while (!processing_response && coap_io_pending(coap_context)) {
         /* process CoAP I/O */
         if ((coap_io_process_time = coap_io_process(
                      coap_context, COAP_IO_PROCESS_TIME_MS)) == -1) {
@@ -503,9 +504,10 @@ static CHARRA_RC create_attestation_request(
 /* --- resource handler definitions --------------------------------------- */
 
 static coap_response_t coap_attest_handler(
-        struct coap_context_t* context CHARRA_UNUSED,
-        coap_session_t* session CHARRA_UNUSED, coap_pdu_t* sent CHARRA_UNUSED,
-        coap_pdu_t* in, const coap_mid_t mid CHARRA_UNUSED) {
+        coap_session_t* session CHARRA_UNUSED,
+        const coap_pdu_t* sent CHARRA_UNUSED,
+        const coap_pdu_t* received,
+        const coap_mid_t mid CHARRA_UNUSED) {
     int coap_r = 0;
     TSS2_RC tss_r = 0;
 
@@ -516,7 +518,7 @@ static coap_response_t coap_attest_handler(
 
     charra_log_info(
             "[" LOG_NAME "] Resource '%s': Received message.", "attest");
-    coap_show_pdu(LOG_DEBUG, in);
+    coap_show_pdu(LOG_DEBUG, received);
 
     /* --- receive incoming data --- */
 
@@ -526,7 +528,7 @@ static coap_response_t coap_attest_handler(
     size_t data_offset = 0;
     size_t data_total_len = 0;
     if ((coap_r = coap_get_data_large(
-                 in, &data_len, &data, &data_offset, &data_total_len)) == 0) {
+                 received, &data_len, &data, &data_offset, &data_total_len)) == 0) {
         charra_log_error("[" LOG_NAME "] Could not get CoAP PDU data.");
         attestation_rc = CHARRA_RC_ERROR;
         goto cleanup;

@@ -19,7 +19,7 @@
  */
 
 #include <arpa/inet.h>
-#include <coap2/coap.h>
+#include <coap3/coap.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -84,10 +84,11 @@ static void handle_sigint(int signum);
 static void release_data(
         struct coap_session_t* session CHARRA_UNUSED, void* app_ptr);
 
-static void coap_attest_handler(struct coap_context_t* ctx,
-        struct coap_resource_t* resource, struct coap_session_t* session,
-        struct coap_pdu_t* in_pdu, struct coap_binary_t* token,
-        struct coap_string_t* query, struct coap_pdu_t* out_pdu);
+static void coap_attest_handler(struct coap_resource_t* resource,
+                                struct coap_session_t* session,
+                                const struct coap_pdu_t* request,
+                                const struct coap_string_t* query,
+                                struct coap_pdu_t* response);
 
 /* --- main --------------------------------------------------------------- */
 
@@ -281,21 +282,20 @@ static void release_data(
     charra_free_and_null(app_ptr);
 }
 
-static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
-        struct coap_resource_t* resource, struct coap_session_t* session,
-        struct coap_pdu_t* in, struct coap_binary_t* token,
-        struct coap_string_t* query, struct coap_pdu_t* out) {
+static void coap_attest_handler(struct coap_resource_t* resource,
+                                struct coap_session_t* session,
+                                const struct coap_pdu_t* request,
+                                const struct coap_string_t* query,
+                                struct coap_pdu_t* response) {
     CHARRA_RC charra_r = CHARRA_RC_SUCCESS;
     int coap_r = 0;
     TSS2_RC tss_r = 0;
     ESYS_TR sig_key_handle = ESYS_TR_NONE;
     TPM2B_PUBLIC* public_key = NULL;
-
     /* --- receive incoming data --- */
-
     charra_log_info(
             "[" LOG_NAME "] Resource '%s': Received message.", "attest");
-    coap_show_pdu(LOG_DEBUG, in);
+    coap_show_pdu(LOG_DEBUG, request);
 
     /* get data */
     size_t data_len = 0;
@@ -303,7 +303,7 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
     size_t data_offset = 0;
     size_t data_total_len = 0;
     if ((coap_r = coap_get_data_large(
-                 in, &data_len, &data, &data_offset, &data_total_len)) == 0) {
+                 request, &data_len, &data, &data_offset, &data_total_len)) == 0) {
         charra_log_error("[" LOG_NAME "] Could not get CoAP PDU data.");
         goto error;
     } else {
@@ -451,10 +451,10 @@ static void coap_attest_handler(struct coap_context_t* ctx CHARRA_UNUSED,
     charra_log_info(
             "[" LOG_NAME
             "] Adding marshaled data to CoAP response PDU and send it.");
-    out->code = COAP_RESPONSE_CODE_CONTENT;
-    if ((coap_r = coap_add_data_large_response(resource, session, in, out,
-                 token, query, COAP_MEDIATYPE_APPLICATION_CBOR, -1, 0,
-                 res_buf_len, res_buf, release_data, res_buf)) == 0) {
+    coap_pdu_set_code(response, COAP_RESPONSE_CODE_CONTENT);
+    if ((coap_r = coap_add_data_large_response(resource, session, request, response,
+                query, COAP_MEDIATYPE_APPLICATION_CBOR, -1, 0,
+                res_buf_len, res_buf, release_data, res_buf)) == 0) {
         charra_log_error("[" LOG_NAME
                          "] Error invoking coap_add_data_large_response().");
         goto error;

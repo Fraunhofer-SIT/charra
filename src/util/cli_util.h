@@ -19,7 +19,7 @@
  */
 
 #include "../common/charra_log.h"
-#include <coap2/coap.h>
+#include <coap3/coap.h>
 #include <stdbool.h>
 
 typedef enum {
