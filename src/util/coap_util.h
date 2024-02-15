@@ -51,20 +51,6 @@ typedef struct coap_token_t {
  */
 typedef uint16_t coap_message_id_t;
 
-/**
- * @brief CoAP message type.
- *
- */
-typedef uint8_t coap_message_t;
-/* confirmable message (requires ACK/RST) */
-#define COAP_MESSAGE_TYPE_CON ((coap_message_t)COAP_MESSAGE_CON)
-/* non-confirmable message (one-shot message) */
-#define COAP_MESSAGE_TYPE_NON ((coap_message_t)COAP_MESSAGE_NON)
-/* used to acknowledge confirmable messages */
-#define COAP_MESSAGE_TYPE_ACK ((coap_message_t)COAP_MESSAGE_ACK)
-/* indicates error in received messages */
-#define COAP_MESSAGE_TYPE_RST ((coap_message_t)COAP_MESSAGE_RST)
-
 /* --- function forward declarations -------------------------------------- */
 
 /**
@@ -144,7 +130,7 @@ coap_session_t* charra_coap_new_client_session_pki(coap_context_t* coap_context,
  *
  * @param session the CoAP session.
  * @param msg_type the CoAP message type.
- * @param method the CoAP request method.
+ * @param pdu_code the CoAP PDU code (request, response, signalling).
  * @param options list of CoAP options.
  * @param data the data to send (this can be larger than the typical size of
  * 1024 bytes for one PDU since internally CoAP block-wise transfers are
@@ -154,7 +140,7 @@ coap_session_t* charra_coap_new_client_session_pki(coap_context_t* coap_context,
  * @return NULL in case of an error.
  */
 coap_pdu_t* charra_coap_new_request(coap_session_t* session,
-        coap_message_t msg_type, coap_request_t method,
+        coap_pdu_type_t pdu_type, coap_pdu_code_t pdu_code,
         coap_optlist_t** options, const uint8_t* data, const size_t data_len);
 
 /**

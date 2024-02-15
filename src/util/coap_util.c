@@ -128,12 +128,12 @@ coap_session_t* charra_coap_new_client_session_pki(coap_context_t* coap_context,
 }
 
 coap_pdu_t* charra_coap_new_request(coap_session_t* session,
-        coap_message_t msg_type, coap_request_t method,
+        coap_pdu_type_t pdu_type, coap_pdu_code_t pdu_code,
         coap_optlist_t** options, const uint8_t* data, const size_t data_len) {
     coap_pdu_t* pdu = NULL;
 
     /* create new PDU */
-    if ((pdu = coap_new_pdu(msg_type, method, session)) == NULL) {
+    if ((pdu = coap_new_pdu(pdu_type, pdu_code, session)) == NULL) {
         charra_log_error("[" LOG_NAME "] Cannot create PDU");
         goto error;
     }
@@ -146,15 +146,15 @@ coap_pdu_t* charra_coap_new_request(coap_session_t* session,
 
     /* generate new token */
     static unsigned char _token_data[24]; /* With support for RFC8974 */
-    coap_binary_t the_token = { 0, _token_data };
+    coap_binary_t the_token = {0, _token_data};
 
-    uint8_t token[8];
-    size_t tokenlen;
+    uint8_t token[8] = {0};
+    size_t tokenlen = 0;
 
     /* add token to PDU */
     if (the_token.length > COAP_TOKEN_DEFAULT_MAX) {
         coap_session_new_token(session, &tokenlen, token);
-        /* Update the last part 8 bytes of the large token */
+        /* Update the last 8 bytes of the large token */
         memcpy(&the_token.s[the_token.length - tokenlen], token, tokenlen);
     } else {
         coap_session_new_token(session, &the_token.length, the_token.s);
