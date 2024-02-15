@@ -21,7 +21,7 @@
 
 ## --- set base image(s) -------------------------------------------------------
 
-FROM ghcr.io/tpm2-software/ubuntu-20.04:latest AS base
+FROM ghcr.io/tpm2-software/ubuntu-22.04:latest AS base
 
 ## --- metadata ----------------------------------------------------------------
 
@@ -35,13 +35,13 @@ ARG uid=1000
 ARG gid=1000
 
 ## software versions (typically Git branches or tags)
-ARG tpm2tss_version='4.0.1'
-ARG tpm2tools_version='5.6'
-ARG libcoap_version='release-4.3.4'
-ARG mbedtls_version='v3.5.1'
-ARG qcbor_version='v1.2'
-ARG tcose_version='v1.1.1'
-ARG pytss_version='2.1.0'
+ARG tpm2tss_version='4.0.1'   # https://github.com/tpm2-software/tpm2-tss
+ARG tpm2tools_version='5.6'   # https://github.com/tpm2-software/tpm2-tools
+ARG libcoap_version='v4.3.4'  # https://github.com/obgm/libcoap
+ARG mbedtls_version='v3.5.2'  # https://github.com/ARMmbed/mbedtls
+ARG qcbor_version='v1.2'      # https://github.com/laurencelundblade/QCBOR
+ARG tcose_version='v1.1.2'    # https://github.com/laurencelundblade/t_cose
+ARG pytss_version='2.2.0'     # https://github.com/tpm2-software/tpm2-pytss
 
 
 ## -----------------------------------------------------------------------------
@@ -87,12 +87,11 @@ RUN git reset --hard \
     && make -j \
     && make install \
     && ldconfig
-
-## make TPM simulator the default for TCTI
-RUN ln -sf 'libtss2-tcti-mssim.so' '/usr/local/lib/libtss2-tcti-default.so'
-
-## remove TPM2-TSS source files
+WORKDIR /
 RUN rm -rf /tmp/tpm2-tss
+
+## make TPM simulator the default for TCTI loader
+RUN ln -sf 'libtss2-tcti-mssim.so' '/usr/local/lib/libtss2-tcti-default.so'
 
 ## TPM2 tools
 RUN git clone --depth=1 -b "${tpm2tools_version}" \
@@ -102,6 +101,7 @@ RUN ./bootstrap \
     && ./configure \
     && make -j \
     && make install
+WORKDIR /
 RUN rm -rfv /tmp/tpm2-tools
 
 ## libcoap
@@ -109,9 +109,11 @@ RUN git clone --recursive -b "${libcoap_version}" \
     'https://github.com/obgm/libcoap.git' /tmp/libcoap
 WORKDIR /tmp/libcoap
 RUN ./autogen.sh \
-    && ./configure --disable-tests --disable-documentation --disable-manpages --enable-dtls --with-tinydtls --enable-fast-install \
+    && ./configure --disable-tests --disable-documentation --disable-manpages \
+        --enable-dtls --with-tinydtls --enable-fast-install \
     && make -j \
     && make install
+WORKDIR /
 RUN rm -rfv /tmp/libcoap
 
 ## mbed TLS
@@ -125,6 +127,7 @@ RUN git clone --recursive -b "${mbedtls_version}" \
 WORKDIR /tmp/mbedtls
 RUN make -j lib SHARED=true \
     && make install
+WORKDIR /
 RUN rm -rfv /tmp/mbedtls
 
 ## QCBOR
@@ -133,6 +136,7 @@ RUN git clone --depth=1 --recursive -b "${qcbor_version}" \
 WORKDIR /tmp/qcbor
 RUN make -j all so \
     && make install install_so
+WORKDIR /
 RUN rm -rfv /tmp/qcbor
 
 ## t_cose
@@ -141,6 +145,7 @@ RUN git clone --depth=1 --recursive -b "${tcose_version}" \
 WORKDIR /tmp/t_cose
 RUN make -j -f Makefile.psa libt_cose.a libt_cose.so \
     &&  make -f Makefile.psa install install_so
+WORKDIR /
 RUN rm -rfv /tmp/t_cose
 
 
