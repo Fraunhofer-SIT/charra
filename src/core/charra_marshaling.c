@@ -408,7 +408,6 @@ CHARRA_RC charra_marshal_attestation_response(
     return charra_r;
 }
 
-// TODO(any): Implement this function using  QCBORDecode_* functions.
 CHARRA_RC charra_unmarshal_attestation_response(
         const uint32_t marshaled_data_len, const uint8_t* marshaled_data,
         msg_attestation_response_dto* attestation_response) {
@@ -418,47 +417,44 @@ CHARRA_RC charra_unmarshal_attestation_response(
     UsefulBufC marshaled_data_buf = {marshaled_data, marshaled_data_len};
     QCBORDecodeContext dc = {0};
     QCBORItem item = {0};
+    UsefulBufC item_str_buf = {0};
 
     QCBORDecode_Init(&dc, marshaled_data_buf, QCBOR_DECODE_MODE_NORMAL);
 
     /* parse root array */
-    if ((cborerr = charra_cbor_get_next(&dc, &item, QCBOR_TYPE_ARRAY)))
-        goto cbor_parse_error;
+    QCBORDecode_EnterArray(&dc, &item);
 
     /* parse "attestation-data" (bytes) */
-    if ((cborerr = charra_cbor_get_next(&dc, &item, QCBOR_TYPE_BYTE_STRING)))
-        goto cbor_parse_error;
-    res.attestation_data_len = item.val.string.len;
-    memcpy(&(res.attestation_data), item.val.string.ptr,
-            res.attestation_data_len);
+    QCBORDecode_GetByteString(&dc, &item_str_buf);
+    res.attestation_data_len = item_str_buf.len;
+    memcpy(&(res.attestation_data), item_str_buf.ptr, res.attestation_data_len);
 
     /* parse "tpm2-signature" (bytes) */
-    if ((cborerr = charra_cbor_get_next(&dc, &item, QCBOR_TYPE_BYTE_STRING)))
-        goto cbor_parse_error;
-    res.tpm2_signature_len = item.val.string.len;
-    memcpy(&(res.tpm2_signature), item.val.string.ptr, res.tpm2_signature_len);
+    QCBORDecode_GetByteString(&dc, &item_str_buf);
+    res.tpm2_signature_len = item_str_buf.len;
+    memcpy(&(res.tpm2_signature), item_str_buf.ptr, res.tpm2_signature_len);
 
     /* parse "tpm2_public_key" (bytes) */
-    if ((cborerr = charra_cbor_get_next(&dc, &item, QCBOR_TYPE_BYTE_STRING)))
-        goto cbor_parse_error;
-    res.tpm2_public_key_len = item.val.string.len;
-    memcpy(&(res.tpm2_public_key), item.val.string.ptr,
-            res.tpm2_public_key_len);
+    QCBORDecode_GetByteString(&dc, &item_str_buf);
+    res.tpm2_public_key_len = item_str_buf.len;
+    memcpy(&(res.tpm2_public_key), item_str_buf.ptr, res.tpm2_public_key_len);
 
     /* parse "event-log" (bytes) */
-    if ((cborerr = charra_cbor_get_next(&dc, &item, QCBOR_TYPE_BYTE_STRING)))
-        goto cbor_parse_error;
-    res.event_log_len = item.val.string.len;
+    QCBORDecode_GetByteString(&dc, &item_str_buf);
+    res.event_log_len = item_str_buf.len;
     uint8_t* event_log = (uint8_t*)malloc(res.event_log_len);
     if (event_log == NULL) {
         goto cbor_parse_error;
     } else {
         res.event_log = event_log;
-        if (memcpy(res.event_log, item.val.string.ptr, res.event_log_len) ==
+        if (memcpy(res.event_log, item_str_buf.ptr, res.event_log_len) ==
                 NULL) {
             goto cbor_parse_error;
         }
     }
+
+    /* exit root array */
+    QCBORDecode_ExitArray(&dc);
 
     if ((cborerr = QCBORDecode_Finish(&dc))) {
         charra_log_error("CBOR parser: expected end of input, but could not "
