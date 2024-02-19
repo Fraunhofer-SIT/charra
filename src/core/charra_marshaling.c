@@ -24,6 +24,7 @@
 #include <inttypes.h>
 #include <qcbor/UsefulBuf.h>
 #include <qcbor/qcbor.h>
+#include <qcbor/qcbor_spiffy_decode.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -181,7 +182,6 @@ CHARRA_RC charra_marshal_attestation_request(
     return charra_r;
 }
 
-// TODO implement this function using QCBOREncode_* functions
 CHARRA_RC charra_unmarshal_attestation_request(
         const uint32_t marshaled_data_len, const uint8_t* marshaled_data,
         msg_attestation_request_dto* attestation_request) {
@@ -191,32 +191,28 @@ CHARRA_RC charra_unmarshal_attestation_request(
     UsefulBufC marshaled_data_buf = {marshaled_data, marshaled_data_len};
     QCBORDecodeContext dc = {0};
     QCBORItem item = {0};
+    UsefulBufC item_str_buf = {0};
 
     QCBORDecode_Init(&dc, marshaled_data_buf, QCBOR_DECODE_MODE_NORMAL);
 
-    if (charra_cbor_get_next(&dc, &item, QCBOR_TYPE_ARRAY))
-        goto cbor_parse_error;
+    /* parse root array */
+    QCBORDecode_EnterArray(&dc, &item);
 
     /* parse "hello" (bool) */
-    if ((cborerr = charra_cbor_get_next(&dc, &item, CHARRA_CBOR_TYPE_BOOLEAN)))
-        goto cbor_parse_error;
-    req.hello = charra_cbor_get_bool_val(&item);
+    QCBORDecode_GetBool(&dc, &(req.hello));
 
     /* parse "key-id" (bytes) */
-    if ((cborerr = charra_cbor_get_next(&dc, &item, QCBOR_TYPE_BYTE_STRING)))
-        goto cbor_parse_error;
-    req.sig_key_id_len = item.val.string.len;
-    memcpy(&(req.sig_key_id), item.val.string.ptr, req.sig_key_id_len);
+    QCBORDecode_GetByteString(&dc, &item_str_buf);
+    req.sig_key_id_len = item_str_buf.len;
+    memcpy(&(req.sig_key_id), item_str_buf.ptr, req.sig_key_id_len);
 
     /* parse "nonce" (bytes) */
-    if ((cborerr = charra_cbor_get_next(&dc, &item, QCBOR_TYPE_BYTE_STRING)))
-        goto cbor_parse_error;
-    req.nonce_len = item.val.string.len;
-    memcpy(&(req.nonce), item.val.string.ptr, req.nonce_len);
+    QCBORDecode_GetByteString(&dc, &item_str_buf);
+    req.nonce_len = item_str_buf.len;
+    memcpy(&(req.nonce), item_str_buf.ptr, req.nonce_len);
 
     /* parse array "pcr-selections" */
-    if ((cborerr = charra_cbor_get_next(&dc, &item, QCBOR_TYPE_ARRAY)))
-        goto cbor_parse_error;
+    QCBORDecode_EnterArray(&dc, &item);
 
     /* initialize array and array length */
     req.pcr_selections_len = (uint32_t)item.val.uCount;
@@ -224,45 +220,53 @@ CHARRA_RC charra_unmarshal_attestation_request(
     /* go through all elements */
     for (uint32_t i = 0; i < req.pcr_selections_len; ++i) {
         /* parse array "pcr-selection" */
-        if ((cborerr = charra_cbor_get_next(&dc, &item, QCBOR_TYPE_ARRAY)))
-            goto cbor_parse_error;
+        QCBORDecode_EnterArray(&dc, &item);
 
         /* parse "tcg-hash-alg-id" (UINT16) */
-        if ((cborerr = charra_cbor_get_next(&dc, &item, QCBOR_TYPE_INT64)))
-            goto cbor_parse_error;
-        req.pcr_selections[i].tcg_hash_alg_id = (uint16_t)item.val.uint64;
+        int64_t int_val = 0;
+        QCBORDecode_GetInt64(&dc, &int_val);
+        req.pcr_selections[i].tcg_hash_alg_id = (uint16_t)int_val;
 
         /* parse array "pcrs" */
-        if ((cborerr = charra_cbor_get_next(&dc, &item, QCBOR_TYPE_ARRAY)))
-            goto cbor_parse_error;
+        QCBORDecode_EnterArray(&dc, &item);
 
         /* initialize array and array length */
         req.pcr_selections[i].pcrs_len = (uint32_t)item.val.uCount;
 
         /* go through all elements */
         for (uint32_t j = 0; j < req.pcr_selections[i].pcrs_len; ++j) {
-            if ((cborerr = charra_cbor_get_next(&dc, &item, QCBOR_TYPE_INT64)))
-                goto cbor_parse_error;
-            req.pcr_selections[i].pcrs[j] = (uint8_t)item.val.uint64;
+            QCBORDecode_GetInt64(&dc, &int_val);
+            req.pcr_selections[i].pcrs[j] = (uint8_t)int_val;
         }
+
+        /* exit array "pcrs" */
+        QCBORDecode_ExitArray(&dc);
+        
+        /* exit array "pcr-selection" */
+        QCBORDecode_ExitArray(&dc);
     }
 
+    /*  exit array "pcr-selections" */
+    QCBORDecode_ExitArray(&dc);
+
     /* parse "event-log-path" (bytes) */
-    if ((cborerr = charra_cbor_get_next(&dc, &item, QCBOR_TYPE_BYTE_STRING)))
-        goto cbor_parse_error;
-    req.event_log_path_len = item.val.string.len;
+    QCBORDecode_GetByteString(&dc, &item_str_buf);
+    req.event_log_path_len = item_str_buf.len;
     if (req.event_log_path_len != 0) {
         uint8_t* event_log_path = (uint8_t*)malloc(req.event_log_path_len);
         if (event_log_path == NULL) {
             goto cbor_parse_error;
         } else {
             req.event_log_path = event_log_path;
-            if (memcpy(req.event_log_path, item.val.string.ptr,
+            if (memcpy(req.event_log_path, item_str_buf.ptr,
                         req.event_log_path_len) == NULL) {
                 goto cbor_parse_error;
             }
         }
     }
+
+    /* exit root array */
+    QCBORDecode_ExitArray(&dc);
 
     /* expect end of CBOR data */
     if ((cborerr = QCBORDecode_Finish(&dc))) {
