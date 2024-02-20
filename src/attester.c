@@ -36,7 +36,6 @@
 #include "core/charra_helper.h"
 #include "core/charra_key_mgr.h"
 #include "core/charra_marshaling.h"
-#include "util/cbor_util.h"
 #include "util/cli_util.h"
 #include "util/coap_util.h"
 #include "util/io_util.h"

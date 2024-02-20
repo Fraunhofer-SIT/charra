@@ -33,7 +33,6 @@
 #include "../common/charra_log.h"
 #include "../common/charra_macro.h"
 #include "../core/charra_dto.h"
-#include "../util/cbor_util.h"
 #include "../util/tpm2_util.h"
 
 static CHARRA_RC charra_marshal_attestation_request_internal(
