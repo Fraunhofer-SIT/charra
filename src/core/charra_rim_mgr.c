@@ -154,7 +154,8 @@ static CHARRA_RC parse_pcr_mapping(yaml_parser_t* parser,
             if (is_key_scalar) {
                 file_pcr_index =
                         parse_pcr_index((char*)token.data.scalar.value);
-                if (file_pcr_index < 0) {
+                if (file_pcr_index < 0 ||
+                        token.data.scalar.style != YAML_PLAIN_SCALAR_STYLE) {
                     charra_log_error("Error while parsing line %d from "
                                      "reference PCR file: "
                                      "Unparseable PCR Index.",
@@ -168,6 +169,9 @@ static CHARRA_RC parse_pcr_mapping(yaml_parser_t* parser,
                 charra_rc = parse_pcr_value((char*)token.data.scalar.value,
                         token.data.scalar.length,
                         reference_pcrs[pcr_selection_index]);
+                if (token.data.scalar.style != YAML_PLAIN_SCALAR_STYLE) {
+                    charra_rc = CHARRA_RC_ERROR;
+                }
                 if (charra_rc != CHARRA_RC_SUCCESS) {
                     charra_log_error("Error while parsing PCR value in "
                                      "line %d from reference PCR file.",
@@ -258,6 +262,7 @@ static CHARRA_RC parse_document(yaml_parser_t* parser, uint8_t** reference_pcrs,
             expected_token = YAML_SCALAR_TOKEN;
             break;
         case YAML_SCALAR_TOKEN:
+            // TODO(any): Allow other hashing algorithms
             /* root mapping key should be the pcr digest algorithm */
             if (strncmp((const char*)token.data.scalar.value, "sha256",
                         token.data.scalar.length) != 0) {

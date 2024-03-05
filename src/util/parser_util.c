@@ -66,7 +66,7 @@ int parse_pcr_index(char* index_start) {
     errno = 0;
     char* end = NULL;
     int pcr_index = strtoul(index_start, &end, 10);  // parse digits as index
-    if (end == index_start || errno != 0 || pcr_index >= TPM2_MAX_PCRS) {
+    if (end == index_start || *end != '\0' || errno != 0 || pcr_index >= TPM2_MAX_PCRS) {
         return -1;
     }
     return pcr_index;
