@@ -379,20 +379,10 @@ CHARRA_RC charra_check_pcr_digest_against_reference(const char* filename,
             yaml_token_delete(&token);
         } while (!stream_end);
     } else {
-        // filename was NULL, assume that empty PCRs shall be used as
-        // reference PCRs
-        charra_log_warn("Using empty PCRs as reference PCRs");
-        for (size_t i = 0; i < reference_pcr_selection_len; ++i) {
-            for (uint32_t j = 0; j < TPM2_SHA256_DIGEST_SIZE; ++j) {
-                reference_pcrs[i][j] = 0;
-            }
-        }
-        charra_rc = compute_and_check_PCR_digest(
-                reference_pcrs, reference_pcr_selection_len, attest_struct);
-        if (charra_rc != CHARRA_RC_NO_MATCH) {
-            no_digest_match = false;
-            goto returns;
-        }
+        /* filename is NULL */
+        charra_log_error("No reference PCR file specified");
+        charra_rc = CHARRA_RC_ERROR;
+        goto returns;
     }
 
 returns:

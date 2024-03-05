@@ -58,6 +58,24 @@ static const struct option attester_options[] = {
         {"verify-peer", required_argument, 0, '4'},
         {"port", required_argument, 0, 'b'}, {0}};
 
+/**
+ * @brief Checks whether all required options have been specified.
+ *
+ * @param caller the cli parser caller
+ * @param log_name the log name
+ * @param variables the cli config variables
+ */
+static int check_required_options(
+        cli_parser_caller caller, const char* log_name, cli_config* variables) {
+    /* check if PCR reference file was specified */
+    if (caller == VERIFIER &&
+            *(variables->verifier_config.reference_pcr_file_path) == NULL) {
+        charra_log_error("[%s] ERROR: no PCR reference file", log_name);
+        return -1;
+    }
+    return 0;
+}
+
 int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
     cli_parser_caller caller = variables->caller;
     char* log_name;
@@ -74,7 +92,8 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
                 &index);
 
         if (identifier == -1) {
-            return 0;  // end of command line arguments reached
+            // end of command line arguments reached
+            return check_required_options(caller, log_name, variables);
         } else if (identifier == '0' || identifier == '?') {
             // print help message
             printf("\nUsage: %s [OPTIONS]\n", log_name);
@@ -97,9 +116,9 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
                 printf(" -t, --timeout=SECONDS:          Wait up to SECONDS "
                        "for the attestation answer. Default is %d seconds.\n",
                         *(variables->verifier_config.timeout));
-                printf(" -f, --pcr-file=PATH:            Read reference PCRs "
-                       "from PATH. Default path is '%s'\n",
-                        *(variables->verifier_config.reference_pcr_file_path));
+                printf(" -f, --pcr-file=FORMAT:PATH:     Read reference PCRs "
+                       "from PATH in a specified FORMAT. Available is: "
+                       "yaml.\n");
                 printf(" -s, --pcr-selection=X1[,X2...]: Specifies which PCRs "
                        "to check on the attester. Each X references one PCR. "
                        "PCR numbers shall be ordered from smallest to biggest, "
@@ -324,15 +343,46 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
             }
             continue;
         } else if (caller == VERIFIER && identifier == 'f') {
-            uint32_t length = strlen(optarg);
-            char* path = malloc(length * sizeof(char));
-            strcpy(path, optarg);
+            size_t length = 0;
+            char* token = NULL;
+            const char delimiter[] = ":";
+            char* format = NULL;
+            char* path = NULL;
+
+            /* get the token representing the file format */
+            token = strtok(optarg, delimiter);
+            format = token;
+
+            /* get the token representing the path of the file */
+            token = strtok(NULL, delimiter);
+            /* check if there is a delimiter */
+            if (token == NULL) {
+                charra_log_error("[%s] Argument syntax error: please use "
+                                 "'--pcr-file=FORMAT:PATH'",
+                        log_name, format);
+                return -1;
+            }
+            length = strlen(token) + 1;
+            path = malloc(length * sizeof(char));
+            if (path == NULL) {
+                charra_log_error("[%s] Could not allocate enough memory");
+                return -1;
+            }
+            strcpy(path, token);
+            path[length - 1] = '\0';
+
+            /* check if format is valid */
+            if (strcmp(format, "yaml") != 0) {
+                charra_log_error("[%s] File format '%s' is not supported.",
+                        log_name, format);
+                return -1;
+            }
+            /* check if file exists */
             if (charra_io_file_exists(path) == CHARRA_RC_SUCCESS) {
                 *(variables->verifier_config.reference_pcr_file_path) = path;
                 continue;
             } else {
-                charra_log_error(
-                        "[%s] Reference PCR file ''%s' does not exist.",
+                charra_log_error("[%s] Reference PCR file '%s' does not exist.",
                         log_name, path);
                 return -1;
             }
