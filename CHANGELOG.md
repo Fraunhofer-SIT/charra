@@ -13,6 +13,32 @@
 
 The following lists the changes CHARRA received over time.
 
+## Changelog 2024-03-05
+
+* Adjustments to `charra_rim_mgr` and `parser_util`:
+
+  * Updated parser to parse the PCR reference file in a YAML format.
+
+  * Implemented stricter parsing rules
+
+  * Fixed minor bugs
+
+* Adjustments to `Verifier`
+
+  * `-f` or `--pcr-file` argument is mandatory to run the verifier
+
+  * The specified PCR reference file has to be in this format: `FORMAT:PATH`
+
+  * The following formats are currently available: `yaml`
+
+* Replaced `reference-pcrs.txt` with `reference-pcrs.yml`
+
+## Changelog 2024-02-20
+
+* Improved `charra_marshaling` with QCBOR spiffy decoding
+
+* Removed `cbor_util`
+
 ## Changelog 2023-11-30
 
 * Adjustments to `Dockerfile`:
