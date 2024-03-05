@@ -37,7 +37,7 @@ Inside the container, change to the `~/charra/` folder, build it, and run it:
 
     cd ~/charra/
     make -j
-    (bin/attester &); sleep .2 ; bin/verifier ; sleep 1 ; pkill -SIGINT attester
+    (bin/attester &); sleep .2 ; bin/verifier -f yaml:reference-pcrs.yml ; sleep 1 ; pkill -SIGINT attester
 
 ## How it Works: Protocol Flow
 
