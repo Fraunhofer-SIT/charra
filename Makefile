@@ -106,6 +106,7 @@ LDPATH =     -L/usr/local/lib/ \
              -L/usr/lib/x86_64-linux-gnu
 
 LIBS =       coap-3-tinydtls \
+			 yaml \
              qcbor m \
              crypto ssl \
              mbedcrypto \
