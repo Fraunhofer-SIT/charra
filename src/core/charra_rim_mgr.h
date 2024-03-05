@@ -33,13 +33,18 @@
  *
  * the reference pcr file is expected to be formatted in the same way as the
  * output of tpm2_pcrread, e.g.:
- * 0 : 0x0000000000000000000000000000000000000000000000000000000000000000
- * ...
- * 23: 0x0000000000000000000000000000000000000000000000000000000000000000
+ * sha256:
+ *   0 : 0x0000000000000000000000000000000000000000000000000000000000000000
+ *
+ *   ...
+ *
+ *   23: 0x0000000000000000000000000000000000000000000000000000000000000000
+ *
  * Entries are identified by the number at the start of the line.
  * Entries are allowed to be missing if they are not in the
  * reference_pcr_selection. Entries are expected to be in order.
- * Multiple sets of PCR states are seperated by an empty newline.
+ * Each set of PCR states starts with a YAML document start token `---` and
+ * ends with a YAML document end token `...`.
  *
  * @param[in] filename The path of the file which holds the reference PCR values
  * @param[in] reference_pcr_selection An array of PCRs indexes that we need.
