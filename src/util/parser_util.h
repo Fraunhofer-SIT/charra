@@ -23,12 +23,12 @@
  * start with the characters '0x'.
  *
  * @param start pointer to the start of the string
- * @param end pointer to the end of line or end of string
+ * @param length length of the string
  * @param pcr_value pointer to an array in which the PCR value will be written.
  * Is expected to be able to hold TPM2_SHA256_DIGEST_SIZE values.
  * @returns CHARRA_RC_SUCCESS on success, otherwise CHARRA_RC_ERROR
  */
-CHARRA_RC parse_pcr_value(char* start, char* eol, uint8_t* pcr_value);
+CHARRA_RC parse_pcr_value(char* start, size_t length, uint8_t* pcr_value);
 
 /**
  * @brief Returns a pointer to the first '\n' in the string. The end of the

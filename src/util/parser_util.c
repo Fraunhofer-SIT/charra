@@ -25,16 +25,18 @@
 #include "../common/charra_macro.h"
 #include <tss2/tss2_tpm2_types.h>
 
-CHARRA_RC parse_pcr_value(char* start, char* eol, uint8_t* pcr_value) {
-    // search for the start of the PCR hex value
-    char* hex_start;
-    for (hex_start = start;
-            !(*(hex_start - 2) == '0' && *(hex_start - 1) == 'x');
-            hex_start++) {
-        if (hex_start >= eol) {
-            return CHARRA_RC_ERROR;
-        }
-    }  // loop ends on first character after the '0x'
+/* a byte is represented as 2 characters in a hex string + 2 bytes for the characters "0x" */
+#define SHA256_HEX_STR_SIZE (TPM2_SHA256_DIGEST_SIZE * 2 + 2)
+
+CHARRA_RC parse_pcr_value(char* start, size_t length, uint8_t* pcr_value) {
+    if (length != SHA256_HEX_STR_SIZE) {
+        return CHARRA_RC_ERROR;
+    }
+    /* string should start with 0x */
+    if (*start != '0' || *(start + 1) != 'x') {
+        return CHARRA_RC_ERROR;
+    }
+    char* hex_start = start + 2;
 
     // iterate over all bytes of the digest
     for (uint32_t digest_index = 0; digest_index < TPM2_SHA256_DIGEST_SIZE;
@@ -42,9 +44,6 @@ CHARRA_RC parse_pcr_value(char* start, char* eol, uint8_t* pcr_value) {
         // hex_index is the byte in string representation at the
         // current digest_index
         char* hex_index = hex_start + (digest_index * 2);
-        if (hex_index + 1 >= eol) {
-            return CHARRA_RC_ERROR;
-        }
 
         // convert byte in string representation to byte as uint8_t
         char byte_as_string[3] = {0};

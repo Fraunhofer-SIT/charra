@@ -72,7 +72,7 @@ static uint8_t tpm_pcr_selection[TPM2_MAX_PCRS] = {0, 1, 2, 3, 4, 5, 6, 7, 10};
 static uint32_t tpm_pcr_selection_len = 9;
 uint16_t attestation_response_timeout =
         30;  // timeout when waiting for attestation answer in seconds
-char* reference_pcr_file_path = "reference-pcrs.txt";
+char* reference_pcr_file_path = "reference-pcrs.yml";
 bool use_ima_event_log = false;
 char* ima_event_log_path =
         "/sys/kernel/security/ima/binary_runtime_measurements";
