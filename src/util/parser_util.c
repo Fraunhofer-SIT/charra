@@ -62,15 +62,6 @@ CHARRA_RC parse_pcr_value(char* start, size_t length, uint8_t* pcr_value) {
     return CHARRA_RC_SUCCESS;
 }
 
-char* find_end_of_line(char* start, char* end) {
-    for (char* c = start; c < end; c++) {
-        if (*c == '\n') {
-            return c;
-        }
-    }  // loop ends when end of file or end of line is reached
-    return end;
-}
-
 int parse_pcr_index(char* index_start) {
     errno = 0;
     char* end = NULL;

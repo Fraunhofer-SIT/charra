@@ -31,12 +31,6 @@
 CHARRA_RC parse_pcr_value(char* start, size_t length, uint8_t* pcr_value);
 
 /**
- * @brief Returns a pointer to the first '\n' in the string. The end of the
- * string gets returned if none is found.
- */
-char* find_end_of_line(char* start, char* end);
-
-/**
  * @brief parse PCR index at the position given by index_start. Returns a
  * negative number in case of an error, including if the parsed index is too
  * big for a PCR index.
