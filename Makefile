@@ -127,6 +127,7 @@ INCLUDE = -I$(INCDIR)
 
 OBJECTS =  $(addsuffix .o, $(addprefix $(OBJDIR)/common/, charra_log))
 OBJECTS += $(addsuffix .o, $(addprefix $(OBJDIR)/core/, charra_helper charra_key_mgr charra_rim_mgr charra_marshaling))
+OBJECTS += $(addsuffix .o, $(addprefix $(OBJDIR)/core/charra_tap/, charra_tap_cbor))
 OBJECTS += $(addsuffix .o, $(addprefix $(OBJDIR)/util/, charra_util coap_util crypto_util io_util tpm2_util cli_util parser_util))
 
 TARGETS = $(addprefix $(BINDIR)/, attester verifier)
@@ -167,6 +168,10 @@ $(OBJDIR)/core/%.o: $(SRCDIR)/core/%.c
 	@mkdir -p $(@D)
 	$(CC) $< $(INCLUDE) $(LIBINCLUDE) $(LDPATH) $(LDFLAGS) $(CFLAGS) -g -o $@ -c $(link_mode)
 
+$(OBJDIR)/core/charra_tap/%.o: $(SRCDIR)/core/charra_tap/%.c
+	@mkdir -p $(@D)
+	$(CC) $< $(INCLUDE) $(LIBINCLUDE) $(LDPATH) $(LDFLAGS) $(CFLAGS) -g -o $@ -c $(link_mode)
+
 $(OBJDIR)/util/%.o: $(SRCDIR)/util/%.c
 	@mkdir -p $(@D)
 	$(CC) $< $(INCLUDE) $(LIBINCLUDE) $(LDPATH) $(LDFLAGS) $(CFLAGS) -g -o $@ -c $(link_mode)
@@ -182,4 +187,3 @@ clean:
 	$(RM) obj/core/*.*
 	$(RM) obj/util/*.*
 	$(RM) obj/*.*
-
