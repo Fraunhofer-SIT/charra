@@ -1,0 +1,459 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
+/*****************************************************************************
+ * Copyright 2019, Fraunhofer Institute for Secure Information Technology SIT.
+ * All rights reserved.
+ ****************************************************************************/
+
+/**
+ * @file charra_tap_cbor.c
+ * @author Markus Horn (markus.horn@sit.fraunhofer.de)
+ * @brief
+ * @version 0.1
+ * @date 2019-09-19
+ *
+ * @copyright Copyright 2019, Fraunhofer Institute for Secure Information
+ * Technology SIT. All rights reserved.
+ *
+ * @license BSD 3-Clause "New" or "Revised" License (SPDX-License-Identifier:
+ * BSD-3-Clause).
+ */
+
+#include <assert.h>
+#include <qcbor/UsefulBuf.h>
+#include <qcbor/qcbor.h>
+#include <qcbor/qcbor_encode.h>
+#include <qcbor/qcbor_spiffy_decode.h>
+#include <stdlib.h>
+
+#include "../../common/charra_log.h"
+#include "../../core/charra_dto.h"
+#include "charra_tap_cbor.h"
+#include "charra_tap_dto.h"
+#include "charra_tap_types.h"
+
+static CHARRA_RC charra_tap_attestation_request_internal(
+        const msg_attestation_request_dto* attestation_request,
+        UsefulBuf buf_in, UsefulBufC* buf_out) {
+    charra_log_trace("<ENTER> %s()", __func__);
+
+    /* verify input */
+    assert(attestation_request != NULL);
+    assert(attestation_request->pcr_selections_len <= TPM2_NUM_PCR_BANKS);
+    assert(attestation_request->pcr_selections != NULL);
+    assert(attestation_request->pcr_selections->pcrs_len <= TPM2_MAX_PCRS);
+    assert(attestation_request->pcr_selections->pcrs != NULL);
+    assert(attestation_request->nonce_len <= sizeof(TPMU_HA));
+    assert(attestation_request->nonce != NULL);
+    if (attestation_request->event_log_path_len != 0) {
+        assert(attestation_request->event_log_path != NULL);
+    }
+
+    QCBOREncodeContext ec = {0};
+
+    QCBOREncode_Init(&ec, buf_in);
+
+    /* root array */
+    QCBOREncode_OpenArray(&ec);
+
+    /* encode "hello" */
+    QCBOREncode_AddBool(&ec, attestation_request->hello);
+
+    /* encode "key-id" */
+    UsefulBufC key_id = {attestation_request->sig_key_id,
+            attestation_request->sig_key_id_len};
+    QCBOREncode_AddBytes(&ec, key_id);
+
+    /* encode "nonce" */
+    UsefulBufC nonce = {
+            attestation_request->nonce, attestation_request->nonce_len};
+    QCBOREncode_AddBytes(&ec, nonce);
+
+    /* encode "pcr-selections" */
+    QCBOREncode_OpenArray(&ec);
+    for (uint32_t i = 0; i < attestation_request->pcr_selections_len; ++i) {
+        QCBOREncode_OpenArray(&ec);
+        QCBOREncode_AddInt64(
+                &ec, attestation_request->pcr_selections[i].tcg_hash_alg_id);
+        {
+            /* open array: pcrs_array_encoder */
+            QCBOREncode_OpenArray(&ec);
+            for (uint32_t j = 0;
+                    j < attestation_request->pcr_selections[i].pcrs_len; ++j) {
+                QCBOREncode_AddUInt64(
+                        &ec, attestation_request->pcr_selections[i].pcrs[j]);
+            }
+            /* close array: pcrs_array_encoder */
+            QCBOREncode_CloseArray(&ec);
+        }
+        /* close array: pcr_selection_array_encoder */
+        QCBOREncode_CloseArray(&ec);
+    }
+
+    /* close array: pcr_selections_array_encoder */
+    QCBOREncode_CloseArray(&ec);
+
+    /* encode "event_log_path" */
+    UsefulBufC event_log_path = {.ptr = attestation_request->event_log_path,
+            .len = attestation_request->event_log_path_len};
+    QCBOREncode_AddBytes(&ec, event_log_path);
+
+    /* close array: root_array_encoder */
+    QCBOREncode_CloseArray(&ec);
+
+    if (QCBOREncode_Finish(&ec, buf_out) == QCBOR_SUCCESS) {
+        return CHARRA_RC_SUCCESS;
+    } else {
+        return CHARRA_RC_MARSHALING_ERROR;
+    }
+}
+
+static CHARRA_RC charra_tap_attestation_request_size(
+        const msg_attestation_request_dto* attestation_request,
+        size_t* marshaled_data_len) {
+    charra_log_trace("<ENTER> %s()", __func__);
+
+    CHARRA_RC charra_r = CHARRA_RC_SUCCESS;
+
+    /* passing this buffer instructs QCBOR to return only the size and do no
+     * actual encoding */
+    UsefulBuf buf_in = {.len = SIZE_MAX, .ptr = NULL};
+    UsefulBufC buf_out = {0};
+
+    if ((charra_r = charra_tap_attestation_request_internal(
+                 attestation_request, buf_in, &buf_out)) == CHARRA_RC_SUCCESS) {
+        *marshaled_data_len = buf_out.len;
+    }
+
+    return charra_r;
+}
+
+CHARRA_RC charra_tap_marshal_attestation_request(
+        const msg_attestation_request_dto* attestation_request,
+        uint32_t* marshaled_data_len, uint8_t** marshaled_data) {
+    charra_log_trace("<ENTER> %s()", __func__);
+    CHARRA_RC charra_r = CHARRA_RC_SUCCESS;
+
+    /* verify input */
+    assert(attestation_request != NULL);
+    assert(attestation_request->pcr_selections_len <= TPM2_NUM_PCR_BANKS);
+    assert(attestation_request->pcr_selections != NULL);
+    assert(attestation_request->pcr_selections->pcrs_len <= TPM2_MAX_PCRS);
+    assert(attestation_request->pcr_selections->pcrs != NULL);
+    assert(attestation_request->nonce_len <= sizeof(TPMU_HA));
+    assert(attestation_request->nonce != NULL);
+    if (attestation_request->event_log_path_len != 0) {
+        assert(attestation_request->event_log_path != NULL);
+    }
+
+    /* compute size of marshaled data */
+    UsefulBuf buf_in = {.len = 0, .ptr = NULL};
+    if ((charra_r = charra_tap_attestation_request_size(
+                 attestation_request, &(buf_in.len))) != CHARRA_RC_SUCCESS) {
+        charra_log_error("Could not compute size of marshaled data.");
+        return charra_r;
+    }
+    charra_log_debug("Size of marshaled data is %zu bytes.", buf_in.len);
+
+    /* allocate buffer size */
+    if ((buf_in.ptr = malloc(buf_in.len)) == NULL) {
+        charra_log_error("Allocating %zu bytes of memory failed.", buf_in.len);
+        return CHARRA_RC_MARSHALING_ERROR;
+    }
+    charra_log_debug("Allocated %zu bytes of memory.", buf_in.len);
+
+    /* encode */
+    UsefulBufC buf_out = {.len = 0, .ptr = NULL};
+    if ((charra_r = charra_tap_attestation_request_internal(
+                 attestation_request, buf_in, &buf_out)) != CHARRA_RC_SUCCESS) {
+        charra_log_error("Could not marshal data.");
+        return charra_r;
+    }
+
+    /* set output parameters */
+    *marshaled_data_len = buf_out.len;
+    *marshaled_data = (uint8_t*)buf_out.ptr;
+
+    return charra_r;
+}
+
+CHARRA_RC charra_tap_unmarshal_attestation_request(
+        const uint32_t marshaled_data_len, const uint8_t* marshaled_data,
+        msg_attestation_request_dto* attestation_request) {
+    msg_attestation_request_dto req = {0};
+    QCBORError cborerr = QCBOR_SUCCESS;
+    UsefulBufC marshaled_data_buf = {marshaled_data, marshaled_data_len};
+    QCBORDecodeContext dc = {0};
+    QCBORItem item = {0};
+    UsefulBufC item_str_buf = {0};
+
+    QCBORDecode_Init(&dc, marshaled_data_buf, QCBOR_DECODE_MODE_NORMAL);
+
+    /* parse root array */
+    QCBORDecode_EnterArray(&dc, &item);
+
+    /* parse "hello" (bool) */
+    QCBORDecode_GetBool(&dc, &(req.hello));
+
+    /* parse "key-id" (bytes) */
+    QCBORDecode_GetByteString(&dc, &item_str_buf);
+    req.sig_key_id_len = item_str_buf.len;
+    memcpy(&(req.sig_key_id), item_str_buf.ptr, req.sig_key_id_len);
+
+    /* parse "nonce" (bytes) */
+    QCBORDecode_GetByteString(&dc, &item_str_buf);
+    req.nonce_len = item_str_buf.len;
+    memcpy(&(req.nonce), item_str_buf.ptr, req.nonce_len);
+
+    /* parse array "pcr-selections" */
+    QCBORDecode_EnterArray(&dc, &item);
+
+    /* initialize array and array length */
+    req.pcr_selections_len = (uint32_t)item.val.uCount;
+
+    /* go through all elements */
+    for (uint32_t i = 0; i < req.pcr_selections_len; ++i) {
+        /* parse array "pcr-selection" */
+        QCBORDecode_EnterArray(&dc, &item);
+
+        /* parse "tcg-hash-alg-id" (UINT16) */
+        int64_t int_val = 0;
+        QCBORDecode_GetInt64(&dc, &int_val);
+        req.pcr_selections[i].tcg_hash_alg_id = (uint16_t)int_val;
+
+        /* parse array "pcrs" */
+        QCBORDecode_EnterArray(&dc, &item);
+
+        /* initialize array and array length */
+        req.pcr_selections[i].pcrs_len = (uint32_t)item.val.uCount;
+
+        /* go through all elements */
+        for (uint32_t j = 0; j < req.pcr_selections[i].pcrs_len; ++j) {
+            QCBORDecode_GetInt64(&dc, &int_val);
+            req.pcr_selections[i].pcrs[j] = (uint8_t)int_val;
+        }
+
+        /* exit array "pcrs" */
+        QCBORDecode_ExitArray(&dc);
+
+        /* exit array "pcr-selection" */
+        QCBORDecode_ExitArray(&dc);
+    }
+
+    /*  exit array "pcr-selections" */
+    QCBORDecode_ExitArray(&dc);
+
+    /* parse "event-log-path" (bytes) */
+    QCBORDecode_GetByteString(&dc, &item_str_buf);
+    req.event_log_path_len = item_str_buf.len;
+    if (req.event_log_path_len != 0) {
+        uint8_t* event_log_path = (uint8_t*)malloc(req.event_log_path_len);
+        if (event_log_path == NULL) {
+            goto cbor_parse_error;
+        } else {
+            req.event_log_path = event_log_path;
+            if (memcpy(req.event_log_path, item_str_buf.ptr,
+                        req.event_log_path_len) == NULL) {
+                goto cbor_parse_error;
+            }
+        }
+    }
+
+    /* exit root array */
+    QCBORDecode_ExitArray(&dc);
+
+    /* expect end of CBOR data */
+    if ((cborerr = QCBORDecode_Finish(&dc))) {
+        charra_log_error("CBOR parser: expected end of input, but could not "
+                         "find it. Continuing.");
+        goto cbor_parse_error;
+    }
+
+    /* set output */
+    *attestation_request = req;
+
+    return CHARRA_RC_SUCCESS;
+
+cbor_parse_error:
+    charra_log_error("CBOR parser: %s", qcbor_err_to_str(cborerr));
+    charra_log_info("CBOR parser: skipping parsing.");
+
+    return CHARRA_RC_MARSHALING_ERROR;
+}
+
+static CHARRA_RC charra_tap_marshal_attestation_response_internal(
+        const charra_tap_msg_attestation_response_dto* attestation_response,
+        UsefulBuf buf_in, UsefulBufC* buf_out) {
+    charra_log_trace("<ENTER> %s()", __func__);
+
+    /* verify input */
+    assert(attestation_response != NULL);
+    assert(attestation_response->attestation_data != NULL);
+    assert(attestation_response->tpm2_signature != NULL);
+
+    QCBOREncodeContext ec = {0};
+
+    QCBOREncode_Init(&ec, buf_in);
+
+    /* root array */
+    QCBOREncode_OpenArray(&ec);
+
+    /* encode information element identifier */
+    QCBOREncode_AddUInt64(&ec, CHARRA_TAP_IE_PCR_ATTESTATION);
+
+    /* encode attestation subtype */
+    QCBOREncode_AddUInt64(&ec, CHARRA_TAP_ATTESTATION_TPM2_QUOTE);
+
+    /* encode "attestation-data" */
+    UsefulBufC attestation_data = {
+            .ptr = attestation_response->attestation_data,
+            .len = attestation_response->attestation_data_len};
+    QCBOREncode_AddBytes(&ec, attestation_data);
+
+    /* encode "tpm2-signature" */
+    UsefulBufC tpm2_signature = {.ptr = attestation_response->tpm2_signature,
+            .len = attestation_response->tpm2_signature_len};
+    QCBOREncode_AddBytes(&ec, tpm2_signature);
+
+    /* close array: root_array_encoder */
+    QCBOREncode_CloseArray(&ec);
+
+    if (QCBOREncode_Finish(&ec, buf_out) == QCBOR_SUCCESS) {
+        return CHARRA_RC_SUCCESS;
+    } else {
+        return CHARRA_RC_MARSHALING_ERROR;
+    }
+}
+
+CHARRA_RC charra_tap_marshal_attestation_response_size(
+        const charra_tap_msg_attestation_response_dto* attestation_response,
+        size_t* marshaled_data_len) {
+    charra_log_trace("<ENTER> %s()", __func__);
+
+    CHARRA_RC charra_r = CHARRA_RC_SUCCESS;
+
+    /* passing this buffer instructs QCBOR to return only the size and do no
+     * actual encoding */
+    UsefulBuf buf_in = {.len = SIZE_MAX, .ptr = NULL};
+    UsefulBufC buf_out = {0};
+
+    if ((charra_r = charra_tap_marshal_attestation_response_internal(
+                 attestation_response, buf_in, &buf_out)) ==
+            CHARRA_RC_SUCCESS) {
+        *marshaled_data_len = buf_out.len;
+    }
+
+    return charra_r;
+}
+
+CHARRA_RC charra_tap_marshal_attestation_response(
+        const charra_tap_msg_attestation_response_dto* attestation_response,
+        uint32_t* marshaled_data_len, uint8_t** marshaled_data) {
+    charra_log_trace("<ENTER> %s()", __func__);
+
+    CHARRA_RC charra_r = CHARRA_RC_SUCCESS;
+
+    /* verify input */
+    assert(attestation_response != NULL);
+    assert(attestation_response->attestation_data != NULL);
+    assert(attestation_response->tpm2_signature != NULL);
+
+    /* compute size of marshaled data */
+    UsefulBuf buf_in = {.len = 0, .ptr = NULL};
+    if ((charra_r = charra_tap_marshal_attestation_response_size(
+                 attestation_response, &(buf_in.len))) != CHARRA_RC_SUCCESS) {
+        charra_log_error("Could not compute size of marshaled data.");
+        return charra_r;
+    }
+    charra_log_debug("Size of marshaled data is %zu bytes.", buf_in.len);
+
+    /* allocate buffer size */
+    if ((buf_in.ptr = malloc(buf_in.len)) == NULL) {
+        charra_log_error("Allocating %zu bytes of memory failed.", buf_in.len);
+        return CHARRA_RC_MARSHALING_ERROR;
+    }
+    charra_log_debug("Allocated %zu bytes of memory.", buf_in.len);
+
+    /* encode */
+    UsefulBufC buf_out = {.len = 0, .ptr = NULL};
+    if ((charra_r = charra_tap_marshal_attestation_response_internal(
+                 attestation_response, buf_in, &buf_out)) !=
+            CHARRA_RC_SUCCESS) {
+        charra_log_error("Could not marshal data.");
+        return charra_r;
+    }
+
+    /* set output parameters */
+    *marshaled_data_len = buf_out.len;
+    *marshaled_data = (uint8_t*)buf_out.ptr;
+
+    return charra_r;
+}
+
+CHARRA_RC charra_tap_unmarshal_attestation_response(
+        const uint32_t marshaled_data_len, const uint8_t* marshaled_data,
+        charra_tap_msg_attestation_response_dto* attestation_response) {
+    charra_tap_msg_attestation_response_dto res = {0};
+    QCBORError cborerr = QCBOR_SUCCESS;
+    UsefulBufC marshaled_data_buf = {marshaled_data, marshaled_data_len};
+    QCBORDecodeContext dc = {0};
+    QCBORItem item = {0};
+    UsefulBufC item_str_buf = {0};
+    uint64_t ie_identifier = 0;
+    uint64_t attestation_subtype = 0;
+
+    QCBORDecode_Init(&dc, marshaled_data_buf, QCBOR_DECODE_MODE_NORMAL);
+
+    /* parse root array */
+    QCBORDecode_EnterArray(&dc, &item);
+
+    /* parse information element identifier */
+    QCBORDecode_GetUInt64(&dc, &ie_identifier);
+
+    /* parse attestation subtype */
+    QCBORDecode_GetUInt64(&dc, &attestation_subtype);
+
+    /* parse "attestation-data" (bytes) */
+    QCBORDecode_GetByteString(&dc, &item_str_buf);
+    res.attestation_data_len = item_str_buf.len;
+    memcpy(&(res.attestation_data), item_str_buf.ptr, res.attestation_data_len);
+
+    /* parse "tpm2-signature" (bytes) */
+    QCBORDecode_GetByteString(&dc, &item_str_buf);
+    res.tpm2_signature_len = item_str_buf.len;
+    memcpy(&(res.tpm2_signature), item_str_buf.ptr, res.tpm2_signature_len);
+
+    /* exit root array */
+    QCBORDecode_ExitArray(&dc);
+
+    if ((cborerr = QCBORDecode_Finish(&dc))) {
+        charra_log_error("CBOR parser: expected end of input, but could not "
+                         "find it. Continuing.");
+        goto cbor_parse_error;
+    }
+
+    if (ie_identifier != CHARRA_TAP_IE_PCR_ATTESTATION) {
+        cborerr = CHARRA_RC_MARSHALING_ERROR;
+        charra_log_error("CBOR parser: unexpected information element "
+                         "identifier: 0x%02x",
+                (uint8_t)ie_identifier);
+        goto cbor_parse_error;
+    }
+
+    if (attestation_subtype != CHARRA_TAP_ATTESTATION_TPM2_QUOTE) {
+        cborerr = CHARRA_RC_MARSHALING_ERROR;
+        charra_log_error("CBOR parser: unexpected attestation subtype: 0x%02x",
+                (uint8_t)attestation_subtype);
+        goto cbor_parse_error;
+    }
+
+    /* set output */
+    *attestation_response = res;
+
+    return CHARRA_RC_SUCCESS;
+
+cbor_parse_error:
+    charra_log_error("CBOR parser: %s", qcbor_err_to_str(cborerr));
+    charra_log_info("CBOR parser: skipping parsing.");
+
+    return CHARRA_RC_MARSHALING_ERROR;
+}
