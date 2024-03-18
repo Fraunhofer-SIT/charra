@@ -20,14 +20,17 @@
 
 #include "tpm2_util.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <tss2/tss2_common.h>
 #include <tss2/tss2_esys.h>
 #include <tss2/tss2_mu.h>
 #include <tss2/tss2_tpm2_types.h>
 
 #include "../common/charra_error.h"
 #include "../common/charra_log.h"
+#include "tpm2_tools_util.h"
 
 TSS2_RC tpm2_create_primary_key_rsa2048(
         ESYS_CONTEXT* ctx, ESYS_TR* primary_handle, TPM2B_PUBLIC** out_public) {
@@ -123,6 +126,31 @@ error:
     }
 
     return r;
+}
+
+TSS2_RC tpm2_load_tpm_context_from_path(
+        ESYS_CONTEXT* context, ESYS_TR* tr_handle, const char* path) {
+    if (path == NULL) {
+        charra_log_error("Error loading key context: no path specified.");
+        return TSS2_BASE_RC_BAD_PATH;
+    }
+    FILE* f = fopen(path, "rb");
+    if (!f) {
+        charra_log_error("Error opening file \"%s\" due to error: %s", path,
+                strerror(errno));
+        return TSS2_BASE_RC_IO_ERROR;
+    }
+
+    TSS2_RC rc =
+            tpm2_tools_util_load_tpm_context_from_file(context, tr_handle, f);
+
+    fclose(f);
+    return rc;
+}
+
+bool tpm2_load_external_public_key_from_path(
+        const char* path, TPM2B_PUBLIC* external_pk) {
+    return tpm2_tools_util_load_public(path, external_pk);
 }
 
 TSS2_RC tpm2_store_key_in_nvram(ESYS_CONTEXT* ctx, const ESYS_TR* key_handle) {

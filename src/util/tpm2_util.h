@@ -7,6 +7,7 @@
 /**
  * @file tpm2_util.h
  * @author Michael Eckel (michael.eckel@sit.fraunhofer.de)
+ * @author Markus Horn (markus.horn@sit.fraunhofer.de)
  * @brief
  * @version 0.1
  * @date 2019-09-19
@@ -21,6 +22,7 @@
 #ifndef TPM2_UTIL_H
 #define TPM2_UTIL_H
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <tss2/tss2_esys.h>
 
@@ -35,6 +37,31 @@
  */
 TSS2_RC tpm2_create_primary_key_rsa2048(
         ESYS_CONTEXT* ctx, ESYS_TR* primary_handle, TPM2B_PUBLIC** out_public);
+
+/**
+ * Loads a ESAPI TPM object context from disk or an ESAPI serialized ESYS_TR
+ * object.
+ * @param context
+ *  The Enhanced System API (ESAPI) context
+ * @param tr_handle
+ *  Optional. The Esys handle for the TPM2 object.
+ * @param path
+ *  The path to the input file.
+ * @return
+ *  TSS2_RC status indicating success.
+ */
+TSS2_RC tpm2_load_tpm_context_from_path(
+        ESYS_CONTEXT* context, ESYS_TR* tr_handle, const char* path);
+
+/**
+ * Loads a TPM2B_PUBLIC from disk that was saved with tpm2_createak.
+ * @param path[in] The path to load from.
+ * @param public[out] The TPM2B_PUBLIC to load.
+ * @return
+ *  true on success, false on error.
+ */
+bool tpm2_load_external_public_key_from_path(
+        const char* path, TPM2B_PUBLIC* external_pk);
 
 /**
  * @brief Stores a key in the TPM NVRAM under the first available NV index.

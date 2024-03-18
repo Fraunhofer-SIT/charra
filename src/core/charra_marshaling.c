@@ -240,7 +240,7 @@ CHARRA_RC charra_unmarshal_attestation_request(
 
         /* exit array "pcrs" */
         QCBORDecode_ExitArray(&dc);
-        
+
         /* exit array "pcr-selection" */
         QCBORDecode_ExitArray(&dc);
     }
