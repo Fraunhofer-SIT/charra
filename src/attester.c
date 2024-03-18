@@ -35,7 +35,7 @@
 #include "core/charra_dto.h"
 #include "core/charra_helper.h"
 #include "core/charra_key_mgr.h"
-#include "core/charra_marshaling.h"
+#include "core/charra_tap/charra_tap_cbor.h"
 #include "util/cli_util.h"
 #include "util/coap_util.h"
 #include "util/io_util.h"
@@ -84,10 +84,8 @@ static void release_data(
         struct coap_session_t* session CHARRA_UNUSED, void* app_ptr);
 
 static void coap_attest_handler(struct coap_resource_t* resource,
-                                struct coap_session_t* session,
-                                const struct coap_pdu_t* request,
-                                const struct coap_string_t* query,
-                                struct coap_pdu_t* response);
+        struct coap_session_t* session, const struct coap_pdu_t* request,
+        const struct coap_string_t* query, struct coap_pdu_t* response);
 
 /* --- main --------------------------------------------------------------- */
 
@@ -282,10 +280,8 @@ static void release_data(
 }
 
 static void coap_attest_handler(struct coap_resource_t* resource,
-                                struct coap_session_t* session,
-                                const struct coap_pdu_t* request,
-                                const struct coap_string_t* query,
-                                struct coap_pdu_t* response) {
+        struct coap_session_t* session, const struct coap_pdu_t* request,
+        const struct coap_string_t* query, struct coap_pdu_t* response) {
     CHARRA_RC charra_r = CHARRA_RC_SUCCESS;
     int coap_r = 0;
     TSS2_RC tss_r = 0;
@@ -301,8 +297,8 @@ static void coap_attest_handler(struct coap_resource_t* resource,
     const uint8_t* data = NULL;
     size_t data_offset = 0;
     size_t data_total_len = 0;
-    if ((coap_r = coap_get_data_large(
-                 request, &data_len, &data, &data_offset, &data_total_len)) == 0) {
+    if ((coap_r = coap_get_data_large(request, &data_len, &data, &data_offset,
+                 &data_total_len)) == 0) {
         charra_log_error("[" LOG_NAME "] Could not get CoAP PDU data.");
         goto error;
     } else {
@@ -315,7 +311,7 @@ static void coap_attest_handler(struct coap_resource_t* resource,
     /* unmarshal data */
     charra_log_info("[" LOG_NAME "] Parsing received CBOR data.");
     msg_attestation_request_dto req = {0};
-    if ((charra_r = charra_unmarshal_attestation_request(
+    if ((charra_r = charra_tap_unmarshal_attestation_request(
                  data_len, data, &req)) != CHARRA_RC_SUCCESS) {
         charra_log_error("[" LOG_NAME "] Could not parse CBOR data.");
         goto error;
@@ -364,7 +360,7 @@ static void coap_attest_handler(struct coap_resource_t* resource,
     /* load TPM key */
     charra_log_info("[" LOG_NAME "] Loading TPM key.");
     if ((charra_r = charra_load_tpm2_key(esys_ctx, req.sig_key_id_len,
-                 req.sig_key_id, &sig_key_handle, &public_key)) !=
+                 req.sig_key_id, &sig_key_handle)) !=
             CHARRA_RC_SUCCESS) {
         charra_log_error("[" LOG_NAME "] Could not load TPM key.");
         goto error;
@@ -377,7 +373,7 @@ static void coap_attest_handler(struct coap_resource_t* resource,
     if ((tss_r = tpm2_quote(esys_ctx, sig_key_handle, &pcr_selection,
                  &qualifying_data, &attest_buf, &signature)) !=
             TSS2_RC_SUCCESS) {
-        charra_log_error("[" LOG_NAME "] TPM2 quote.");
+        charra_log_error("[" LOG_NAME "] TPM2 quote. %d", tss_r);
         goto error;
     } else {
         charra_log_info("[" LOG_NAME "] TPM Quote successful.");
@@ -411,20 +407,15 @@ static void coap_attest_handler(struct coap_resource_t* resource,
     charra_log_info("[" LOG_NAME "] Preparing response.");
 
     /* prepare response DTO */
-    msg_attestation_response_dto res = {
+    charra_tap_msg_attestation_response_dto res = {
             .attestation_data_len = attest_buf->size,
             .attestation_data = {0},  // must be memcpy'd, see below
             .tpm2_signature_len = sizeof(*signature),
             .tpm2_signature = {0},  // must be memcpy'd, see below
-            .tpm2_public_key_len = sizeof(*public_key),
-            .tpm2_public_key = {0},  // must be memcpy'd, see below
-            .event_log_len = ima_event_log_len,
-            .event_log = ima_event_log,
     };
     memcpy(res.attestation_data, attest_buf->attestationData,
             res.attestation_data_len);
     memcpy(res.tpm2_signature, signature, res.tpm2_signature_len);
-    memcpy(res.tpm2_public_key, public_key, res.tpm2_public_key_len);
 
     /* clean up */
     charra_free_and_null(signature);
@@ -435,7 +426,7 @@ static void coap_attest_handler(struct coap_resource_t* resource,
     charra_log_info("[" LOG_NAME "] Marshaling response to CBOR.");
     uint32_t res_buf_len = 0;
     uint8_t* res_buf = NULL;
-    if ((charra_r = charra_marshal_attestation_response(
+    if ((charra_r = charra_tap_marshal_attestation_response(
                  &res, &res_buf_len, &res_buf)) != CHARRA_RC_SUCCESS) {
         charra_log_error("[" LOG_NAME "] Error marshaling data.");
         goto error;
@@ -451,9 +442,9 @@ static void coap_attest_handler(struct coap_resource_t* resource,
             "[" LOG_NAME
             "] Adding marshaled data to CoAP response PDU and send it.");
     coap_pdu_set_code(response, COAP_RESPONSE_CODE_CONTENT);
-    if ((coap_r = coap_add_data_large_response(resource, session, request, response,
-                query, COAP_MEDIATYPE_APPLICATION_CBOR, -1, 0,
-                res_buf_len, res_buf, release_data, res_buf)) == 0) {
+    if ((coap_r = coap_add_data_large_response(resource, session, request,
+                 response, query, COAP_MEDIATYPE_APPLICATION_CBOR, -1, 0,
+                 res_buf_len, res_buf, release_data, res_buf)) == 0) {
         charra_log_error("[" LOG_NAME
                          "] Error invoking coap_add_data_large_response().");
         goto error;

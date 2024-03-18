@@ -33,13 +33,15 @@
 #include "common/charra_macro.h"
 #include "core/charra_dto.h"
 #include "core/charra_key_mgr.h"
-#include "core/charra_marshaling.h"
 #include "core/charra_rim_mgr.h"
+#include "core/charra_tap/charra_tap_cbor.h"
+#include "core/charra_tap/charra_tap_dto.h"
 #include "util/charra_util.h"
 #include "util/cli_util.h"
 #include "util/coap_util.h"
 #include "util/crypto_util.h"
 #include "util/io_util.h"
+#include "util/tpm2_tools_util.h"
 #include "util/tpm2_util.h"
 
 #define CHARRA_UNUSED __attribute__((unused))
@@ -108,7 +110,7 @@ static coap_response_t coap_attest_handler(coap_session_t* session,
 /* --- static variables --------------------------------------------------- */
 
 static msg_attestation_request_dto last_request = {0};
-static msg_attestation_response_dto last_response = {0};
+static charra_tap_msg_attestation_response_dto last_response = {0};
 
 /* --- main --------------------------------------------------------------- */
 
@@ -342,7 +344,7 @@ int main(int argc, char** argv) {
     /* marshal attestation request */
     charra_log_info(
             "[" LOG_NAME "] Marshaling attestation request data to CBOR.");
-    if ((result = charra_marshal_attestation_request(
+    if ((result = charra_tap_marshal_attestation_request(
                  &req, &req_buf_len, &req_buf)) != CHARRA_RC_SUCCESS) {
         charra_log_error(
                 "[" LOG_NAME "] Marshaling attestation request data failed.");
@@ -539,8 +541,8 @@ static coap_response_t coap_attest_handler(
 
     /* unmarshal data */
     charra_log_info("[" LOG_NAME "] Parsing received CBOR data.");
-    msg_attestation_response_dto res = {0};
-    if ((attestation_rc = charra_unmarshal_attestation_response(
+    charra_tap_msg_attestation_response_dto res = {0};
+    if ((attestation_rc = charra_tap_unmarshal_attestation_response(
                  data_len, data, &res)) != CHARRA_RC_SUCCESS) {
         charra_log_error("[" LOG_NAME "] Could not parse CBOR data.");
         goto cleanup;
@@ -584,10 +586,9 @@ static coap_response_t coap_attest_handler(
     }
 
     /* load TPM key */
-    TPM2B_PUBLIC* tpm2_public_key = (TPM2B_PUBLIC*)res.tpm2_public_key;
-    charra_log_info("[" LOG_NAME "] Loading TPM key.");
+    TPM2B_PUBLIC tpm2_public_key = {0};  // (TPM2B_PUBLIC*)res.tpm2_public_key;
     if ((attestation_rc = charra_load_external_public_key(esys_ctx,
-                 tpm2_public_key, &sig_key_handle)) != CHARRA_RC_SUCCESS) {
+                 &tpm2_public_key, &sig_key_handle)) != CHARRA_RC_SUCCESS) {
         charra_log_error("[" LOG_NAME "] Loading external public key failed.");
         goto cleanup;
     } else {
@@ -627,7 +628,7 @@ static coap_response_t coap_attest_handler(
                 "] Converting TPM public key to mbedTLS public key ...");
         mbedtls_rsa_context mbedtls_rsa_pub_key = {0};
         if ((attestation_rc = charra_crypto_tpm_pub_key_to_mbedtls_pub_key(
-                     tpm2_public_key, &mbedtls_rsa_pub_key)) !=
+                     &tpm2_public_key, &mbedtls_rsa_pub_key)) !=
                 CHARRA_RC_SUCCESS) {
             charra_log_error("[" LOG_NAME "] mbedTLS RSA error");
             goto cleanup;
@@ -705,46 +706,47 @@ static coap_response_t coap_attest_handler(
         }
     }
 
-    /* verify event log */
-    // TODO(any): Implement real verification.
-    bool attestation_event_log = true;
-    if (use_ima_event_log) {
-        charra_log_info("[" LOG_NAME "] Verifying event log ...");
-        if (res.event_log_len == 0) {
-            charra_log_error("[" LOG_NAME "] Received no event log altough IMA "
-                             "event log verification is on.");
-            attestation_event_log = false;
-        } else {
-            charra_log_info(
-                    "[" LOG_NAME "]     <<< This is to be implemented. >>>");
-            charra_log_info("[" LOG_NAME
-                            "]     IMA Event Log size is %d bytes.",
-                    res.event_log_len);
-            charra_log_debug("[" LOG_NAME "]     IMA Event Log:");
+    // /* verify event log */
+    // // TODO(any): Implement real verification.
+    // bool attestation_event_log = true;
+    // if (use_ima_event_log) {
+    //     charra_log_info("[" LOG_NAME "] Verifying event log ...");
+    //     if (res.event_log_len == 0) {
+    //         charra_log_error("[" LOG_NAME "] Received no event log altough
+    //         IMA "
+    //                          "event log verification is on.");
+    //         attestation_event_log = false;
+    //     } else {
+    //         charra_log_info(
+    //                 "[" LOG_NAME "]     <<< This is to be implemented. >>>");
+    //         charra_log_info("[" LOG_NAME
+    //                         "]     IMA Event Log size is %d bytes.",
+    //                 res.event_log_len);
+    //         charra_log_debug("[" LOG_NAME "]     IMA Event Log:");
 
-            if (res.event_log_len > 20) {
-                charra_print_hex(CHARRA_LOG_DEBUG, 10, res.event_log,
-                        "                                                  0x",
-                        "...", false);
-                charra_print_hex(CHARRA_LOG_DEBUG, 10,
-                        (res.event_log + res.event_log_len - 10), "", "\n",
-                        false);
-            } else if ((res.event_log_len > 0)) {
-                charra_print_hex(CHARRA_LOG_DEBUG, res.event_log_len,
-                        res.event_log,
-                        "                                                  0x",
-                        "\n", false);
-            } else {
-                charra_log_debug("[" LOG_NAME "]     <none>");
-            }
-        }
-    }
+    //         if (res.event_log_len > 20) {
+    //             charra_print_hex(CHARRA_LOG_DEBUG, 10, res.event_log,
+    //                     " 0x",
+    //                     "...", false);
+    //             charra_print_hex(CHARRA_LOG_DEBUG, 10,
+    //                     (res.event_log + res.event_log_len - 10), "", "\n",
+    //                     false);
+    //         } else if ((res.event_log_len > 0)) {
+    //             charra_print_hex(CHARRA_LOG_DEBUG, res.event_log_len,
+    //                     res.event_log,
+    //                     " 0x",
+    //                     "\n", false);
+    //         } else {
+    //             charra_log_debug("[" LOG_NAME "]     <none>");
+    //         }
+    //     }
+    // }
 
     /* --- output result --- */
 
-    bool attestation_result = attestation_result_signature &&
-                              attestation_result_nonce &&
-                              attestation_result_pcrs && attestation_event_log;
+    bool attestation_result =
+            attestation_result_signature && attestation_result_nonce &&
+            attestation_result_pcrs;  // && attestation_event_log;
 
     /* print attestation result */
     charra_log_info("[" LOG_NAME "] +----------------------------+");
@@ -773,7 +775,7 @@ cleanup:
 
     /* free event log */
     // TODO(any): Provide function charra_free_msg_attestation_response_dto().
-    charra_free_if_not_null(res.event_log);
+    // charra_free_if_not_null(res.event_log);
 
     /* free ESAPI objects */
     if (validation != NULL) {
