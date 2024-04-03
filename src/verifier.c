@@ -708,47 +708,13 @@ static coap_response_t coap_attest_handler(
         }
     }
 
-    // /* verify event log */
-    // // TODO(any): Implement real verification.
-    // bool attestation_event_log = true;
-    // if (use_ima_event_log) {
-    //     charra_log_info("[" LOG_NAME "] Verifying event log ...");
-    //     if (res.event_log_len == 0) {
-    //         charra_log_error("[" LOG_NAME "] Received no event log altough
-    //         IMA "
-    //                          "event log verification is on.");
-    //         attestation_event_log = false;
-    //     } else {
-    //         charra_log_info(
-    //                 "[" LOG_NAME "]     <<< This is to be implemented. >>>");
-    //         charra_log_info("[" LOG_NAME
-    //                         "]     IMA Event Log size is %d bytes.",
-    //                 res.event_log_len);
-    //         charra_log_debug("[" LOG_NAME "]     IMA Event Log:");
-
-    //         if (res.event_log_len > 20) {
-    //             charra_print_hex(CHARRA_LOG_DEBUG, 10, res.event_log,
-    //                     " 0x",
-    //                     "...", false);
-    //             charra_print_hex(CHARRA_LOG_DEBUG, 10,
-    //                     (res.event_log + res.event_log_len - 10), "", "\n",
-    //                     false);
-    //         } else if ((res.event_log_len > 0)) {
-    //             charra_print_hex(CHARRA_LOG_DEBUG, res.event_log_len,
-    //                     res.event_log,
-    //                     " 0x",
-    //                     "\n", false);
-    //         } else {
-    //             charra_log_debug("[" LOG_NAME "]     <none>");
-    //         }
-    //     }
-    // }
+    // TODO(any): Implement real verification.
 
     /* --- output result --- */
 
     bool attestation_result =
             attestation_result_signature && attestation_result_nonce &&
-            attestation_result_pcrs;  // && attestation_event_log;
+            attestation_result_pcrs;
 
     /* print attestation result */
     charra_log_info("[" LOG_NAME "] +----------------------------+");
@@ -776,7 +742,6 @@ cleanup:
 
     /* free event log */
     // TODO(any): Provide function charra_free_msg_attestation_response_dto().
-    // charra_free_if_not_null(res.event_log);
 
     /* free ESAPI objects */
     if (validation != NULL) {
