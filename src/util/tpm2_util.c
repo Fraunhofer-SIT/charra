@@ -7,6 +7,7 @@
 /**
  * @file tpm2_util.c
  * @author Michael Eckel (michael.eckel@sit.fraunhofer.de)
+ * @author Markus Horn (markus.horn@sit.fraunhofer.de)
  * @brief
  * @version 0.1
  * @date 2019-09-19

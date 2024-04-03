@@ -7,6 +7,7 @@
 /**
  * @file command_line_util.h
  * @author Dominik Lorych (dominik.lorych@sit.fraunhofer.de)
+ * @author Markus Horn (markus.horn@sit.fraunhofer.de)
  * @brief Provides command line parsing for verifier & attester.
  * @version 0.1
  * @date 2021-02-18

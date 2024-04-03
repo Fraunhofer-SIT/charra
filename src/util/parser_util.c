@@ -7,6 +7,7 @@
 /**
  * @file parser_util.c
  * @author Dominik Lorych (dominik.lorych@sit.fraunhofer.de)
+ * @author Markus Horn (markus.horn@sit.fraunhofer.de)
  * @brief
  * @version 0.1
  * @date 2021-03-23

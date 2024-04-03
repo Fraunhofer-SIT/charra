@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*****************************************************************************
- * Copyright 2019, Fraunhofer Institute for Secure Information Technology SIT.
+ * Copyright 2024, Fraunhofer Institute for Secure Information Technology SIT.
  * All rights reserved.
  ****************************************************************************/
 
@@ -9,9 +9,9 @@
  * @author Markus Horn (markus.horn@sit.fraunhofer.de)
  * @brief
  * @version 0.1
- * @date 2019-09-19
+ * @date 2024-03-18
  *
- * @copyright Copyright 2019, Fraunhofer Institute for Secure Information
+ * @copyright Copyright 2024, Fraunhofer Institute for Secure Information
  * Technology SIT. All rights reserved.
  *
  * @license BSD 3-Clause "New" or "Revised" License (SPDX-License-Identifier:
