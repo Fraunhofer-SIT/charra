@@ -7,6 +7,7 @@
 /**
  * @file command_line_util.c
  * @author Dominik Lorych (dominik.lorych@sit.fraunhofer.de)
+ * @author Markus Horn (markus.horn@sit.fraunhofer.de)
  * @brief Provides command line parsing for verifier & attester.
  * @version 0.1
  * @date 2021-02-18
@@ -42,6 +43,7 @@ static const struct option verifier_options[] = {
         {"public-key", required_argument, 0, '2'},
         {"peer-public-key", required_argument, 0, '3'},
         {"verify-peer", required_argument, 0, '4'},
+        {"attestation-public-key", required_argument, 0, '5'},
         {"ip", required_argument, 0, 'a'}, {"port", required_argument, 0, 'b'},
         {"ima", optional_argument, 0, 'm'}, {0}};
 
@@ -56,6 +58,7 @@ static const struct option attester_options[] = {
         {"public-key", required_argument, 0, '2'},
         {"peer-public-key", required_argument, 0, '3'},
         {"verify-peer", required_argument, 0, '4'},
+        {"attestation-key", required_argument, 0, '5'},
         {"port", required_argument, 0, 'b'}, {0}};
 
 /**
@@ -67,11 +70,24 @@ static const struct option attester_options[] = {
  */
 static int check_required_options(
         cli_parser_caller caller, const char* log_name, cli_config* variables) {
-    /* check if PCR reference file was specified */
-    if (caller == VERIFIER &&
-            *(variables->verifier_config.reference_pcr_file_path) == NULL) {
-        charra_log_error("[%s] ERROR: no PCR reference file", log_name);
-        return -1;
+    if (caller == VERIFIER) {
+        /* check if PCR reference file was specified */
+        if (*(variables->verifier_config.reference_pcr_file_path) == NULL) {
+            charra_log_error("[%s] ERROR: no PCR reference file", log_name);
+            return -1;
+        }
+        /* check if attestation-public-key file was specified */
+        if (*(variables->verifier_config.attestation_public_key_path) == NULL) {
+            charra_log_error(
+                    "[%s] ERROR: no attestation public key file", log_name);
+            return -1;
+        }
+    } else {
+        /* check if attestation key file was specified */
+        if (*(variables->attester_config.attestation_key_ctx_path) == NULL) {
+            charra_log_error("[%s] ERROR: no attestation key file", log_name);
+            return -1;
+        }
     }
     return 0;
 }
@@ -116,6 +132,8 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
                 printf(" -t, --timeout=SECONDS:          Wait up to SECONDS "
                        "for the attestation answer. Default is %d seconds.\n",
                         *(variables->verifier_config.timeout));
+                printf("     --attestation-public-key=PATH:      Specifies the path to "
+                       "the public portion of the attestation key.\n");
                 printf(" -f, --pcr-file=FORMAT:PATH:     Read reference PCRs "
                        "from PATH in a specified FORMAT. Available is: "
                        "yaml.\n");
@@ -154,6 +172,8 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
                 printf(" -i, --identity=IDENTITY:        Use IDENTITY as "
                        "identity for DTLS. Implicitly enables DTLS-PSK.\n");
             } else {
+                printf("     --attestation-key=PATH:     Specifies the path to "
+                       "the attestation key.\n");
                 printf("     --port=PORT:                Open PORT instead of "
                        "port %u.\n",
                         *(variables->common_config.port));
@@ -316,6 +336,22 @@ int parse_command_line_arguments(int argc, char** argv, cli_config* variables) {
                                  "'%s' could not be parsed as 0 or 1.",
                         log_name, optarg);
                 return -1;
+            }
+            continue;
+        } else if (identifier == '5') {
+            char* path = malloc(strlen(optarg) + 1);
+            strcpy(path, optarg);
+            if (charra_io_file_exists(path) != CHARRA_RC_SUCCESS) {
+                charra_log_error(
+                        "[%s] Attestation key: file '%s' does not exist.",
+                        log_name, path);
+                return -1;
+            }
+            if (caller == VERIFIER) {
+                *(variables->verifier_config.attestation_public_key_path) =
+                        path;
+            } else {
+                *(variables->attester_config.attestation_key_ctx_path) = path;
             }
             continue;
         }

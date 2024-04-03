@@ -50,6 +50,7 @@ typedef struct {
  */
 typedef struct {
     char** dtls_psk_hint;
+    char** attestation_key_ctx_path;
 } cli_config_attester;
 
 /**
@@ -59,6 +60,7 @@ typedef struct {
 typedef struct {
     char* dst_host;
     uint16_t* timeout;
+    char** attestation_public_key_path;
     char** reference_pcr_file_path;
     uint8_t* tpm_pcr_selection;
     uint32_t* tpm_pcr_selection_len;
