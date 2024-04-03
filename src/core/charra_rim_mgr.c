@@ -7,6 +7,7 @@
 /**
  * @file charra_rim_mgr.c
  * @author Michael Eckel (michael.eckel@sit.fraunhofer.de)
+ * @author Markus Horn (markus.horn@sit.fraunhofer.de)
  * @brief
  * @version 0.1
  * @date 2020-09-19
