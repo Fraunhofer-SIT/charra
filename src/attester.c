@@ -64,6 +64,7 @@ char* ima_event_log_path =
 bool use_dtls_psk = false;
 char* dtls_psk_key = "Charra DTLS Key";
 char* dtls_psk_hint = "Charra Attester";
+char* attestation_key_ctx_path = NULL;
 // TODO(any): Allocate memory for CBOR buffer with malloc() as logs can be huge.
 
 // for DTLS-RPK
@@ -123,6 +124,7 @@ int main(int argc, char** argv) {
         },
         .attester_config = {
             .dtls_psk_hint = &dtls_psk_hint,
+            .attestation_key_ctx_path = &attestation_key_ctx_path,
         },
     };
     /* clang-format on */
@@ -360,7 +362,7 @@ static void coap_attest_handler(struct coap_resource_t* resource,
     /* load TPM key */
     charra_log_info("[" LOG_NAME "] Loading TPM key.");
     if ((charra_r = charra_load_tpm2_key(esys_ctx, req.sig_key_id_len,
-                 req.sig_key_id, &sig_key_handle)) !=
+                 req.sig_key_id, &sig_key_handle, attestation_key_ctx_path)) !=
             CHARRA_RC_SUCCESS) {
         charra_log_error("[" LOG_NAME "] Could not load TPM key.");
         goto error;
@@ -455,6 +457,7 @@ error:
     charra_free_if_not_null(signature);
     charra_free_if_not_null(attest_buf);
     charra_free_if_not_null(public_key);
+    charra_free_if_not_null(attestation_key_ctx_path);
     charra_io_free_continuous_file_buffer(&ima_event_log);
 
     /* flush handles */

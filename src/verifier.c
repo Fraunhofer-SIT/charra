@@ -75,6 +75,7 @@ static uint32_t tpm_pcr_selection_len = 9;
 uint16_t attestation_response_timeout =
         30;  // timeout when waiting for attestation answer in seconds
 char* reference_pcr_file_path = NULL;
+char* attestation_public_key_path = NULL;
 bool use_ima_event_log = false;
 char* ima_event_log_path =
         "/sys/kernel/security/ima/binary_runtime_measurements";
@@ -149,6 +150,7 @@ int main(int argc, char** argv) {
         .verifier_config = {
             .dst_host = dst_host,
             .timeout = &attestation_response_timeout,
+            .attestation_public_key_path = &attestation_public_key_path,
             .reference_pcr_file_path = &reference_pcr_file_path,
             .tpm_pcr_selection = tpm_pcr_selection,
             .tpm_pcr_selection_len = &tpm_pcr_selection_len,
@@ -588,7 +590,7 @@ static coap_response_t coap_attest_handler(
     /* load TPM key */
     TPM2B_PUBLIC tpm2_public_key = {0};  // (TPM2B_PUBLIC*)res.tpm2_public_key;
     if ((attestation_rc = charra_load_external_public_key(esys_ctx,
-                 &tpm2_public_key, &sig_key_handle)) != CHARRA_RC_SUCCESS) {
+                 &tpm2_public_key, &sig_key_handle, attestation_public_key_path)) != CHARRA_RC_SUCCESS) {
         charra_log_error("[" LOG_NAME "] Loading external public key failed.");
         goto cleanup;
     } else {
@@ -760,10 +762,9 @@ static coap_response_t coap_attest_handler(
     charra_log_info("[" LOG_NAME "] +----------------------------+");
 
 cleanup:
-    /* free PCR file path */
-    if (reference_pcr_file_path != NULL) {
-        free(reference_pcr_file_path);
-    }
+    /* free heap objects*/
+    charra_free_if_not_null(reference_pcr_file_path);
+    charra_free_if_not_null(attestation_public_key_path);
 
     /* flush handles */
     if (sig_key_handle != ESYS_TR_NONE) {

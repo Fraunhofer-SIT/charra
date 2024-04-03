@@ -30,12 +30,11 @@
 #include "../util/tpm2_util.h"
 
 CHARRA_RC charra_load_tpm2_key(ESYS_CONTEXT* ctx, const uint32_t key_len,
-        const uint8_t* key, ESYS_TR* key_handle) {
+        const uint8_t* key, ESYS_TR* key_handle, const char* path) {
     TSS2_RC r = TSS2_RC_SUCCESS;
     if (memcmp(key, "PK.RSA.default", key_len) == 0) {
         charra_log_info("Loading key \"PK.RSA.default\".");
-        r = tpm2_load_tpm_context_from_path(
-                ctx, key_handle, "./tpm_keys/rsa_ak.ctx");
+        r = tpm2_load_tpm_context_from_path(ctx, key_handle, path);
         if (r != TSS2_RC_SUCCESS) {
             charra_log_error("Loading of key \"PK.RSA.default\" failed.");
             return CHARRA_RC_ERROR;
@@ -49,14 +48,19 @@ CHARRA_RC charra_load_tpm2_key(ESYS_CONTEXT* ctx, const uint32_t key_len,
 }
 
 CHARRA_RC charra_load_external_public_key(ESYS_CONTEXT* ctx,
-        TPM2B_PUBLIC* external_public_key, ESYS_TR* key_handle) {
+        TPM2B_PUBLIC* external_public_key, ESYS_TR* key_handle,
+        const char* path) {
     TSS2_RC r = TSS2_RC_SUCCESS;
+    if (path == NULL) {
+        charra_log_error("Invalid path for external public key.");
+        return CHARRA_RC_ERROR;
+    }
     if (external_public_key == NULL) {
         charra_log_error("Invalid pointer for external public key.");
         return CHARRA_RC_ERROR;
     }
     charra_log_info("Loading TPM key from file.");
-    if (tpm2_load_external_public_key_from_path("./tpm_keys/rsa_ak.pub", external_public_key)) {
+    if (tpm2_load_external_public_key_from_path(path, external_public_key)) {
         charra_log_info("Loaded external public key.");
     } else {
         charra_log_error("Loading external public key from file failed.");
