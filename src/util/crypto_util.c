@@ -277,7 +277,8 @@ error:
 
 CHARRA_RC charra_crypto_rsa_verify_signature_hashed(
         mbedtls_rsa_context* mbedtls_rsa_pub_key, mbedtls_md_type_t hash_algo,
-        const unsigned char* data_digest, const unsigned char* signature) {
+        const unsigned char* data_digest, const unsigned char* signature,
+        const TPM2B_PUBLIC* const tpm2_public) {
     CHARRA_RC charra_r = CHARRA_RC_SUCCESS;
     int mbedtls_r = 0;
 
@@ -290,9 +291,23 @@ CHARRA_RC charra_crypto_rsa_verify_signature_hashed(
     }
     uint8_t hash_digest_size = mbedtls_md_get_size(md_info);
 
-    /* verify signature */
-    if ((mbedtls_r = mbedtls_rsa_rsassa_pss_verify(mbedtls_rsa_pub_key,
-                 hash_algo, hash_digest_size, data_digest, signature)) != 0) {
+    /* determine signing scheme and verify function */
+    switch (tpm2_public->publicArea.parameters.rsaDetail.scheme.scheme) {
+    case TPM2_ALG_RSASSA:
+        mbedtls_rsa_rsassa_pkcs1_v15_verify(mbedtls_rsa_pub_key, hash_algo,
+                hash_digest_size, data_digest, signature);
+
+        break;
+    case TPM2_ALG_RSAPSS:
+        mbedtls_r = mbedtls_rsa_rsassa_pss_verify(mbedtls_rsa_pub_key,
+                hash_algo, hash_digest_size, data_digest, signature);
+        break;
+    default:
+        charra_log_error("Unsupported signature scheme");
+        charra_r = CHARRA_RC_CRYPTO_ERROR;
+        goto error;
+    }
+    if (mbedtls_r != 0) {
         charra_r = CHARRA_RC_CRYPTO_ERROR;
         goto error;
     }
@@ -304,7 +319,7 @@ error:
 CHARRA_RC charra_crypto_rsa_verify_signature(
         mbedtls_rsa_context* mbedtls_rsa_pub_key, mbedtls_md_type_t hash_algo,
         const unsigned char* data, size_t data_len,
-        const unsigned char* signature) {
+        const unsigned char* signature, const TPM2B_PUBLIC* const tpm2_public) {
     CHARRA_RC charra_r = CHARRA_RC_SUCCESS;
 
     /* hash data */
@@ -316,8 +331,8 @@ CHARRA_RC charra_crypto_rsa_verify_signature(
 
     /* verify signature */
     if ((charra_r = charra_crypto_rsa_verify_signature_hashed(
-                 mbedtls_rsa_pub_key, hash_algo, data_digest, signature)) !=
-            0) {
+                 mbedtls_rsa_pub_key, hash_algo, data_digest, signature,
+                 tpm2_public)) != 0) {
         charra_r = CHARRA_RC_CRYPTO_ERROR;
         goto error;
     }

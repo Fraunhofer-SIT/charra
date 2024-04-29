@@ -72,12 +72,13 @@ CHARRA_RC charra_crypto_tpm_pub_key_to_mbedtls_pub_key(
 
 CHARRA_RC charra_crypto_rsa_verify_signature_hashed(
         mbedtls_rsa_context* mbedtls_rsa_pub_key, mbedtls_md_type_t hash_algo,
-        const unsigned char* data_digest, const unsigned char* signature);
+        const unsigned char* data_digest, const unsigned char* signature,
+        const TPM2B_PUBLIC* const tpm2_public);
 
 CHARRA_RC charra_crypto_rsa_verify_signature(
         mbedtls_rsa_context* mbedtls_rsa_pub_key, mbedtls_md_type_t hash_algo,
         const unsigned char* data, size_t data_len,
-        const unsigned char* signature);
+        const unsigned char* signature, const TPM2B_PUBLIC* const tpm2_public);
 
 /**
  * @brief Compute PCR composite digest from PCR values and check if it matches

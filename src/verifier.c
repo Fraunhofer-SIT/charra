@@ -92,6 +92,9 @@ char* attestation_public_key_path = NULL;
 bool use_ima_event_log = false;
 char* ima_event_log_path =
         "/sys/kernel/security/ima/binary_runtime_measurements";
+cli_config_signature_hash_algorithm signature_hash_algorithm = {
+        .mbedtls_hash_algorithm = MBEDTLS_MD_SHA256,
+        .tpm2_hash_algorithm = TPM2_ALG_SHA256};
 
 // for DTLS-PSK
 bool use_dtls_psk = false;
@@ -170,6 +173,7 @@ int main(int argc, char** argv) {
             .use_ima_event_log = &use_ima_event_log,
             .ima_event_log_path = &ima_event_log_path,
             .dtls_psk_identity = &dtls_psk_identity,
+            .signature_hash_algorithm = &signature_hash_algorithm,
         },
     };
     /* clang-format on */
@@ -631,7 +635,8 @@ static coap_response_t coap_attest_handler(
                 "[" LOG_NAME "] Verifying TPM Quote signature with TPM ...");
         /* verify attestation signature with TPM */
         if ((attestation_rc = charra_verify_tpm2_quote_signature_with_tpm(
-                     esys_ctx, sig_key_handle, TPM2_ALG_SHA256, &attest,
+                     esys_ctx, sig_key_handle,
+                     signature_hash_algorithm.tpm2_hash_algorithm, &attest,
                      &signature, &validation)) == CHARRA_RC_SUCCESS) {
             charra_log_info(
                     "[" LOG_NAME "]     => TPM Quote signature is valid!");
@@ -658,10 +663,11 @@ static coap_response_t coap_attest_handler(
         charra_log_info("[" LOG_NAME
                         "] Verifying TPM Quote signature with mbedTLS ...");
         if ((attestation_rc = charra_crypto_rsa_verify_signature(
-                     &mbedtls_rsa_pub_key, MBEDTLS_MD_SHA256,
+                     &mbedtls_rsa_pub_key,
+                     signature_hash_algorithm.mbedtls_hash_algorithm,
                      res.attestation_data, (size_t)res.attestation_data_len,
-                     signature.signature.rsapss.sig.buffer)) ==
-                CHARRA_RC_SUCCESS) {
+                     signature.signature.rsapss.sig.buffer,
+                     &tpm2_public_key)) == CHARRA_RC_SUCCESS) {
             charra_log_info(
                     "[" LOG_NAME "]     => TPM Quote signature is valid!");
         } else {

@@ -25,6 +25,7 @@
 #include "../../common/charra_log.h"
 #include <coap3/coap.h>
 #include <getopt.h>
+#include <mbedtls/md.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -77,6 +78,11 @@ typedef struct {
 
 #define TPM2_PCR_BANK_COUNT 4  // sha1, sha256, sha384, sha512
 
+typedef struct {
+    mbedtls_md_type_t mbedtls_hash_algorithm;
+    TPM2_ALG_ID tpm2_hash_algorithm;
+} cli_config_signature_hash_algorithm;
+
 /**
  * A structure holding pointers to variables of the verifier
  * which might geht modified by the CLI parser
@@ -91,6 +97,7 @@ typedef struct {
     bool* use_ima_event_log;
     char** ima_event_log_path;
     char** dtls_psk_identity;
+    cli_config_signature_hash_algorithm* signature_hash_algorithm;
 } cli_config_verifier;
 
 /**

@@ -28,7 +28,7 @@
 #include <string.h>
 
 #define LOG_NAME "verifier"
-#define VERIFIER_SHORT_OPTIONS "vl:c:t:f:s:pk:i:r"
+#define VERIFIER_SHORT_OPTIONS "vl:c:t:f:s:pk:i:rg:"
 
 typedef enum {
     CLI_VERIFIER_IDENTITY = 'i',
@@ -38,6 +38,7 @@ typedef enum {
     CLI_VERIFIER_PCR_FILE = 'f',
     CLI_VERIFIER_PCR_SELECTION = 's',
     CLI_VERIFIER_IMA = 'm',
+    CLI_VERIFIER_HASH_ALGORITHM = 'g',
 } cli_util_verifier_args_e;
 
 static const struct option verifier_options[] = {
@@ -50,7 +51,9 @@ static const struct option verifier_options[] = {
                 CLI_VERIFIER_ATTESTATION_PUBLIC_KEY},
         {"pcr-file", required_argument, 0, CLI_VERIFIER_PCR_FILE},
         {"pcr-selection", required_argument, 0, CLI_VERIFIER_PCR_SELECTION},
-        {"ima", optional_argument, 0, CLI_VERIFIER_IMA}, {0}};
+        {"ima", optional_argument, 0, CLI_VERIFIER_IMA},
+        {"hash-algorithm", required_argument, 0, CLI_VERIFIER_HASH_ALGORITHM},
+        {0}};
 
 /**
  * @brief Checks whether all required options have been specified.
@@ -116,6 +119,8 @@ static void print_verifier_help_message(const cli_config* const variables) {
     printf("                                 '%s'. Alternatives "
            "can be passed.\n",
             *(variables->specific_config.verifier_config.ima_event_log_path));
+    printf(" -g, --hash-algorithm=ALGORITHM: The hash algorithm used to digest "
+           "the tpm quote.\n");
 
     /* print DTLS-PSK grouped options */
     printf("DTLS-PSK Options:\n");
@@ -374,6 +379,31 @@ static void cli_verifier_ima(const cli_config* variables) {
     }
 }
 
+static int cli_verifier_hash_algorithm(cli_config* variables) {
+    cli_config_signature_hash_algorithm* hash_algo =
+            variables->specific_config.verifier_config.signature_hash_algorithm;
+    if (strcmp(optarg, "sha1") == 0) {
+        hash_algo->mbedtls_hash_algorithm = MBEDTLS_MD_SHA1;
+        hash_algo->tpm2_hash_algorithm = TPM2_ALG_SHA1;
+    } else if (strcmp(optarg, "sha256") == 0) {
+        hash_algo->mbedtls_hash_algorithm = MBEDTLS_MD_SHA256;
+        hash_algo->tpm2_hash_algorithm = TPM2_ALG_SHA256;
+    } else if (strcmp(optarg, "sha384") == 0) {
+        hash_algo->mbedtls_hash_algorithm = MBEDTLS_MD_SHA384;
+        hash_algo->tpm2_hash_algorithm = TPM2_ALG_SHA384;
+    } else if (strcmp(optarg, "sha512") == 0) {
+        hash_algo->mbedtls_hash_algorithm = MBEDTLS_MD_SHA512;
+        hash_algo->tpm2_hash_algorithm = TPM2_ALG_SHA512;
+    } else {
+        /* This algorithms are not supported by mbedTLS:
+        sm3_256, sha3_256, sha3_384, sha3_512 */
+        charra_log_error(
+                "[%s] Unsupported hash algorithm: '%s'", LOG_NAME, optarg);
+        return -1;
+    }
+    return 0;
+}
+
 int parse_command_line_verifier_arguments(
         int argc, char** argv, cli_config* variables) {
     int rc = 0;
@@ -414,6 +444,9 @@ int parse_command_line_verifier_arguments(
             break;
         case CLI_VERIFIER_IMA:
             cli_verifier_ima(variables);
+            break;
+        case CLI_VERIFIER_HASH_ALGORITHM:
+            rc = cli_verifier_hash_algorithm(variables);
             break;
         /* parse common options */
         default:
