@@ -38,7 +38,7 @@
 #include "core/charra_tap/charra_tap_cbor.h"
 #include "core/charra_tap/charra_tap_dto.h"
 #include "util/charra_util.h"
-#include "util/cli_util.h"
+#include "util/cli/cli_util_verifier.h"
 #include "util/coap_util.h"
 #include "util/crypto_util.h"
 #include "util/io_util.h"
@@ -148,7 +148,7 @@ int main(int argc, char** argv) {
             .dtls_rpk_verify_peer_public_key =
                     &dtls_rpk_verify_peer_public_key,
         },
-        .verifier_config = {
+        .specific_config.verifier_config = {
             .dst_host = dst_host,
             .timeout = &attestation_response_timeout,
             .attestation_public_key_path = &attestation_public_key_path,
@@ -167,7 +167,8 @@ int main(int argc, char** argv) {
     coap_set_log_level(coap_log_level);
 
     /* parse CLI arguments */
-    if ((result = parse_command_line_arguments(argc, argv, &cli_config)) != 0) {
+    if ((result = parse_command_line_verifier_arguments(
+                 argc, argv, &cli_config)) != 0) {
         // 1 means help message was displayed (thus exit), -1 means error
         return (result == 1) ? CHARRA_RC_SUCCESS : CHARRA_RC_CLI_ERROR;
     }
@@ -591,7 +592,8 @@ static coap_response_t coap_attest_handler(
     /* load TPM key */
     TPM2B_PUBLIC tpm2_public_key = {0};  // (TPM2B_PUBLIC*)res.tpm2_public_key;
     if ((attestation_rc = charra_load_external_public_key(esys_ctx,
-                 &tpm2_public_key, &sig_key_handle, attestation_public_key_path)) != CHARRA_RC_SUCCESS) {
+                 &tpm2_public_key, &sig_key_handle,
+                 attestation_public_key_path)) != CHARRA_RC_SUCCESS) {
         charra_log_error("[" LOG_NAME "] Loading external public key failed.");
         goto cleanup;
     } else {
@@ -713,9 +715,9 @@ static coap_response_t coap_attest_handler(
 
     /* --- output result --- */
 
-    bool attestation_result =
-            attestation_result_signature && attestation_result_nonce &&
-            attestation_result_pcrs;
+    bool attestation_result = attestation_result_signature &&
+                              attestation_result_nonce &&
+                              attestation_result_pcrs;
 
     /* print attestation result */
     charra_log_info("[" LOG_NAME "] +----------------------------+");

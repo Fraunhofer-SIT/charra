@@ -31,13 +31,26 @@
 #include "../util/tpm2_util.h"
 
 CHARRA_RC charra_load_tpm2_key(ESYS_CONTEXT* ctx, const uint32_t key_len,
-        const uint8_t* key, ESYS_TR* key_handle, const char* path) {
+        const uint8_t* key, ESYS_TR* key_handle, cli_config_attester* config) {
     TSS2_RC r = TSS2_RC_SUCCESS;
     if (memcmp(key, "PK.RSA.default", key_len) == 0) {
         charra_log_info("Loading key \"PK.RSA.default\".");
-        r = tpm2_load_tpm_context_from_path(ctx, key_handle, path);
+        switch (config->attestation_key_format) {
+        case CLI_UTIL_ATTESTATION_KEY_FORMAT_FILE:
+            r = tpm2_load_tpm_context_from_path(
+                    ctx, key_handle, config->attestation_key.ctx_path);
+            break;
+        case CLI_UTIL_ATTESTATION_KEY_FORMAT_HANDLE:
+            r = tpm2_load_tpm_context_from_handle(
+                    ctx, config->attestation_key.tpm2_handle, key_handle);
+            break;
+        case CLI_UTIL_ATTESTATION_KEY_FORMAT_UNKNOWN:
+            charra_log_error("Unknown format for TPM key.");
+            return CHARRA_RC_ERROR;
+        }
         if (r != TSS2_RC_SUCCESS) {
-            charra_log_error("Loading of key \"PK.RSA.default\" failed.");
+            charra_log_error(
+                    "Loading of key \"PK.RSA.default\" failed. 0x%x", r);
             return CHARRA_RC_ERROR;
         }
     } else {
