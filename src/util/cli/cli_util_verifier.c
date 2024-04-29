@@ -23,9 +23,9 @@
 #include "../io_util.h"
 #include "cli_util_common.h"
 #include <bits/getopt_core.h>
-#include <errno.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define LOG_NAME "verifier"
 #define VERIFIER_SHORT_OPTIONS "vl:c:t:f:s:pk:i:r"
@@ -96,14 +96,14 @@ static void print_verifier_help_message(const cli_config* const variables) {
            "PCR numbers shall be ordered from smallest to biggest, "
            "comma-seperated\n");
     printf("                                 and without "
-           "whitespace. By default these PCRs are checked: ");
+           "whitespace. By default these PCRs are checked: sha256:");
     const uint32_t tpm_pcr_selection_len =
-            *variables->specific_config.verifier_config.tpm_pcr_selection_len;
+            variables->specific_config.verifier_config.tpm_pcr_selection_len[1];
     for (uint32_t i = 0; i < tpm_pcr_selection_len; i++) {
         printf("%d", variables->specific_config.verifier_config
-                             .tpm_pcr_selection[i]);
-        if (i != *variables->specific_config.verifier_config
-                                 .tpm_pcr_selection_len -
+                             .tpm_pcr_selection[1][i]);
+        if (i != variables->specific_config.verifier_config
+                                 .tpm_pcr_selection_len[1] -
                          1) {
             printf(", ");
         }
@@ -224,50 +224,142 @@ static int cli_verifier_pcr_file(const cli_config* variables) {
     }
 }
 
+static char* cli_verifier_strtok(
+        char* str, const char* const delim, char** saveptr) {
+    char* token = NULL;
+
+    if (str == NULL) {
+        /* get string from saveptr */
+        str = *saveptr;
+    }
+
+    if (*str == '\0') {
+        /* check if string reached its end */
+        *saveptr = str;
+        return NULL;
+    }
+
+    token = str;
+    /* get first character which is part of the delimiter */
+    str += strcspn(token, delim);
+    if (*str != '\0') {
+        /* setup next token */
+        *str = '\0';
+        *saveptr = str + 1;
+    } else {
+        /* there is no more token */
+        *saveptr = str;
+    }
+
+    return token;
+}
+
+static int cli_verifier_parse_pcr_bank(uint8_t* tpm_pcr_selection_bank,
+        uint32_t* tpm_pcr_selection_len, char* pcr_list) {
+    if (strcmp(pcr_list, "all") == 0) {
+        for (uint8_t i = 0; i < TPM2_MAX_PCRS; i++) {
+            tpm_pcr_selection_bank[i] = true;
+        }
+        *tpm_pcr_selection_len = TPM2_MAX_PCRS;
+        return 0;
+    }
+    char* pcr_token = NULL;
+    char* next_token = pcr_list;
+    uint8_t tpm_pcr_selection_hash_set[TPM2_MAX_PCRS] = {0};
+    uint8_t pcr = 0;
+    uint64_t parse_value = 0;
+    /* fill the hash_set with  */
+    while ((pcr_token = cli_verifier_strtok(NULL, ",", &next_token)) != NULL) {
+        if (cli_util_common_parse_option_as_ulong(
+                    pcr_token, 10, &parse_value) != 0) {
+            charra_log_error("[%s] Could not parse '%s'.", LOG_NAME, pcr_token);
+            return -1;
+        }
+        if (parse_value >= TPM2_MAX_PCRS) {
+            charra_log_error(
+                    "[%s] Unsupported handle '%s'.", LOG_NAME, pcr_token);
+            return -1;
+        }
+        pcr = (uint8_t)parse_value;
+        tpm_pcr_selection_hash_set[pcr] = true;
+    }
+    /* add hash set values sorted into tpm_pcr_selection_bank */
+    *tpm_pcr_selection_len = 0;
+    for (uint8_t i = 0; i < TPM2_MAX_PCRS; i++) {
+        if (tpm_pcr_selection_hash_set[i] == 0) {
+            continue;
+        }
+        tpm_pcr_selection_bank[*tpm_pcr_selection_len] = i;
+        *tpm_pcr_selection_len = *tpm_pcr_selection_len + 1;
+    }
+    return 0;
+}
+
+static int cli_verifier_parse_pcr_bank_to_index(const char* const pcr_bank) {
+    if (strcmp(pcr_bank, "sha1") == 0) {
+        return 0;
+    } else if (strcmp(pcr_bank, "sha256") == 0) {
+        return 1;
+    } else if (strcmp(pcr_bank, "sha384") == 0) {
+        return 2;
+    } else if (strcmp(pcr_bank, "sha512") == 0) {
+        return 3;
+    }
+    return -1;
+}
+
+static int cli_verifier_parse_pcr_selection(
+        const cli_config* variables, char* pcr_selections) {
+    /*
+    Syntax of PCR selections is: "bank1:pcr1,pcr2,pcr3+bank2:pcr4,pcr5"
+    best way to parse is by splitting the string by '+' for each bank
+    */
+    char* bank_token = NULL;
+    char* next_token = pcr_selections;
+    char* bank_name = NULL;
+    char* pcr_list = NULL;
+    int bank = -1;
+    while ((bank_token = cli_verifier_strtok(NULL, "+", &next_token)) != NULL) {
+        bank_name = cli_verifier_strtok(bank_token, ":", &pcr_list);
+        if (bank_name == NULL) {
+            charra_log_error("[%s] No bank defined '%s'", LOG_NAME);
+            return -1;
+        }
+        bank = cli_verifier_parse_pcr_bank_to_index(bank_name);
+        if (bank < 0 || bank >= TPM2_PCR_BANK_COUNT) {
+            charra_log_error("[%s] Invalid PCR bank '%s'", LOG_NAME, bank_name);
+            return -1;
+        }
+        if (cli_verifier_parse_pcr_bank(
+                    variables->specific_config.verifier_config
+                            .tpm_pcr_selection[bank],
+                    &variables->specific_config.verifier_config
+                             .tpm_pcr_selection_len[bank],
+                    pcr_list) != 0) {
+            return -1;
+        }
+    }
+    return 0;
+}
+
 static int cli_verifier_pcr_selection(const cli_config* variables) {
-    uint32_t length = strlen(optarg);
-    uint8_t* tpm_pcr_selection =
+    uint8_t(*tpm_pcr_selection)[TPM2_MAX_PCRS] =
             variables->specific_config.verifier_config.tpm_pcr_selection;
     uint32_t* tpm_pcr_selection_len =
             variables->specific_config.verifier_config.tpm_pcr_selection_len;
-    for (uint32_t i = 0; i < *tpm_pcr_selection_len; i++) {
-        /*
-         * overwrite static config with zeros in case CLI config uses
-         * less PCRs
-         */
-        tpm_pcr_selection[i] = 0;
-    }
-    *tpm_pcr_selection_len = 0;
-    char* number_start = optarg;
-    int last_number = -1;
-    do {
-        char* end = NULL;
-        errno = 0;
-        uint32_t number = strtoul(number_start, &end, 10);
-        if (end == number_start || errno != 0) {
-            charra_log_error("[%s] PCR selection could not be parsed, "
-                             "parse error at '%s'",
-                    LOG_NAME, number_start);
-            return -1;
-        } else if (number >= TPM2_MAX_PCRS) {
-            charra_log_error(
-                    "[%s] One PCR from the PCR selection was parsed as "
-                    "%d, but the TPM2 only has PCRs up to %d.",
-                    LOG_NAME, number, TPM2_MAX_PCRS - 1);
-            return -1;
-        } else if ((int)number <= last_number) {
-            charra_log_error(
-                    "[%s] PCR selection was detected to not be ordered "
-                    "from smallest to biggest. Last parsed number %d "
-                    "is bigger or equal to current number %d.",
-                    LOG_NAME, last_number, number);
-            return -1;
+    for (uint32_t i = 0; i < TPM2_PCR_BANK_COUNT; i++) {
+        for (uint32_t j = 0; j < TPM2_MAX_PCRS; j++) {
+            /*
+             * overwrite static config with zeros in case CLI config uses
+             * less PCRs
+             */
+            tpm_pcr_selection[i][j] = 0;
         }
-        number_start = end + 1;
-        tpm_pcr_selection[*tpm_pcr_selection_len] = number;
-        (*tpm_pcr_selection_len)++;
-        last_number = number;
-    } while (number_start < optarg + length);
+        tpm_pcr_selection_len[i] = 0;
+    }
+    if (cli_verifier_parse_pcr_selection(variables, optarg) != 0) {
+        return -1;
+    }
     return 0;
 }
 

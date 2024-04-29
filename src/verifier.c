@@ -71,8 +71,20 @@ static const bool USE_TPM_FOR_RANDOM_NONCE_GENERATION = false;
 #define TPM_SIG_KEY_ID_LEN 14
 #define TPM_SIG_KEY_ID "PK.RSA.default"
 // TODO: Make PCR selection configurable via CLI
-static uint8_t tpm_pcr_selection[TPM2_MAX_PCRS] = {0, 1, 2, 3, 4, 5, 6, 7, 10};
-static uint32_t tpm_pcr_selection_len = 9;
+// TODO: Implement integration of all PCR banks
+static uint8_t tpm_pcr_selection[TPM2_PCR_BANK_COUNT][TPM2_MAX_PCRS] = {
+        /* sha1 */
+        {0},
+        /* sha256 */
+        {0, 1, 2, 3, 4, 5, 6, 7, 10},
+        /* sha384 */
+        {0},
+        /* sha512 */
+        {0}};
+static uint32_t tpm_pcr_selection_len[TPM2_PCR_BANK_COUNT] = {0,  // sha1
+        9,                                                        // sha256
+        0,                                                        // sha384
+        0};                                                       // sha512
 uint16_t attestation_response_timeout =
         30;  // timeout when waiting for attestation answer in seconds
 char* reference_pcr_file_path = NULL;
@@ -154,7 +166,7 @@ int main(int argc, char** argv) {
             .attestation_public_key_path = &attestation_public_key_path,
             .reference_pcr_file_path = &reference_pcr_file_path,
             .tpm_pcr_selection = tpm_pcr_selection,
-            .tpm_pcr_selection_len = &tpm_pcr_selection_len,
+            .tpm_pcr_selection_len = tpm_pcr_selection_len,
             .use_ima_event_log = &use_ima_event_log,
             .ima_event_log_path = &ima_event_log_path,
             .dtls_psk_identity = &dtls_psk_identity,
@@ -189,8 +201,8 @@ int main(int argc, char** argv) {
             tpm_pcr_selection_len);
     charra_log_log_raw(CHARRA_LOG_DEBUG,
             "                                                      ");
-    for (uint32_t i = 0; i < tpm_pcr_selection_len; i++) {
-        if (i != tpm_pcr_selection_len - 1) {
+    for (uint32_t i = 0; i < tpm_pcr_selection_len[1]; i++) {
+        if (i != tpm_pcr_selection_len[1] - 1) {
             charra_log_log_raw(CHARRA_LOG_DEBUG, "%d, ", tpm_pcr_selection[i]);
         } else {
             charra_log_log_raw(CHARRA_LOG_DEBUG, "%d\n", tpm_pcr_selection[i]);
@@ -487,7 +499,8 @@ static CHARRA_RC create_attestation_request(
             .pcr_selections_len = 1,
             .pcr_selections = {{
                     .tcg_hash_alg_id = TPM2_ALG_SHA256,
-                    .pcrs_len = tpm_pcr_selection_len,
+                    /* TODO: add other PCR banks */
+                    .pcrs_len = tpm_pcr_selection_len[1],
                     .pcrs = {0}  // must be memcpy'd, see below
             }},
             .event_log_path_len =
@@ -497,7 +510,9 @@ static CHARRA_RC create_attestation_request(
     };
     memcpy(req.sig_key_id, TPM_SIG_KEY_ID, TPM_SIG_KEY_ID_LEN);
     memcpy(req.nonce, nonce, nonce_len);
-    memcpy(req.pcr_selections->pcrs, tpm_pcr_selection, tpm_pcr_selection_len);
+    /* TODO: add other PCR banks */
+    memcpy(req.pcr_selections->pcrs, tpm_pcr_selection[1],
+            tpm_pcr_selection_len[1]);
 
     /* set output param(s) */
     *attestation_request = req;
@@ -694,10 +709,10 @@ static coap_response_t coap_attest_handler(
                 attest_struct.attested.quote.pcrDigest.buffer,
                 "                                              0x", "\n",
                 false);
-
+        /* TODO: add support for other hash algorithms */
         CHARRA_RC pcr_check = charra_check_pcr_digest_against_reference(
-                reference_pcr_file_path, tpm_pcr_selection,
-                tpm_pcr_selection_len, &attest_struct);
+                reference_pcr_file_path, tpm_pcr_selection[1],
+                tpm_pcr_selection_len[1], &attest_struct);
         if (pcr_check == CHARRA_RC_SUCCESS) {
             charra_log_info(
                     "[" LOG_NAME "]     => PCR composite digest is valid!");

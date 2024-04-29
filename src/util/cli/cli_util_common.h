@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <tss2/tss2_esys.h>
+#include <tss2/tss2_tpm2_types.h>
 
 typedef enum {
     VERIFIER,
@@ -74,6 +75,8 @@ typedef struct {
     } attestation_key;
 } cli_config_attester;
 
+#define TPM2_PCR_BANK_COUNT 4  // sha1, sha256, sha384, sha512
+
 /**
  * A structure holding pointers to variables of the verifier
  * which might geht modified by the CLI parser
@@ -83,7 +86,7 @@ typedef struct {
     uint16_t* timeout;
     char** attestation_public_key_path;
     char** reference_pcr_file_path;
-    uint8_t* tpm_pcr_selection;
+    uint8_t (*tpm_pcr_selection)[TPM2_MAX_PCRS];
     uint32_t* tpm_pcr_selection_len;
     bool* use_ima_event_log;
     char** ima_event_log_path;
