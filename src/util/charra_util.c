@@ -49,7 +49,7 @@ static const unsigned char mbedtls_personalization[] =
 static const unsigned char mbedtls_personalization_len =
         sizeof(mbedtls_personalization);
 
-CHARRA_RC charra_random_bytes(const uint32_t len, uint8_t* random_bytes) {
+CHARRA_RC charra_random_bytes(const uint32_t len, uint8_t* const random_bytes) {
     CHARRA_RC charra_r = CHARRA_RC_SUCCESS;
     /* initialize contexts */
     mbedtls_entropy_context entropy = {0};
@@ -83,7 +83,7 @@ error:
 }
 
 CHARRA_RC charra_random_bytes_from_tpm(
-        const uint32_t len, uint8_t* random_bytes) {
+        const uint32_t len, uint8_t* const random_bytes) {
     assert(len <= sizeof(TPMU_HA));
 
     TSS2_RC tss2_rc = 0;
@@ -134,10 +134,10 @@ error:
     return charra_rc;
 }
 
-TSS2_RC charra_verify_tpm2_quote_signature_with_tpm(ESYS_CONTEXT* ctx,
+TSS2_RC charra_verify_tpm2_quote_signature_with_tpm(ESYS_CONTEXT* const ctx,
         const ESYS_TR sig_key_handle, const TPM2_ALG_ID hash_algo_id,
-        const TPM2B_ATTEST* attest_buf, TPMT_SIGNATURE* signature,
-        TPMT_TK_VERIFIED** validation) {
+        const TPM2B_ATTEST* const attest_buf, TPMT_SIGNATURE* const signature,
+        TPMT_TK_VERIFIED** const validation) {
     TSS2_RC tss2_r = TSS2_RC_SUCCESS;
     char* error_msg = NULL;
 
@@ -181,8 +181,8 @@ error:
     return tss2_r;
 }
 
-CHARRA_RC charra_unmarshal_tpm2_quote(size_t attest_buf_len,
-        const uint8_t* attest_buf, TPMS_ATTEST* attest_struct) {
+CHARRA_RC charra_unmarshal_tpm2_quote(const size_t attest_buf_len,
+        const uint8_t* const attest_buf, TPMS_ATTEST* const attest_struct) {
     CHARRA_RC charra_rc = CHARRA_RC_SUCCESS;
     TSS2_RC tss2_rc = TSS2_RC_SUCCESS;
     char* error_msg = NULL;
@@ -222,7 +222,18 @@ error:
     return charra_rc;
 }
 
-bool charra_verify_tpm2_quote_qualifying_data(uint16_t qualifying_data_len,
+bool charra_verify_tpm2_magic(const TPMS_ATTEST* const attest_struct) {
+    /* verify input parameters */
+    if (attest_struct == NULL) {
+        return false;
+    }
+
+    /* check if TPM2 magic matches */
+    return (TPM2_GENERATED_VALUE == attest_struct->magic);
+}
+
+bool charra_verify_tpm2_quote_qualifying_data(
+        const uint16_t qualifying_data_len,
         const uint8_t* const qualifying_data,
         const TPMS_ATTEST* const attest_struct) {
     /* verify input parameters */
@@ -260,6 +271,7 @@ bool charra_verify_tpm2_quote_pcr_composite_digest(
         const TPMS_ATTEST* const attest_struct,
         const uint8_t* const pcr_composite_digest,
         const uint16_t pcr_composite_digest_len) {
+    // TODO(any): to be used
     /* extract PCR digest from attestation structure */
     TPMS_QUOTE_INFO quote_info = attest_struct->attested.quote;
     const uint8_t* const pcr_digest = quote_info.pcrDigest.buffer;
