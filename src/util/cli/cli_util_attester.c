@@ -162,10 +162,7 @@ static int cli_attester_attestation_key(cli_config* variables) {
 
 static void cli_attester_psk_hint(const cli_config* variables) {
     *variables->common_config.use_dtls_psk = true;
-    uint32_t length = strlen(optarg);
-    char* hint = malloc(length * sizeof(char));
-    strcpy(hint, optarg);
-    *(variables->specific_config.attester_config.dtls_psk_hint) = hint;
+    *(variables->specific_config.attester_config.dtls_psk_hint) = optarg;
 }
 
 int parse_command_line_attester_arguments(

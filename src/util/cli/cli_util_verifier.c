@@ -182,10 +182,7 @@ static void print_verifier_help_message(const cli_config* const variables) {
 
 static void cli_verifer_identity(const cli_config* variables) {
     *variables->common_config.use_dtls_psk = true;
-    uint32_t length = strlen(optarg);
-    char* identity = malloc(length * sizeof(char));
-    strcpy(identity, optarg);
-    *(variables->specific_config.verifier_config.dtls_psk_identity) = identity;
+    *(variables->specific_config.verifier_config.dtls_psk_identity) = optarg;
 }
 
 static int cli_verifier_ip(const cli_config* variables) {
@@ -215,20 +212,17 @@ static int cli_verifier_timeout(const cli_config* variables) {
 }
 
 static int cli_verifier_attestation_public_key(const cli_config* variables) {
-    char* path = malloc(strlen(optarg) + 1);
-    strcpy(path, optarg);
-    if (charra_io_file_exists(path) != CHARRA_RC_SUCCESS) {
+    if (charra_io_file_exists(optarg) != CHARRA_RC_SUCCESS) {
         charra_log_error("[%s] Attestation key: file '%s' does not exist.",
-                LOG_NAME, path);
+                LOG_NAME, optarg);
         return -1;
     }
     *(variables->specific_config.verifier_config.attestation_public_key_path) =
-            path;
+            optarg;
     return 0;
 }
 
 static int cli_verifier_pcr_file(const cli_config* variables) {
-    size_t length = 0;
     char* token = NULL;
     const char delimiter[] = ":";
     char* format = NULL;
@@ -247,14 +241,7 @@ static int cli_verifier_pcr_file(const cli_config* variables) {
                 LOG_NAME, CLI_VERIFIER_PCR_FILE_LONG);
         return -1;
     }
-    length = strlen(token) + 1;
-    path = malloc(length * sizeof(char));
-    if (path == NULL) {
-        charra_log_error("[%s] Could not allocate enough memory");
-        return -1;
-    }
-    strcpy(path, token);
-    path[length - 1] = '\0';
+    path = token;
 
     /* check if format is valid */
     if (strcmp(format, "yaml") != 0) {
@@ -417,10 +404,7 @@ static void cli_verifier_ima(const cli_config* variables) {
     *(variables->specific_config.verifier_config.use_ima_event_log) = true;
     if (optarg != NULL) {
         *(variables->specific_config.verifier_config.ima_event_log_path) =
-                malloc(strlen(optarg) + 1);
-        strncpy(*(variables->specific_config.verifier_config
-                                .ima_event_log_path),
-                optarg, strlen(optarg));
+                optarg;
     }
 }
 

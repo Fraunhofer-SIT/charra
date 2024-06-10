@@ -153,10 +153,7 @@ static void cli_util_common_psk(const cli_config* variables) {
 
 static void cli_util_common_psk_key(const cli_config* variables) {
     *variables->common_config.use_dtls_psk = true;
-    uint32_t length = strlen(optarg);
-    char* key = malloc(length * sizeof(char));
-    strcpy(key, optarg);
-    *(variables->common_config.dtls_psk_key) = key;
+    *(variables->common_config.dtls_psk_key) = optarg;
 }
 
 static void cli_util_common_rpk(const cli_config* variables) {
@@ -166,8 +163,7 @@ static void cli_util_common_rpk(const cli_config* variables) {
 static int cli_util_common_dtls_rpk_private_key(
         const cli_config* variables, const char* const log_name) {
     *variables->common_config.use_dtls_rpk = true;
-    char* path = malloc(strlen(optarg));
-    strcpy(path, optarg);
+    char* path = optarg;
     if (charra_io_file_exists(path) == CHARRA_RC_SUCCESS) {
         *(variables->common_config.dtls_rpk_private_key_path) = path;
         return 0;
@@ -181,8 +177,7 @@ static int cli_util_common_dtls_rpk_private_key(
 static int cli_util_common_dtls_rpk_public_key(
         const cli_config* variables, const char* const log_name) {
     *variables->common_config.use_dtls_rpk = true;
-    char* path = malloc(strlen(optarg));
-    strcpy(path, optarg);
+    char* path = optarg;
     if (charra_io_file_exists(path) == CHARRA_RC_SUCCESS) {
         *(variables->common_config.dtls_rpk_public_key_path) = path;
         return 0;
@@ -196,8 +191,7 @@ static int cli_util_common_dtls_rpk_public_key(
 static int cli_util_common_dtls_rpk_peer_public_key(
         const cli_config* variables, const char* const log_name) {
     *variables->common_config.use_dtls_rpk = true;
-    char* path = malloc(strlen(optarg));
-    strcpy(path, optarg);
+    char* path = optarg;
     if (charra_io_file_exists(path) == CHARRA_RC_SUCCESS) {
         *(variables->common_config.dtls_rpk_peer_public_key_path) = path;
         return 0;

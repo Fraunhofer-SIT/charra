@@ -291,7 +291,6 @@ static void coap_attest_handler(struct coap_resource_t* resource,
     int coap_r = 0;
     TSS2_RC tss_r = 0;
     ESYS_TR sig_key_handle = ESYS_TR_NONE;
-    TPM2B_PUBLIC* public_key = NULL;
     /* --- receive incoming data --- */
     charra_log_info(
             "[" LOG_NAME "] Resource '%s': Received message.", "attest");
@@ -426,7 +425,6 @@ static void coap_attest_handler(struct coap_resource_t* resource,
     /* clean up */
     charra_free_and_null(signature);
     charra_free_and_null(attest_buf);
-    charra_free_and_null(public_key);
 
     /* marshal response */
     charra_log_info("[" LOG_NAME "] Marshaling response to CBOR.");
@@ -460,7 +458,6 @@ error:
     /* free heap objects */
     charra_free_if_not_null(signature);
     charra_free_if_not_null(attest_buf);
-    charra_free_if_not_null(public_key);
     charra_io_free_continuous_file_buffer(&ima_event_log);
 
     /* flush handles */

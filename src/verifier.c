@@ -752,10 +752,6 @@ static coap_response_t coap_attest_handler(
     charra_log_info("[" LOG_NAME "] +----------------------------+");
 
 cleanup:
-    /* free heap objects*/
-    charra_free_if_not_null(reference_pcr_file_path);
-    charra_free_if_not_null(attestation_public_key_path);
-
     /* flush handles */
     if (sig_key_handle != ESYS_TR_NONE) {
         if (Esys_FlushContext(esys_ctx, sig_key_handle) != TSS2_RC_SUCCESS) {
