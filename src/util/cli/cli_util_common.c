@@ -26,92 +26,43 @@
 #include <errno.h>
 #include <stdlib.h>
 
-typedef enum {
-    CLI_COMMON_VERBOSE = 'v',
-    CLI_COMMON_LOG_LEVEL = 'l',
-    CLI_COMMON_COAP_LOG_LEVEL = 'c',
-    CLI_COMMON_HELP = '0',
-    CLI_COMMON_PORT = 'b',
-    CLI_COMMON_RPK = 'r',
-    CLI_COMMON_PRIVATE_KEY = '1',
-    CLI_COMMON_PUBLIC_KEY = '2',
-    CLI_COMMON_PEER_PUBLIC_KEY = '3',
-    CLI_COMMON_VERIFY_PEER = '4',
-    CLI_COMMON_PSK = 'p',
-    CLI_COMMON_KEY = 'k',
-} cli_util_common_args_e;
-
-const struct option cli_util_common_options[] = {
-        /* common options */
-        {"verbose", no_argument, 0, CLI_COMMON_VERBOSE},
-        {"log-level", required_argument, 0, CLI_COMMON_LOG_LEVEL},
-        {"coap-log-level", required_argument, 0, CLI_COMMON_COAP_LOG_LEVEL},
-        {"help", no_argument, 0, CLI_COMMON_HELP},
-        /* port only has a specific help message */
-        {"port", required_argument, 0, CLI_COMMON_PORT},
-        /* common rpk group-options */
-        {"rpk", no_argument, 0, CLI_COMMON_RPK},
-        {"private-key", required_argument, 0, CLI_COMMON_PRIVATE_KEY},
-        {"public-key", required_argument, 0, CLI_COMMON_PUBLIC_KEY},
-        {"peer-public-key", required_argument, 0, CLI_COMMON_PEER_PUBLIC_KEY},
-        {"verify-peer", required_argument, 0, CLI_COMMON_VERIFY_PEER},
-        /* common psk group-options (they have specific help messages) */
-        {"psk", no_argument, 0, CLI_COMMON_PSK},
-        {"key", required_argument, 0, CLI_COMMON_KEY}};
-
-const size_t cli_util_common_options_size = sizeof(cli_util_common_options);
-const size_t cli_util_common_options_length =
-        sizeof(cli_util_common_options) / sizeof(struct option);
-
-int cli_util_common_get_combined_option_array(struct option** combined_options,
-        const struct option* const specific_options,
-        const size_t specific_option_length, const char* const log_name) {
-    *combined_options =
-            calloc(cli_util_common_options_length + specific_option_length,
-                    sizeof(struct option));
-    if (*combined_options == NULL) {
-        charra_log_error("[%s] ERROR: cli-parser ran out of memory", log_name);
-        return -1;
-    }
-    memcpy((void*)*combined_options, (void*)cli_util_common_options,
-            cli_util_common_options_size);
-    memcpy((void*)(*combined_options + cli_util_common_options_length),
-            specific_options, (specific_option_length * sizeof(struct option)));
-    return 0;
-}
-
 static void print_dtls_psk_help_message(const cli_config* const variables) {
     printf("DTLS-RPK Options:\n");
     printf("                                 Charra includes default "
            "'keys' in the keys folder, but these are only intended for "
            "testing. They MUST be changed in actual production "
            "environments!\n");
-    printf(" -r, --rpk:                      Enable DTLS-RPK (raw "
+    printf(" -%c, --%s:                      Enable DTLS-RPK (raw "
            "public keys) protocol . The protocol is intended for "
            "scenarios in which public keys of either attester or "
-           "verifier or both of them are pre-shared.\n");
-    printf("     --private-key=PATH:         Specify the path of the "
+           "verifier or both of them are pre-shared.\n",
+            CLI_COMMON_RPK, CLI_COMMON_RPK_LONG);
+    printf("     --%s=PATH:         Specify the path of the "
            "private key used for RPK. Currently only supports DER "
-           "(ASN.1) format.\n");
+           "(ASN.1) format.\n",
+            CLI_COMMON_PRIVATE_KEY_LONG);
     printf("                                 By default '%s' is used. "
            "Implicitly enables DTLS-RPK.\n",
             *variables->common_config.dtls_rpk_private_key_path);
-    printf("     --public-key=PATH:          Specify the path of the "
+    printf("     --%s=PATH:          Specify the path of the "
            "public key used for RPK. Currently only supports DER "
-           "(ASN.1) format.\n");
+           "(ASN.1) format.\n",
+            CLI_COMMON_PUBLIC_KEY_LONG);
     printf("                                 By default '%s' is used. "
            "Implicitly enables DTLS-RPK.\n",
             *variables->common_config.dtls_rpk_public_key_path);
-    printf("     --peer-public-key=PATH:     Specify the path of the "
+    printf("     --%s=PATH:     Specify the path of the "
            "reference public key of the peer, used for RPK. Currently "
-           "only supports DER (ASN.1) format.\n");
+           "only supports DER (ASN.1) format.\n",
+            CLI_COMMON_PEER_PUBLIC_KEY_LONG);
     printf("                                 By default '%s' is used. "
            "Implicitly enables DTLS-RPK.\n",
             *variables->common_config.dtls_rpk_peer_public_key_path);
-    printf("     --verify-peer=[0,1]:        Specify whether the peers "
+    printf("     --%s=[0,1]:        Specify whether the peers "
            "public key shall be checked against the reference public "
            "key. 0 means no check, 1 means check. By default the check "
-           "is performed.\n");
+           "is performed.\n",
+            CLI_COMMON_VERIFY_PEER_LONG);
     printf("                                 WARNING: Disabling the "
            "verification means that connections from any peer will be "
            "accepted. This is primarily intended for the verifier, "
@@ -128,16 +79,20 @@ static void cli_util_common_print_help_message(const char* const log_name,
         const cli_config* const variables) {
     /* print help messages of common arguments */
     printf("\nUsage: %s [OPTIONS]\n", log_name);
-    printf("     --help:                     Print this help "
-           "message.\n");
-    printf(" -v, --verbose:                  Set CHARRA and CoAP "
-           "log-level to DEBUG.\n");
-    printf(" -l, --log-level=LEVEL:          Set CHARRA log-level to "
+    printf("     --%s:                     Print this help "
+           "message.\n",
+            CLI_COMMON_HELP_LONG);
+    printf(" -%c, --%s:                  Set CHARRA and CoAP "
+           "log-level to DEBUG.\n",
+            CLI_COMMON_VERBOSE, CLI_COMMON_VERBOSE_LONG);
+    printf(" -%c, --%s=LEVEL:          Set CHARRA log-level to "
            "LEVEL. Available are: TRACE, DEBUG, INFO, WARN, ERROR, "
-           "FATAL. Default is INFO.\n");
-    printf(" -c, --coap-log-level=LEVEL:     Set CoAP log-level to "
+           "FATAL. Default is INFO.\n",
+            CLI_COMMON_LOG_LEVEL, CLI_COMMON_LOG_LEVEL_LONG);
+    printf(" -%c, --%s=LEVEL:     Set CoAP log-level to "
            "LEVEL. Available are: DEBUG, INFO, NOTICE, WARNING, ERR, "
-           "CRIT, ALERT, EMERG, CIPHERS. Default is INFO.\n");
+           "CRIT, ALERT, EMERG, CIPHERS. Default is INFO.\n",
+            CLI_COMMON_COAP_LOG_LEVEL, CLI_COMMON_COAP_LOG_LEVEL_LONG);
 
     if (print_specific_help_message != NULL) {
         print_specific_help_message(variables);
@@ -156,9 +111,10 @@ static int cli_util_common_charra_log_level(
     int result = charra_log_level_from_str(
             optarg, variables->common_config.charra_log_level);
     if (result != 0) {
-        charra_log_error("[%s] Error while parsing '-l/--log-level': "
+        charra_log_error("[%s] Error while parsing '-%c/--%s': "
                          "Unrecognized argument %s",
-                log_name, optarg);
+                log_name, CLI_COMMON_LOG_LEVEL, CLI_COMMON_LOG_LEVEL_LONG,
+                optarg);
         return -1;
     }
     return 0;
@@ -169,9 +125,10 @@ static int cli_util_common_coap_log_level(
     int result = charra_coap_log_level_from_str(
             optarg, variables->common_config.coap_log_level);
     if (result != 0) {
-        charra_log_error("[%s] Error while parsing '-c/--coap-log-level': "
+        charra_log_error("[%s] Error while parsing '-%c/--%s': "
                          "Unrecognized argument %s",
-                log_name, optarg);
+                log_name, CLI_COMMON_COAP_LOG_LEVEL,
+                CLI_COMMON_COAP_LOG_LEVEL_LONG, optarg);
         return -1;
     }
     return 0;
@@ -182,9 +139,9 @@ static int cli_util_common_port(
     char* end;
     *(variables->common_config.port) = (unsigned int)strtoul(optarg, &end, 10);
     if (*(variables->common_config.port) == 0 || end == optarg) {
-        charra_log_error("[%s] Error while parsing '--port': Port could not be "
+        charra_log_error("[%s] Error while parsing '--%s': Port could not be "
                          "parsed",
-                log_name);
+                log_name, CLI_COMMON_PORT_LONG);
         return -1;
     }
     return 0;
@@ -259,9 +216,9 @@ static int cli_util_common_verify_rpk_peer_public_key(
     } else if (strcmp("1", optarg) == 0) {
         *variables->common_config.dtls_rpk_verify_peer_public_key = true;
     } else {
-        charra_log_error("[%s] Error while parsing '--verify-peer': "
+        charra_log_error("[%s] Error while parsing '--%s': "
                          "'%s' could not be parsed as 0 or 1.",
-                log_name, optarg);
+                log_name, CLI_COMMON_VERIFY_PEER_LONG, optarg);
         return -1;
     }
     return 0;

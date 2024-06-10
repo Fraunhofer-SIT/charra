@@ -30,6 +30,15 @@
 #define LOG_NAME "verifier"
 #define VERIFIER_SHORT_OPTIONS "vl:c:t:f:s:pk:i:rg:"
 
+#define CLI_VERIFIER_IDENTITY_LONG "identity"
+#define CLI_VERIFIER_IP_LONG "ip"
+#define CLI_VERIFIER_TIMEOUT_LONG "timeout"
+#define CLI_VERIFIER_ATTESTATION_PUBLIC_KEY_LONG "attestation-public-key"
+#define CLI_VERIFIER_PCR_FILE_LONG "pcr-file"
+#define CLI_VERIFIER_PCR_SELECTION_LONG "pcr-selection"
+#define CLI_VERIFIER_IMA_LONG "ima"
+#define CLI_VERIFIER_HASH_ALGORITHM_LONG "hash-algorithm"
+
 typedef enum {
     CLI_VERIFIER_IDENTITY = 'i',
     CLI_VERIFIER_IP = 'a',
@@ -42,17 +51,43 @@ typedef enum {
 } cli_util_verifier_args_e;
 
 static const struct option verifier_options[] = {
+        /* common options */
+        {CLI_COMMON_VERBOSE_LONG, no_argument, 0, CLI_COMMON_VERBOSE},
+        {CLI_COMMON_LOG_LEVEL_LONG, required_argument, 0, CLI_COMMON_LOG_LEVEL},
+        {CLI_COMMON_COAP_LOG_LEVEL_LONG, required_argument, 0,
+                CLI_COMMON_COAP_LOG_LEVEL},
+        {CLI_COMMON_HELP_LONG, no_argument, 0, CLI_COMMON_HELP},
+        /* port only has a specific help message */
+        {CLI_COMMON_PORT_LONG, required_argument, 0, CLI_COMMON_PORT},
+        /* common rpk group-options */
+        {CLI_COMMON_RPK_LONG, no_argument, 0, CLI_COMMON_RPK},
+        {CLI_COMMON_PRIVATE_KEY_LONG, required_argument, 0,
+                CLI_COMMON_PRIVATE_KEY},
+        {CLI_COMMON_PUBLIC_KEY_LONG, required_argument, 0,
+                CLI_COMMON_PUBLIC_KEY},
+        {CLI_COMMON_PEER_PUBLIC_KEY_LONG, required_argument, 0,
+                CLI_COMMON_PEER_PUBLIC_KEY},
+        {CLI_COMMON_VERIFY_PEER_LONG, required_argument, 0,
+                CLI_COMMON_VERIFY_PEER},
+        /* common psk group-options (they have specific help messages) */
+        {CLI_COMMON_PSK_LONG, no_argument, 0, CLI_COMMON_PSK},
+        {CLI_COMMON_KEY_LONG, required_argument, 0, CLI_COMMON_KEY},
+
         /* verifier specific psk group-options */
-        {"identity", required_argument, 0, CLI_VERIFIER_IDENTITY},
-        /* attester specific options */
-        {"ip", required_argument, 0, CLI_VERIFIER_IP},
-        {"timeout", required_argument, 0, CLI_VERIFIER_TIMEOUT},
-        {"attestation-public-key", required_argument, 0,
+        {CLI_VERIFIER_IDENTITY_LONG, required_argument, 0,
+                CLI_VERIFIER_IDENTITY},
+        /* verifier specific options */
+        {CLI_VERIFIER_IP_LONG, required_argument, 0, CLI_VERIFIER_IP},
+        {CLI_VERIFIER_TIMEOUT_LONG, required_argument, 0, CLI_VERIFIER_TIMEOUT},
+        {CLI_VERIFIER_ATTESTATION_PUBLIC_KEY_LONG, required_argument, 0,
                 CLI_VERIFIER_ATTESTATION_PUBLIC_KEY},
-        {"pcr-file", required_argument, 0, CLI_VERIFIER_PCR_FILE},
-        {"pcr-selection", required_argument, 0, CLI_VERIFIER_PCR_SELECTION},
-        {"ima", optional_argument, 0, CLI_VERIFIER_IMA},
-        {"hash-algorithm", required_argument, 0, CLI_VERIFIER_HASH_ALGORITHM},
+        {CLI_VERIFIER_PCR_FILE_LONG, required_argument, 0,
+                CLI_VERIFIER_PCR_FILE},
+        {CLI_VERIFIER_PCR_SELECTION_LONG, required_argument, 0,
+                CLI_VERIFIER_PCR_SELECTION},
+        {CLI_VERIFIER_IMA_LONG, optional_argument, 0, CLI_VERIFIER_IMA},
+        {CLI_VERIFIER_HASH_ALGORITHM_LONG, required_argument, 0,
+                CLI_VERIFIER_HASH_ALGORITHM},
         {0}};
 
 /**
@@ -81,23 +116,28 @@ static int check_required_options(const cli_config* const variables) {
 
 static void print_verifier_help_message(const cli_config* const variables) {
     /* print specific verifier options */
-    printf("     --ip=IP:                    Connect to IP instead "
-           "of doing the attestation on localhost.\n");
-    printf("     --port=PORT:                Connect to PORT "
+    printf("     --%s=IP:                    Connect to IP instead "
+           "of doing the attestation on localhost.\n",
+            CLI_VERIFIER_IP_LONG);
+    printf("     --%s=PORT:                Connect to PORT "
            "instead of default port %u.\n",
-            *(variables->common_config.port));
-    printf(" -t, --timeout=SECONDS:          Wait up to SECONDS "
+            CLI_COMMON_PORT_LONG, *(variables->common_config.port));
+    printf(" -%c, --%s=SECONDS:          Wait up to SECONDS "
            "for the attestation answer. Default is %d seconds.\n",
+            CLI_VERIFIER_TIMEOUT, CLI_VERIFIER_TIMEOUT_LONG,
             *(variables->specific_config.verifier_config.timeout));
-    printf("     --attestation-public-key=PATH:      Specifies the path to "
-           "the public portion of the attestation key.\n");
-    printf(" -f, --pcr-file=FORMAT:PATH:     Read reference PCRs "
+    printf("     --%s=PATH:      Specifies the path to "
+           "the public portion of the attestation key.\n",
+            CLI_VERIFIER_ATTESTATION_PUBLIC_KEY_LONG);
+    printf(" -%c, --%s=FORMAT:PATH:     Read reference PCRs "
            "from PATH in a specified FORMAT. Available is: "
-           "yaml.\n");
-    printf(" -s, --pcr-selection=X1[,X2...]: Specifies which PCRs "
+           "yaml.\n",
+            CLI_VERIFIER_PCR_FILE, CLI_VERIFIER_PCR_FILE_LONG);
+    printf(" -%c, --%s=X1[,X2...]: Specifies which PCRs "
            "to check on the attester. Each X references one PCR. "
            "PCR numbers shall be ordered from smallest to biggest, "
-           "comma-seperated\n");
+           "comma-seperated\n",
+            CLI_VERIFIER_PCR_SELECTION, CLI_VERIFIER_PCR_SELECTION_LONG);
     printf("                                 and without "
            "whitespace. By default these PCRs are checked: sha256:");
     const uint32_t tpm_pcr_selection_len =
@@ -113,26 +153,31 @@ static void print_verifier_help_message(const cli_config* const variables) {
     }
 
     printf("\n");
-    printf("     --ima[=PATH]:               Request the attester "
+    printf("     --%s[=PATH]:               Request the attester "
            "to include an IMA event log in the attestation "
-           "response. By default IMA requests the file\n");
+           "response. By default IMA requests the file\n",
+            CLI_VERIFIER_IMA_LONG);
     printf("                                 '%s'. Alternatives "
            "can be passed.\n",
             *(variables->specific_config.verifier_config.ima_event_log_path));
-    printf(" -g, --hash-algorithm=ALGORITHM: The hash algorithm used to digest "
-           "the tpm quote.\n");
+    printf(" -%c, --%s=ALGORITHM: The hash algorithm used to digest "
+           "the tpm quote.\n",
+            CLI_VERIFIER_HASH_ALGORITHM, CLI_VERIFIER_HASH_ALGORITHM_LONG);
 
     /* print DTLS-PSK grouped options */
     printf("DTLS-PSK Options:\n");
-    printf(" -p, --psk:                      Enable DTLS protocol "
+    printf(" -%c, --%s:                      Enable DTLS protocol "
            "with PSK. By default the key '%s' and identity '%s' "
            "are used.\n",
+            CLI_COMMON_PSK, CLI_COMMON_PSK_LONG,
             *variables->common_config.dtls_psk_key,
             *variables->specific_config.verifier_config.dtls_psk_identity);
-    printf(" -k, --key=KEY:                  Use KEY as pre-shared "
-           "key for DTLS-PSK. Implicitly enables DTLS-PSK.\n");
-    printf(" -i, --identity=IDENTITY:        Use IDENTITY as "
-           "identity for DTLS. Implicitly enables DTLS-PSK.\n");
+    printf(" -%c, --%s=KEY:                  Use KEY as pre-shared "
+           "key for DTLS-PSK. Implicitly enables DTLS-PSK.\n",
+            CLI_COMMON_KEY, CLI_COMMON_KEY_LONG);
+    printf(" -%c, --%s=IDENTITY:        Use IDENTITY as "
+           "identity for DTLS. Implicitly enables DTLS-PSK.\n",
+            CLI_VERIFIER_IDENTITY, CLI_VERIFIER_IDENTITY_LONG);
 }
 
 static void cli_verifer_identity(const cli_config* variables) {
@@ -146,9 +191,9 @@ static void cli_verifer_identity(const cli_config* variables) {
 static int cli_verifier_ip(const cli_config* variables) {
     int argument_length = strlen(optarg);
     if (argument_length > 15) {
-        charra_log_error("[%s] Error while parsing '--ip': Input too long "
+        charra_log_error("[%s] Error while parsing '--%s': Input too long "
                          "for IPv4 address",
-                LOG_NAME);
+                LOG_NAME, CLI_VERIFIER_IP_LONG);
         return -1;
     }
     strncpy(variables->specific_config.verifier_config.dst_host, optarg, 16);
@@ -161,9 +206,9 @@ static int cli_verifier_timeout(const cli_config* variables) {
             (uint16_t)strtoul(optarg, &end, 10);
     if (*(variables->specific_config.verifier_config.timeout) == 0 ||
             end == optarg) {
-        charra_log_error("[%s] Error while parsing '--port': Port "
+        charra_log_error("[%s] Error while parsing '--%s': Port "
                          "could not be parsed",
-                LOG_NAME);
+                LOG_NAME, CLI_COMMON_PORT_LONG);
         return -1;
     }
     return 0;
@@ -198,8 +243,8 @@ static int cli_verifier_pcr_file(const cli_config* variables) {
     /* check if there is a delimiter */
     if (token == NULL) {
         charra_log_error("[%s] Argument syntax error: please use "
-                         "'--pcr-file=FORMAT:PATH'",
-                LOG_NAME, format);
+                         "'--%s=FORMAT:PATH'",
+                LOG_NAME, CLI_VERIFIER_PCR_FILE_LONG);
         return -1;
     }
     length = strlen(token) + 1;
@@ -407,18 +452,10 @@ static int cli_verifier_hash_algorithm(cli_config* variables) {
 int parse_command_line_verifier_arguments(
         int argc, char** argv, cli_config* variables) {
     int rc = 0;
-    const size_t verifier_options_length =
-            sizeof(verifier_options) / sizeof(struct option);
-    struct option* combined_options = NULL;
-    rc = cli_util_common_get_combined_option_array(&combined_options,
-            verifier_options, verifier_options_length, LOG_NAME);
-    if (rc != 0) {
-        return -1;
-    }
     for (;;) {
         int index = -1;
         int identifier = getopt_long(
-                argc, argv, VERIFIER_SHORT_OPTIONS, combined_options, &index);
+                argc, argv, VERIFIER_SHORT_OPTIONS, verifier_options, &index);
         switch (identifier) {
         case -1:
             rc = check_required_options(variables);
@@ -459,6 +496,5 @@ int parse_command_line_verifier_arguments(
         }
     }
 cleanup:
-    free((void*)combined_options);
     return rc;
 }

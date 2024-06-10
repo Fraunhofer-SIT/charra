@@ -32,10 +32,43 @@
 #include <tss2/tss2_esys.h>
 #include <tss2/tss2_tpm2_types.h>
 
+/* common options (long) */
+#define CLI_COMMON_VERBOSE_LONG "verbose"
+#define CLI_COMMON_LOG_LEVEL_LONG "log-level"
+#define CLI_COMMON_COAP_LOG_LEVEL_LONG "coap-log-level"
+#define CLI_COMMON_HELP_LONG "help"
+#define CLI_COMMON_PORT_LONG "port"
+
+/* common rpk group-options (long) */
+#define CLI_COMMON_RPK_LONG "rpk"
+#define CLI_COMMON_PRIVATE_KEY_LONG "private-key"
+#define CLI_COMMON_PUBLIC_KEY_LONG "public-key"
+#define CLI_COMMON_PEER_PUBLIC_KEY_LONG "peer-public-key"
+#define CLI_COMMON_VERIFY_PEER_LONG "verify-peer"
+
+/* common psk group-options (long) */
+#define CLI_COMMON_PSK_LONG "psk"
+#define CLI_COMMON_KEY_LONG "key"
+
 typedef enum {
     VERIFIER,
     ATTESTER,
 } cli_parser_caller;
+
+typedef enum {
+    CLI_COMMON_VERBOSE = 'v',
+    CLI_COMMON_LOG_LEVEL = 'l',
+    CLI_COMMON_COAP_LOG_LEVEL = 'c',
+    CLI_COMMON_HELP = '0',
+    CLI_COMMON_PORT = 'b',
+    CLI_COMMON_RPK = 'r',
+    CLI_COMMON_PRIVATE_KEY = '1',
+    CLI_COMMON_PUBLIC_KEY = '2',
+    CLI_COMMON_PEER_PUBLIC_KEY = '3',
+    CLI_COMMON_VERIFY_PEER = '4',
+    CLI_COMMON_PSK = 'p',
+    CLI_COMMON_KEY = 'k',
+} cli_util_common_args_e;
 
 /**
  * A structure holding pointers to common variables of attester and verifier
@@ -134,20 +167,6 @@ int cli_util_common_parse_option_as_ulong(
  */
 int cli_util_common_split_option_string(
         char* option, char** format, char** value);
-
-/**
- * @brief Creates an option array which combines cli common options and specific
- * options. Combined_options has to be freed by the caller.
- *
- * @param[out] combined_options Array containing the combined options
- * @param[in] specific_options Array containing the specific options
- * @param[in] specific_option_length The length of the specific options array
- * @param[in] log_name The log_name of the caller
- * @return 0 on success, -1 on error
- */
-int cli_util_common_get_combined_option_array(struct option** combined_options,
-        const struct option* const specific_options,
-        const size_t specific_option_length, const char* const log_name);
 
 /**
  * @brief Parses a single command line argument
