@@ -13,6 +13,35 @@
 
 The following lists the changes CHARRA received over time.
 
+## Changelog 2024-06-12
+
+* Adjustments to `cli_util`
+
+  * Splitted the logic into `cli_util`, `cli_util_attester`, and `cli-util_verifier`
+
+  * Prefixed `DTLS-RPK` and `DTLS_PSK` options with rpk/psk
+
+  * fixed undefined behavior while parsing command line error when using option `-h`
+
+* Adjustments to `--attestation-key`
+
+  * an attestation key can now be loaded with a TPM handle
+
+  * `--attestation-key` will now require a FORMAT. Available are: `context` and `handle`
+
+* `--pcr-selection` will now require a list of PCR banks as with the `tpm2-tools`
+
+  * there is currently only support for `sha256` (other pcr banks will be ignored)
+
+* Adjustments to `verifier`
+
+  * Added option `-g/--hash-algorithm` to set the hash-algorithm which was used to digest the tpm quote
+
+  * The verifier is now able to verify signatures with different rsa signing schemes:
+
+    - `TPM2_ALG_RSASSA`
+    - `TPM2_ALG_RSAPSS`
+
 ## Changelog 2024-04-03
 
 * Implemented CHARRA remote attestation using the TAP information model
@@ -176,4 +205,3 @@ The following lists the changes CHARRA received over time.
 ## Changelog 2019-09-19
 
 * Initial version
-

@@ -133,13 +133,14 @@ static void print_verifier_help_message(const cli_config* const variables) {
            "from PATH in a specified FORMAT. Available is: "
            "yaml.\n",
             CLI_VERIFIER_PCR_FILE, CLI_VERIFIER_PCR_FILE_LONG);
-    printf(" -%c, --%s=X1[,X2...]: Specifies which PCRs "
-           "to check on the attester. Each X references one PCR. "
-           "PCR numbers shall be ordered from smallest to biggest, "
-           "comma-seperated\n",
+    printf(" -%c, --%s=X1[+X2...]: Specifies which PCRs "
+           "to check on the attester. Each X refers to a PCR bank that "
+           "begins with the algorithm, followed by a ':' and a comma-separated "
+           "list of PCRs. \n"
+           "                                 Each PCR bank is separated "
+           "by a '+'. ",
             CLI_VERIFIER_PCR_SELECTION, CLI_VERIFIER_PCR_SELECTION_LONG);
-    printf("                                 and without "
-           "whitespace. By default these PCRs are checked: sha256:");
+    printf("By default these PCRs are checked: sha256:");
     const uint32_t tpm_pcr_selection_len =
             variables->specific_config.verifier_config.tpm_pcr_selection_len[1];
     for (uint32_t i = 0; i < tpm_pcr_selection_len; i++) {
@@ -148,7 +149,7 @@ static void print_verifier_help_message(const cli_config* const variables) {
         if (i != variables->specific_config.verifier_config
                                  .tpm_pcr_selection_len[1] -
                          1) {
-            printf(", ");
+            printf(",");
         }
     }
 
