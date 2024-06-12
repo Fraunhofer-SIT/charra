@@ -30,7 +30,7 @@
 #define LOG_NAME "verifier"
 #define VERIFIER_SHORT_OPTIONS "vl:c:t:f:s:pk:i:rg:"
 
-#define CLI_VERIFIER_IDENTITY_LONG "identity"
+#define CLI_VERIFIER_PSK_IDENTITY_LONG "psk-identity"
 #define CLI_VERIFIER_IP_LONG "ip"
 #define CLI_VERIFIER_TIMEOUT_LONG "timeout"
 #define CLI_VERIFIER_ATTESTATION_PUBLIC_KEY_LONG "attestation-public-key"
@@ -40,7 +40,7 @@
 #define CLI_VERIFIER_HASH_ALGORITHM_LONG "hash-algorithm"
 
 typedef enum {
-    CLI_VERIFIER_IDENTITY = 'i',
+    CLI_VERIFIER_PSK_IDENTITY = 'i',
     CLI_VERIFIER_IP = 'a',
     CLI_VERIFIER_TIMEOUT = 't',
     CLI_VERIFIER_ATTESTATION_PUBLIC_KEY = '5',
@@ -61,21 +61,21 @@ static const struct option verifier_options[] = {
         {CLI_COMMON_PORT_LONG, required_argument, 0, CLI_COMMON_PORT},
         /* common rpk group-options */
         {CLI_COMMON_RPK_LONG, no_argument, 0, CLI_COMMON_RPK},
-        {CLI_COMMON_PRIVATE_KEY_LONG, required_argument, 0,
-                CLI_COMMON_PRIVATE_KEY},
-        {CLI_COMMON_PUBLIC_KEY_LONG, required_argument, 0,
-                CLI_COMMON_PUBLIC_KEY},
-        {CLI_COMMON_PEER_PUBLIC_KEY_LONG, required_argument, 0,
-                CLI_COMMON_PEER_PUBLIC_KEY},
-        {CLI_COMMON_VERIFY_PEER_LONG, required_argument, 0,
-                CLI_COMMON_VERIFY_PEER},
+        {CLI_COMMON_RPK_PRIVATE_KEY_LONG, required_argument, 0,
+                CLI_COMMON_RPK_PRIVATE_KEY},
+        {CLI_COMMON_RPK_PUBLIC_KEY_LONG, required_argument, 0,
+                CLI_COMMON_RPK_PUBLIC_KEY},
+        {CLI_COMMON_RPK_PEER_PUBLIC_KEY_LONG, required_argument, 0,
+                CLI_COMMON_RPK_PEER_PUBLIC_KEY},
+        {CLI_COMMON_RPK_VERIFY_PEER_LONG, required_argument, 0,
+                CLI_COMMON_RPK_VERIFY_PEER},
         /* common psk group-options (they have specific help messages) */
         {CLI_COMMON_PSK_LONG, no_argument, 0, CLI_COMMON_PSK},
-        {CLI_COMMON_KEY_LONG, required_argument, 0, CLI_COMMON_KEY},
+        {CLI_COMMON_PSK_KEY_LONG, required_argument, 0, CLI_COMMON_PSK_KEY},
 
         /* verifier specific psk group-options */
-        {CLI_VERIFIER_IDENTITY_LONG, required_argument, 0,
-                CLI_VERIFIER_IDENTITY},
+        {CLI_VERIFIER_PSK_IDENTITY_LONG, required_argument, 0,
+                CLI_VERIFIER_PSK_IDENTITY},
         /* verifier specific options */
         {CLI_VERIFIER_IP_LONG, required_argument, 0, CLI_VERIFIER_IP},
         {CLI_VERIFIER_TIMEOUT_LONG, required_argument, 0, CLI_VERIFIER_TIMEOUT},
@@ -172,12 +172,12 @@ static void print_verifier_help_message(const cli_config* const variables) {
             CLI_COMMON_PSK, CLI_COMMON_PSK_LONG,
             *variables->common_config.dtls_psk_key,
             *variables->specific_config.verifier_config.dtls_psk_identity);
-    printf(" -%c, --%s=KEY:                  Use KEY as pre-shared "
+    printf(" -%c, --%s=KEY:              Use KEY as pre-shared "
            "key for DTLS-PSK. Implicitly enables DTLS-PSK.\n",
-            CLI_COMMON_KEY, CLI_COMMON_KEY_LONG);
-    printf(" -%c, --%s=IDENTITY:        Use IDENTITY as "
+            CLI_COMMON_PSK_KEY, CLI_COMMON_PSK_KEY_LONG);
+    printf(" -%c, --%s=IDENTITY:    Use IDENTITY as "
            "identity for DTLS. Implicitly enables DTLS-PSK.\n",
-            CLI_VERIFIER_IDENTITY, CLI_VERIFIER_IDENTITY_LONG);
+            CLI_VERIFIER_PSK_IDENTITY, CLI_VERIFIER_PSK_IDENTITY_LONG);
 }
 
 static void cli_verifer_identity(const cli_config* variables) {
@@ -445,7 +445,7 @@ int parse_command_line_verifier_arguments(
             rc = check_required_options(variables);
             goto cleanup;
         /* parse specific options */
-        case CLI_VERIFIER_IDENTITY:
+        case CLI_VERIFIER_PSK_IDENTITY:
             cli_verifer_identity(variables);
             break;
         case CLI_VERIFIER_IP:

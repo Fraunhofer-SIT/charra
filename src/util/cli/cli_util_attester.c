@@ -29,11 +29,11 @@
 #define LOG_NAME "attester"
 #define ATTESTER_SHORT_OPTIONS "vl:c:pk:h:r"
 
-#define CLI_ATTESTER_HINT_LONG "hint"
+#define CLI_ATTESTER_PSK_HINT_LONG "psk-hint"
 #define CLI_ATTESTER_ATTESTATION_KEY_LONG "attestation-key"
 
 typedef enum {
-    CLI_ATTESTER_HINT = 'h',
+    CLI_ATTESTER_PSK_HINT = 'h',
     CLI_ATTESTER_ATTESTATION_KEY = '5',
 } cli_util_attester_args_e;
 
@@ -48,20 +48,21 @@ static const struct option attester_options[] = {
         {CLI_COMMON_PORT_LONG, required_argument, 0, CLI_COMMON_PORT},
         /* common rpk group-options */
         {CLI_COMMON_RPK_LONG, no_argument, 0, CLI_COMMON_RPK},
-        {CLI_COMMON_PRIVATE_KEY_LONG, required_argument, 0,
-                CLI_COMMON_PRIVATE_KEY},
-        {CLI_COMMON_PUBLIC_KEY_LONG, required_argument, 0,
-                CLI_COMMON_PUBLIC_KEY},
-        {CLI_COMMON_PEER_PUBLIC_KEY_LONG, required_argument, 0,
-                CLI_COMMON_PEER_PUBLIC_KEY},
-        {CLI_COMMON_VERIFY_PEER_LONG, required_argument, 0,
-                CLI_COMMON_VERIFY_PEER},
+        {CLI_COMMON_RPK_PRIVATE_KEY_LONG, required_argument, 0,
+                CLI_COMMON_RPK_PRIVATE_KEY},
+        {CLI_COMMON_RPK_PUBLIC_KEY_LONG, required_argument, 0,
+                CLI_COMMON_RPK_PUBLIC_KEY},
+        {CLI_COMMON_RPK_PEER_PUBLIC_KEY_LONG, required_argument, 0,
+                CLI_COMMON_RPK_PEER_PUBLIC_KEY},
+        {CLI_COMMON_RPK_VERIFY_PEER_LONG, required_argument, 0,
+                CLI_COMMON_RPK_VERIFY_PEER},
         /* common psk group-options (they have specific help messages) */
         {CLI_COMMON_PSK_LONG, no_argument, 0, CLI_COMMON_PSK},
-        {CLI_COMMON_KEY_LONG, required_argument, 0, CLI_COMMON_KEY},
+        {CLI_COMMON_PSK_KEY_LONG, required_argument, 0, CLI_COMMON_PSK_KEY},
 
         /* attester specific psk group-options */
-        {CLI_ATTESTER_HINT_LONG, required_argument, 0, CLI_ATTESTER_HINT},
+        {CLI_ATTESTER_PSK_HINT_LONG, required_argument, 0,
+                CLI_ATTESTER_PSK_HINT},
         /* attester specific options */
         {CLI_ATTESTER_ATTESTATION_KEY_LONG, required_argument, 0,
                 CLI_ATTESTER_ATTESTATION_KEY},
@@ -101,12 +102,12 @@ static void print_attester_help_message(const cli_config* const variables) {
             CLI_COMMON_PSK, CLI_COMMON_PSK_LONG,
             *variables->common_config.dtls_psk_key,
             *variables->specific_config.attester_config.dtls_psk_hint);
-    printf(" -%c, --%s=KEY:                  Use KEY as pre-shared "
+    printf(" -%c, --%s=KEY:              Use KEY as pre-shared "
            "key for DTLS. Implicitly enables DTLS-PSK.\n",
-            CLI_COMMON_KEY, CLI_COMMON_KEY_LONG);
-    printf(" -%c, --%s=HINT:                Use HINT as hint for "
+            CLI_COMMON_PSK_KEY, CLI_COMMON_PSK_KEY_LONG);
+    printf(" -%c, --%s=HINT:            Use HINT as hint for "
            "DTLS. Implicitly enables DTLS-PSK.\n",
-            CLI_ATTESTER_HINT, CLI_ATTESTER_HINT_LONG);
+            CLI_ATTESTER_PSK_HINT, CLI_ATTESTER_PSK_HINT_LONG);
 }
 
 static cli_config_attester_attestation_key_format_e
@@ -180,7 +181,7 @@ int parse_command_line_attester_arguments(
         case CLI_ATTESTER_ATTESTATION_KEY:
             rc = cli_attester_attestation_key(variables);
             break;
-        case CLI_ATTESTER_HINT:
+        case CLI_ATTESTER_PSK_HINT:
             cli_attester_psk_hint(variables);
             break;
         /* parse common options */

@@ -26,7 +26,7 @@
 #include <errno.h>
 #include <stdlib.h>
 
-static void print_dtls_psk_help_message(const cli_config* const variables) {
+static void print_dtls_rpk_help_message(const cli_config* const variables) {
     printf("DTLS-RPK Options:\n");
     printf("                                 Charra includes default "
            "'keys' in the keys folder, but these are only intended for "
@@ -37,32 +37,32 @@ static void print_dtls_psk_help_message(const cli_config* const variables) {
            "scenarios in which public keys of either attester or "
            "verifier or both of them are pre-shared.\n",
             CLI_COMMON_RPK, CLI_COMMON_RPK_LONG);
-    printf("     --%s=PATH:         Specify the path of the "
+    printf("     --%s=PATH:     Specify the path of the "
            "private key used for RPK. Currently only supports DER "
            "(ASN.1) format.\n",
-            CLI_COMMON_PRIVATE_KEY_LONG);
+            CLI_COMMON_RPK_PRIVATE_KEY_LONG);
     printf("                                 By default '%s' is used. "
            "Implicitly enables DTLS-RPK.\n",
             *variables->common_config.dtls_rpk_private_key_path);
-    printf("     --%s=PATH:          Specify the path of the "
+    printf("     --%s=PATH:      Specify the path of the "
            "public key used for RPK. Currently only supports DER "
            "(ASN.1) format.\n",
-            CLI_COMMON_PUBLIC_KEY_LONG);
+            CLI_COMMON_RPK_PUBLIC_KEY_LONG);
     printf("                                 By default '%s' is used. "
            "Implicitly enables DTLS-RPK.\n",
             *variables->common_config.dtls_rpk_public_key_path);
-    printf("     --%s=PATH:     Specify the path of the "
+    printf("     --%s=PATH: Specify the path of the "
            "reference public key of the peer, used for RPK. Currently "
            "only supports DER (ASN.1) format.\n",
-            CLI_COMMON_PEER_PUBLIC_KEY_LONG);
+            CLI_COMMON_RPK_PEER_PUBLIC_KEY_LONG);
     printf("                                 By default '%s' is used. "
            "Implicitly enables DTLS-RPK.\n",
             *variables->common_config.dtls_rpk_peer_public_key_path);
-    printf("     --%s=[0,1]:        Specify whether the peers "
+    printf("     --%s=[0,1]:    Specify whether the peers "
            "public key shall be checked against the reference public "
            "key. 0 means no check, 1 means check. By default the check "
            "is performed.\n",
-            CLI_COMMON_VERIFY_PEER_LONG);
+            CLI_COMMON_RPK_VERIFY_PEER_LONG);
     printf("                                 WARNING: Disabling the "
            "verification means that connections from any peer will be "
            "accepted. This is primarily intended for the verifier, "
@@ -98,7 +98,7 @@ static void cli_util_common_print_help_message(const char* const log_name,
         print_specific_help_message(variables);
     }
 
-    print_dtls_psk_help_message(variables);
+    print_dtls_rpk_help_message(variables);
 }
 
 static void cli_util_common_verbose(const cli_config* variables) {
@@ -212,7 +212,7 @@ static int cli_util_common_verify_rpk_peer_public_key(
     } else {
         charra_log_error("[%s] Error while parsing '--%s': "
                          "'%s' could not be parsed as 0 or 1.",
-                log_name, CLI_COMMON_VERIFY_PEER_LONG, optarg);
+                log_name, CLI_COMMON_RPK_VERIFY_PEER_LONG, optarg);
         return -1;
     }
     return 0;
@@ -235,23 +235,23 @@ int cli_util_common_parse_command_line_argument(const int identifier,
         return cli_util_common_charra_log_level(variables, log_name);
     case CLI_COMMON_COAP_LOG_LEVEL:
         return cli_util_common_coap_log_level(variables, log_name);
-    case CLI_COMMON_PEER_PUBLIC_KEY:
+    case CLI_COMMON_RPK_PEER_PUBLIC_KEY:
         return cli_util_common_dtls_rpk_peer_public_key(variables, log_name);
-    case CLI_COMMON_PRIVATE_KEY:
+    case CLI_COMMON_RPK_PRIVATE_KEY:
         return cli_util_common_dtls_rpk_private_key(variables, log_name);
-    case CLI_COMMON_VERIFY_PEER:
+    case CLI_COMMON_RPK_VERIFY_PEER:
         return cli_util_common_verify_rpk_peer_public_key(variables, log_name);
     case CLI_COMMON_RPK:
         cli_util_common_rpk(variables);
         return 0;
-    case CLI_COMMON_PUBLIC_KEY:
+    case CLI_COMMON_RPK_PUBLIC_KEY:
         return cli_util_common_dtls_rpk_public_key(variables, log_name);
     case CLI_COMMON_PSK:
         cli_util_common_psk(variables);
         return 0;
     case CLI_COMMON_PORT:
         return cli_util_common_port(variables, log_name);
-    case CLI_COMMON_KEY:
+    case CLI_COMMON_PSK_KEY:
         cli_util_common_psk_key(variables);
         return 0;
     default:

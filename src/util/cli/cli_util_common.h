@@ -41,14 +41,14 @@
 
 /* common rpk group-options (long) */
 #define CLI_COMMON_RPK_LONG "rpk"
-#define CLI_COMMON_PRIVATE_KEY_LONG "private-key"
-#define CLI_COMMON_PUBLIC_KEY_LONG "public-key"
-#define CLI_COMMON_PEER_PUBLIC_KEY_LONG "peer-public-key"
-#define CLI_COMMON_VERIFY_PEER_LONG "verify-peer"
+#define CLI_COMMON_RPK_PRIVATE_KEY_LONG "rpk-private-key"
+#define CLI_COMMON_RPK_PUBLIC_KEY_LONG "rpk-public-key"
+#define CLI_COMMON_RPK_PEER_PUBLIC_KEY_LONG "rpk-peer-public-key"
+#define CLI_COMMON_RPK_VERIFY_PEER_LONG "rpk-verify-peer"
 
 /* common psk group-options (long) */
 #define CLI_COMMON_PSK_LONG "psk"
-#define CLI_COMMON_KEY_LONG "key"
+#define CLI_COMMON_PSK_KEY_LONG "psk-key"
 
 typedef enum {
     VERIFIER,
@@ -62,12 +62,12 @@ typedef enum {
     CLI_COMMON_HELP = '0',
     CLI_COMMON_PORT = 'b',
     CLI_COMMON_RPK = 'r',
-    CLI_COMMON_PRIVATE_KEY = '1',
-    CLI_COMMON_PUBLIC_KEY = '2',
-    CLI_COMMON_PEER_PUBLIC_KEY = '3',
-    CLI_COMMON_VERIFY_PEER = '4',
+    CLI_COMMON_RPK_PRIVATE_KEY = '1',
+    CLI_COMMON_RPK_PUBLIC_KEY = '2',
+    CLI_COMMON_RPK_PEER_PUBLIC_KEY = '3',
+    CLI_COMMON_RPK_VERIFY_PEER = '4',
     CLI_COMMON_PSK = 'p',
-    CLI_COMMON_KEY = 'k',
+    CLI_COMMON_PSK_KEY = 'k',
 } cli_util_common_args_e;
 
 /**
