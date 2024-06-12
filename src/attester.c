@@ -292,6 +292,7 @@ static void coap_attest_handler(struct coap_resource_t* resource,
     TSS2_RC tss_r = 0;
     ESYS_TR sig_key_handle = ESYS_TR_NONE;
     /* --- receive incoming data --- */
+
     charra_log_info(
             "[" LOG_NAME "] Resource '%s': Received message.", "attest");
     coap_show_pdu(LOG_DEBUG, request);
@@ -334,9 +335,11 @@ static void coap_attest_handler(struct coap_resource_t* resource,
     qualifying_data.size = req.nonce_len;
     memcpy(qualifying_data.buffer, req.nonce, req.nonce_len);
 
-    charra_log_info("Received nonce of length %d:", req.nonce_len);
+    charra_log_info("[" LOG_NAME
+                    "] Received qualifying data (nonce) of length %d:",
+            req.nonce_len);
     charra_print_hex(CHARRA_LOG_INFO, req.nonce_len, req.nonce,
-            "                                   0x", "\n", false);
+            "                                              0x", "\n", false);
 
     /* PCR selection */
     TPML_PCR_SELECTION pcr_selection = {0};
@@ -362,26 +365,27 @@ static void coap_attest_handler(struct coap_resource_t* resource,
     }
 
     /* load TPM key */
-    charra_log_info("[" LOG_NAME "] Loading TPM key.");
-    if ((charra_r = charra_load_tpm2_key(esys_ctx, req.sig_key_id_len,
-                 req.sig_key_id, &sig_key_handle,
+    charra_log_info("[" LOG_NAME "] Loading TPM (attestation) key.");
+    if ((charra_r = charra_load_tpm2_key(esys_ctx, &sig_key_handle,
                  &cli_attester_config.specific_config.attester_config)) !=
             CHARRA_RC_SUCCESS) {
-        charra_log_error("[" LOG_NAME "] Could not load TPM key.");
+        charra_log_error(
+                "[" LOG_NAME "] Could not load TPM (attestation) key.");
         goto error;
     }
 
-    /* do the TPM quote */
-    charra_log_info("[" LOG_NAME "] Do TPM Quote.");
+    /* perform TPM quote */
+    charra_log_info("[" LOG_NAME "] Perform TPM2 Quote.");
     TPM2B_ATTEST* attest_buf = NULL;
     TPMT_SIGNATURE* signature = NULL;
     if ((tss_r = tpm2_quote(esys_ctx, sig_key_handle, &pcr_selection,
                  &qualifying_data, &attest_buf, &signature)) !=
             TSS2_RC_SUCCESS) {
-        charra_log_error("[" LOG_NAME "] TPM2 quote. %d", tss_r);
+        charra_log_error(
+                "[" LOG_NAME "] TPM2 quote unsuccessful. Error: %d", tss_r);
         goto error;
     } else {
-        charra_log_info("[" LOG_NAME "] TPM Quote successful.");
+        charra_log_info("[" LOG_NAME "] TPM2 Quote successful.");
     }
 
     /* --- send response data --- */

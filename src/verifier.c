@@ -488,10 +488,11 @@ static CHARRA_RC create_attestation_request(
             return err;
         }
     }
-    charra_log_info("[" LOG_NAME "] Generated nonce of length %d:", nonce_len);
+    charra_log_info("[" LOG_NAME
+                    "] Generated random qualifying data (nonce) of length %d:",
+            nonce_len);
     charra_print_hex(CHARRA_LOG_INFO, nonce_len, nonce,
-            "                                                  0x", "\n",
-            false);
+            "                                              0x", "\n", false);
 
     /* build attestation request */
     msg_attestation_request_dto req = {
@@ -620,7 +621,7 @@ static coap_response_t coap_attest_handler(
     }
 
     /* prepare verification */
-    charra_log_info("[" LOG_NAME "] Preparing TPM Quote verification.");
+    charra_log_info("[" LOG_NAME "] Preparing TPM2 Quote verification.");
     TPM2B_ATTEST attest = {0};
     attest.size = res.attestation_data_len;
     memcpy(attest.attestationData, res.attestation_data,
@@ -632,25 +633,25 @@ static coap_response_t coap_attest_handler(
     bool attestation_result_signature = false;
     {
         charra_log_info(
-                "[" LOG_NAME "] Verifying TPM Quote signature with TPM ...");
+                "[" LOG_NAME "] Verifying TPM2 Quote signature with TPM ...");
         /* verify attestation signature with TPM */
         if ((attestation_rc = charra_verify_tpm2_quote_signature_with_tpm(
                      esys_ctx, sig_key_handle,
                      signature_hash_algorithm.tpm2_hash_algorithm, &attest,
                      &signature, &validation)) == CHARRA_RC_SUCCESS) {
             charra_log_info(
-                    "[" LOG_NAME "]     => TPM Quote signature is valid!");
+                    "[" LOG_NAME "]     => TPM2 Quote signature is valid!");
             attestation_result_signature = true;
         } else {
             charra_log_error(
-                    "[" LOG_NAME "]     => TPM Quote signature is NOT valid!");
+                    "[" LOG_NAME "]     => TPM2 Quote signature is NOT valid!");
         }
     }
     {
         /* convert TPM public key to mbedTLS public key */
         charra_log_info(
                 "[" LOG_NAME
-                "] Converting TPM public key to mbedTLS public key ...");
+                "] Converting TPM2 public key to mbedTLS public key ...");
         mbedtls_rsa_context mbedtls_rsa_pub_key = {0};
         if ((attestation_rc = charra_crypto_tpm_pub_key_to_mbedtls_pub_key(
                      &tpm2_public_key, &mbedtls_rsa_pub_key)) !=
@@ -661,7 +662,7 @@ static coap_response_t coap_attest_handler(
 
         /* verify attestation signature with mbedTLS */
         charra_log_info("[" LOG_NAME
-                        "] Verifying TPM Quote signature with mbedTLS ...");
+                        "] Verifying TPM2 Quote signature with mbedTLS ...");
         if ((attestation_rc = charra_crypto_rsa_verify_signature(
                      &mbedtls_rsa_pub_key,
                      signature_hash_algorithm.mbedtls_hash_algorithm,
@@ -669,10 +670,10 @@ static coap_response_t coap_attest_handler(
                      signature.signature.rsapss.sig.buffer,
                      &tpm2_public_key)) == CHARRA_RC_SUCCESS) {
             charra_log_info(
-                    "[" LOG_NAME "]     => TPM Quote signature is valid!");
+                    "[" LOG_NAME "]     => TPM2 Quote signature is valid!");
         } else {
             charra_log_error(
-                    "[" LOG_NAME "]     => TPM Quote signature is NOT valid!");
+                    "[" LOG_NAME "]     => TPM2 Quote signature is NOT valid!");
         }
         mbedtls_rsa_free(&mbedtls_rsa_pub_key);
     }
@@ -686,20 +687,37 @@ static coap_response_t coap_attest_handler(
         goto cleanup;
     }
 
-    /* --- verify nonce --- */
+    /* --- verify TPM magic --- */
+    bool attestation_result_tpm2_magic = false;
+    {
+        charra_log_info("[" LOG_NAME "] Verifying TPM magic ...");
+
+        attestation_result_tpm2_magic =
+                charra_verify_tpm2_magic(&attest_struct);
+        if (attestation_result_tpm2_magic == true) {
+            charra_log_info("[" LOG_NAME "]     =>  TPM2 magic is valid!");
+        } else {
+            charra_log_error("[" LOG_NAME "]     => TPM2 magic is NOT valid! "
+                             "This might be a bogus TPM2 Quote!");
+        }
+    }
+
+    /* --- verify qualifying data (nonce) --- */
     bool attestation_result_nonce = false;
     {
-        charra_log_info("[" LOG_NAME "] Verifying nonce ...");
+        charra_log_info("[" LOG_NAME "] Verifying qualifying data (nonce) ...");
 
         attestation_result_nonce = charra_verify_tpm2_quote_qualifying_data(
                 last_request.nonce_len, last_request.nonce, &attest_struct);
         if (attestation_result_nonce == true) {
-            charra_log_info("[" LOG_NAME "]     => Nonce in TPM Quote is "
-                            "valid! (matches the one sent)");
+            charra_log_info(
+                    "[" LOG_NAME "]     => Qualifying data (nonce) in TPM2 "
+                    "Quote is valid (matches the one sent)!");
         } else {
-            charra_log_error("[" LOG_NAME
-                             "]     => Nonce in TPM Quote is NOT valid! (does "
-                             "not match the one sent)");
+            charra_log_error(
+                    "[" LOG_NAME
+                    "]     => Qualifying data (nonce) in TPM2 Quote is "
+                    "NOT valid (does not match the one sent)!");
         }
     }
 
@@ -709,7 +727,7 @@ static coap_response_t coap_attest_handler(
         charra_log_info("[" LOG_NAME "] Verifying PCRs ...");
 
         charra_log_info("[" LOG_NAME
-                        "] Actual PCR composite digest from TPM Quote is:");
+                        "] Actual PCR composite digest from TPM2 Quote is:");
         charra_print_hex(CHARRA_LOG_INFO,
                 attest_struct.attested.quote.pcrDigest.size,
                 attest_struct.attested.quote.pcrDigest.buffer,
