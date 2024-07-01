@@ -27,9 +27,10 @@
 #include <tss2/tss2_tpm2_types.h>
 
 #include "../common/charra_error.h"
+#include "../util/cli/cli_util_common.h"
 
 CHARRA_RC charra_load_tpm2_key(ESYS_CONTEXT* const ctx,
-        ESYS_TR* const key_handle, const char* const path);
+        ESYS_TR* const key_handle, cli_config_attester* config);
 
 CHARRA_RC charra_load_external_public_key(ESYS_CONTEXT* ctx,
         TPM2B_PUBLIC* external_public_key, ESYS_TR* key_handle,

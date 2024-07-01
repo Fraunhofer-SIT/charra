@@ -31,12 +31,24 @@
 #include "../util/tpm2_util.h"
 
 CHARRA_RC charra_load_tpm2_key(ESYS_CONTEXT* const ctx,
-        ESYS_TR* const key_handle, const char* const path) {
+        ESYS_TR* const key_handle, cli_config_attester* config) {
     TSS2_RC r = TSS2_RC_SUCCESS;
 
     /* load TPM2 attestation key */
-    if ((r = tpm2_load_tpm_context_from_path(ctx, key_handle, path)) !=
-            TSS2_RC_SUCCESS) {
+    switch (config->attestation_key_format) {
+    case CLI_UTIL_ATTESTATION_KEY_FORMAT_FILE:
+        r = tpm2_load_tpm_context_from_path(
+                ctx, key_handle, config->attestation_key.ctx_path);
+        break;
+    case CLI_UTIL_ATTESTATION_KEY_FORMAT_HANDLE:
+        r = tpm2_load_tpm_context_from_handle(
+                ctx, config->attestation_key.tpm2_handle, key_handle);
+        break;
+    case CLI_UTIL_ATTESTATION_KEY_FORMAT_UNKNOWN:
+        charra_log_error("Unknown format for TPM key.");
+        return CHARRA_RC_ERROR;
+    }
+    if (r != TSS2_RC_SUCCESS) {
         return CHARRA_RC_ERROR;
     }
 

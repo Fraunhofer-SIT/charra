@@ -129,6 +129,13 @@ error:
     return r;
 }
 
+TSS2_RC tpm2_load_tpm_context_from_handle(
+        ESYS_CONTEXT* context, ESYS_TR tr_handle, ESYS_TR* key_handle) {
+    TSS2_RC r = TSS2_RC_SUCCESS;
+    r = Esys_TR_FromTPMPublic(context, tr_handle, ESYS_TR_NONE, ESYS_TR_NONE, ESYS_TR_NONE, key_handle);
+    return r;
+}
+
 TSS2_RC tpm2_load_tpm_context_from_path(
         ESYS_CONTEXT* context, ESYS_TR* tr_handle, const char* path) {
     if (path == NULL) {

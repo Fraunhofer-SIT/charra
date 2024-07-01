@@ -37,7 +37,7 @@
 #include "core/charra_helper.h"
 #include "core/charra_key_mgr.h"
 #include "core/charra_tap/charra_tap_cbor.h"
-#include "util/cli_util.h"
+#include "util/cli/cli_util_attester.h"
 #include "util/coap_util.h"
 #include "util/io_util.h"
 #include "util/tpm2_util.h"
@@ -56,6 +56,7 @@ coap_log_t coap_log_level = LOG_INFO;
 charra_log_t charra_log_level = CHARRA_LOG_INFO;
 
 /* config */
+static cli_config cli_attester_config = {0};
 static const char LISTEN_ADDRESS[] = "0.0.0.0";
 static unsigned int port = COAP_DEFAULT_PORT;  // default port 5683
 #define CBOR_ENCODER_BUFFER_LENGTH 20480       // 20 KiB should be sufficient
@@ -65,7 +66,6 @@ char* ima_event_log_path =
 bool use_dtls_psk = false;
 char* dtls_psk_key = "Charra DTLS Key";
 char* dtls_psk_hint = "Charra Attester";
-char* attestation_key_ctx_path = NULL;
 // TODO(any): Allocate memory for CBOR buffer with malloc() as logs can be huge.
 
 // for DTLS-RPK
@@ -105,7 +105,7 @@ int main(int argc, char** argv) {
 
     /* initialize structures to pass to the CLI parser */
     /* clang-format off */
-    cli_config cli_config = {
+    cli_attester_config = (cli_config){
         .caller = ATTESTER,
         .common_config = {
             .charra_log_level = &charra_log_level,
@@ -123,15 +123,17 @@ int main(int argc, char** argv) {
             .dtls_rpk_verify_peer_public_key =
                     &dtls_rpk_verify_peer_public_key,
         },
-        .attester_config = {
+        .specific_config.attester_config = {
             .dtls_psk_hint = &dtls_psk_hint,
-            .attestation_key_ctx_path = &attestation_key_ctx_path,
+            .attestation_key_format = CLI_UTIL_ATTESTATION_KEY_FORMAT_FILE,
+            .attestation_key.ctx_path = NULL,
         },
     };
     /* clang-format on */
 
     /* parse CLI arguments */
-    if ((result = parse_command_line_arguments(argc, argv, &cli_config)) != 0) {
+    if ((result = parse_command_line_attester_arguments(
+                 argc, argv, &cli_attester_config)) != 0) {
         // 1 means help message is displayed, -1 means error
         return (result == 1) ? EXIT_SUCCESS : EXIT_FAILURE;
     }
@@ -289,8 +291,6 @@ static void coap_attest_handler(struct coap_resource_t* resource,
     int coap_r = 0;
     TSS2_RC tss_r = 0;
     ESYS_TR sig_key_handle = ESYS_TR_NONE;
-    TPM2B_PUBLIC* public_key = NULL;
-
     /* --- receive incoming data --- */
 
     charra_log_info(
@@ -367,7 +367,8 @@ static void coap_attest_handler(struct coap_resource_t* resource,
     /* load TPM key */
     charra_log_info("[" LOG_NAME "] Loading TPM (attestation) key.");
     if ((charra_r = charra_load_tpm2_key(esys_ctx, &sig_key_handle,
-                 attestation_key_ctx_path)) != CHARRA_RC_SUCCESS) {
+                 &cli_attester_config.specific_config.attester_config)) !=
+            CHARRA_RC_SUCCESS) {
         charra_log_error(
                 "[" LOG_NAME "] Could not load TPM (attestation) key.");
         goto error;
@@ -428,7 +429,6 @@ static void coap_attest_handler(struct coap_resource_t* resource,
     /* clean up */
     charra_free_and_null(signature);
     charra_free_and_null(attest_buf);
-    charra_free_and_null(public_key);
 
     /* marshal response */
     charra_log_info("[" LOG_NAME "] Marshaling response to CBOR.");
@@ -462,13 +462,21 @@ error:
     /* free heap objects */
     charra_free_if_not_null(signature);
     charra_free_if_not_null(attest_buf);
-    charra_free_if_not_null(public_key);
-    charra_free_if_not_null(attestation_key_ctx_path);
     charra_io_free_continuous_file_buffer(&ima_event_log);
 
     /* flush handles */
     if (sig_key_handle != ESYS_TR_NONE) {
-        if (Esys_FlushContext(esys_ctx, sig_key_handle) != TSS2_RC_SUCCESS) {
+        TSS2_RC r = TSS2_RC_SUCCESS;
+        if (cli_attester_config.specific_config.attester_config
+                        .attestation_key_format ==
+                CLI_UTIL_ATTESTATION_KEY_FORMAT_HANDLE) {
+            /* close persistent key */
+            r = Esys_TR_Close(esys_ctx, &sig_key_handle);
+        } else {
+            /* flush transient key */
+            r = Esys_FlushContext(esys_ctx, sig_key_handle);
+        }
+        if (r != TSS2_RC_SUCCESS) {
             charra_log_error(
                     "[" LOG_NAME "] TSS cleanup sig_key_handle failed.");
         }
