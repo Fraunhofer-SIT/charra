@@ -21,7 +21,7 @@
 #include <inttypes.h>
 
 #include "../common/charra_error.h"
-#include "charra_dto.h"
+#include "charra_tap/charra_tap_cbor.h"
 
 #ifndef CHARRA_HELPER_H
 #define CHARRA_HELPER_H

@@ -19,6 +19,10 @@
  * BSD-3-Clause).
  */
 
+#include "../common/charra_error.h"
+#include "../core/charra_tap/charra_tap_dto.h"
+#include <stdint.h>
+
 /**
  * @brief Parses PCR value from a string. Expects the PCR value to
  * start with the characters '0x'.
@@ -37,3 +41,16 @@ CHARRA_RC parse_pcr_value(char* start, size_t length, uint8_t* pcr_value);
  * big for a PCR index.
  */
 int parse_pcr_index(char* index_start);
+
+/**
+ * @brief Parses a request for a PCR log into a response.
+ *
+ * @param[in] log_name application name for the logger
+ * @param[in] ima_log_path path to the ima log file
+ * @param[in] tcg_boot_log_path path to the tcg-boot log file
+ * @param[in] request pointer to the request
+ * @param[out] response pointer to the response
+ */
+CHARRA_RC parse_pcr_log_request(const char* const log_name,
+        const char* const ima_log_path, const char* const tcg_boot_log_path,
+        const pcr_log_dto* const request, pcr_log_response_dto* response);

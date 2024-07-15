@@ -26,7 +26,6 @@
 #include "../common/charra_error.h"
 #include "../common/charra_log.h"
 #include "../util/io_util.h"
-#include "charra_dto.h"
 
 CHARRA_RC charra_tpm2_pcr_selection_to_bitmap(const uint32_t pcr_selection_len,
         const uint8_t pcr_selection[],

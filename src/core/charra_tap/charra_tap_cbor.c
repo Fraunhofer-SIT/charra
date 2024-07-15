@@ -23,16 +23,18 @@
 #include <qcbor/qcbor.h>
 #include <qcbor/qcbor_encode.h>
 #include <qcbor/qcbor_spiffy_decode.h>
+#include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "../../common/charra_log.h"
-#include "../../core/charra_dto.h"
+#include "../../common/charra_macro.h"
 #include "charra_tap_cbor.h"
 #include "charra_tap_dto.h"
 #include "charra_tap_types.h"
 
 static CHARRA_RC charra_tap_attestation_request_internal(
-        const msg_attestation_request_dto* attestation_request,
+        const charra_tap_msg_attestation_request_dto* attestation_request,
         UsefulBuf buf_in, UsefulBufC* buf_out) {
     charra_log_trace("<ENTER> %s()", __func__);
 
@@ -44,9 +46,6 @@ static CHARRA_RC charra_tap_attestation_request_internal(
     assert(attestation_request->pcr_selections->pcrs != NULL);
     assert(attestation_request->nonce_len <= sizeof(TPMU_HA));
     assert(attestation_request->nonce != NULL);
-    if (attestation_request->event_log_path_len != 0) {
-        assert(attestation_request->event_log_path != NULL);
-    }
 
     QCBOREncodeContext ec = {0};
 
@@ -92,10 +91,23 @@ static CHARRA_RC charra_tap_attestation_request_internal(
     /* close array: pcr_selections_array_encoder */
     QCBOREncode_CloseArray(&ec);
 
-    /* encode "event_log_path" */
-    UsefulBufC event_log_path = {.ptr = attestation_request->event_log_path,
-            .len = attestation_request->event_log_path_len};
-    QCBOREncode_AddBytes(&ec, event_log_path);
+    /* encode pcr-log requests */
+    QCBOREncode_OpenArray(&ec);
+    for (uint32_t i = 0; i < attestation_request->pcr_log_len; ++i) {
+        /* open array: pcr-log */
+        QCBOREncode_OpenArray(&ec);
+        /* pcr-log identifier */
+        UsefulBufC identifier = {attestation_request->pcr_logs[i].identifier,
+                strlen(attestation_request->pcr_logs[i].identifier) + 1};
+        QCBOREncode_AddText(&ec, identifier);
+        /* pcr-log start */
+        QCBOREncode_AddUInt64(&ec, attestation_request->pcr_logs[i].start);
+        /* pcr-log count */
+        QCBOREncode_AddUInt64(&ec, attestation_request->pcr_logs[i].count);
+        /* close array: pcr-log */
+        QCBOREncode_CloseArray(&ec);
+    }
+    QCBOREncode_CloseArray(&ec);
 
     /* close array: root_array_encoder */
     QCBOREncode_CloseArray(&ec);
@@ -108,7 +120,7 @@ static CHARRA_RC charra_tap_attestation_request_internal(
 }
 
 static CHARRA_RC charra_tap_attestation_request_size(
-        const msg_attestation_request_dto* attestation_request,
+        const charra_tap_msg_attestation_request_dto* attestation_request,
         size_t* marshaled_data_len) {
     charra_log_trace("<ENTER> %s()", __func__);
 
@@ -128,7 +140,7 @@ static CHARRA_RC charra_tap_attestation_request_size(
 }
 
 CHARRA_RC charra_tap_marshal_attestation_request(
-        const msg_attestation_request_dto* attestation_request,
+        const charra_tap_msg_attestation_request_dto* attestation_request,
         uint32_t* marshaled_data_len, uint8_t** marshaled_data) {
     charra_log_trace("<ENTER> %s()", __func__);
     CHARRA_RC charra_r = CHARRA_RC_SUCCESS;
@@ -141,9 +153,8 @@ CHARRA_RC charra_tap_marshal_attestation_request(
     assert(attestation_request->pcr_selections->pcrs != NULL);
     assert(attestation_request->nonce_len <= sizeof(TPMU_HA));
     assert(attestation_request->nonce != NULL);
-    if (attestation_request->event_log_path_len != 0) {
-        assert(attestation_request->event_log_path != NULL);
-    }
+    assert(attestation_request->pcr_log_len <= SUPPORTED_PCR_LOGS_COUNT);
+    assert(attestation_request->pcr_logs != NULL);
 
     /* compute size of marshaled data */
     UsefulBuf buf_in = {.len = 0, .ptr = NULL};
@@ -178,8 +189,8 @@ CHARRA_RC charra_tap_marshal_attestation_request(
 
 CHARRA_RC charra_tap_unmarshal_attestation_request(
         const uint32_t marshaled_data_len, const uint8_t* marshaled_data,
-        msg_attestation_request_dto* attestation_request) {
-    msg_attestation_request_dto req = {0};
+        charra_tap_msg_attestation_request_dto* attestation_request) {
+    charra_tap_msg_attestation_request_dto req = {0};
     QCBORError cborerr = QCBOR_SUCCESS;
     UsefulBufC marshaled_data_buf = {marshaled_data, marshaled_data_len};
     QCBORDecodeContext dc = {0};
@@ -242,21 +253,39 @@ CHARRA_RC charra_tap_unmarshal_attestation_request(
     /*  exit array "pcr-selections" */
     QCBORDecode_ExitArray(&dc);
 
-    /* parse "event-log-path" (bytes) */
-    QCBORDecode_GetByteString(&dc, &item_str_buf);
-    req.event_log_path_len = item_str_buf.len;
-    if (req.event_log_path_len != 0) {
-        uint8_t* event_log_path = (uint8_t*)malloc(req.event_log_path_len);
-        if (event_log_path == NULL) {
-            goto cbor_parse_error;
-        } else {
-            req.event_log_path = event_log_path;
-            if (memcpy(req.event_log_path, item_str_buf.ptr,
-                        req.event_log_path_len) == NULL) {
-                goto cbor_parse_error;
-            }
-        }
+    /* parse pcr-log requests */
+    QCBORDecode_EnterArray(&dc, &item);
+    uint32_t pcr_log_count = (uint32_t)item.val.uCount;
+    req.pcr_log_len = pcr_log_count;
+    req.pcr_logs = calloc(pcr_log_count, sizeof(pcr_log_dto));
+    /* TODO don't forget to free the allocated memory */
+
+    for (uint32_t i = 0; i < pcr_log_count; ++i) {
+        /* parse array "pcr-log" */
+        QCBORDecode_EnterArray(&dc, &item);
+
+        /* parse pcr-log identifier */
+        QCBORDecode_GetTextString(&dc, &item_str_buf);
+
+        uint64_t start = 0;
+        uint64_t count = 0;
+
+        /* parse pcr-log start */
+        QCBORDecode_GetUInt64(&dc, &start);
+
+        /* parse pcr-log count */
+        QCBORDecode_GetUInt64(&dc, &count);
+
+        /* exit array "pcr-log" */
+        QCBORDecode_ExitArray(&dc);
+
+        /* TODO don't forget to free the allocated memory */
+        req.pcr_logs[i].identifier = calloc(item_str_buf.len + 1, 1);
+        memcpy(req.pcr_logs[i].identifier, item_str_buf.ptr, item_str_buf.len);
+        req.pcr_logs[i].start = start;
+        req.pcr_logs[i].count = count;
     }
+    QCBORDecode_ExitArray(&dc);
 
     /* exit root array */
     QCBORDecode_ExitArray(&dc);
@@ -287,14 +316,17 @@ static CHARRA_RC charra_tap_marshal_attestation_response_internal(
 
     /* verify input */
     assert(attestation_response != NULL);
-    assert(attestation_response->attestation_data != NULL);
-    assert(attestation_response->tpm2_signature != NULL);
+    assert(attestation_response->tpm2_quote.attestation_data != NULL);
+    assert(attestation_response->tpm2_quote.tpm2_signature != NULL);
 
     QCBOREncodeContext ec = {0};
 
     QCBOREncode_Init(&ec, buf_in);
 
     /* root array */
+    QCBOREncode_OpenArray(&ec);
+
+    /* array tpm2_quote */
     QCBOREncode_OpenArray(&ec);
 
     /* encode information element identifier */
@@ -305,14 +337,52 @@ static CHARRA_RC charra_tap_marshal_attestation_response_internal(
 
     /* encode "attestation-data" */
     UsefulBufC attestation_data = {
-            .ptr = attestation_response->attestation_data,
-            .len = attestation_response->attestation_data_len};
+            .ptr = attestation_response->tpm2_quote.attestation_data,
+            .len = attestation_response->tpm2_quote.attestation_data_len};
     QCBOREncode_AddBytes(&ec, attestation_data);
 
     /* encode "tpm2-signature" */
-    UsefulBufC tpm2_signature = {.ptr = attestation_response->tpm2_signature,
-            .len = attestation_response->tpm2_signature_len};
+    UsefulBufC tpm2_signature = {
+            .ptr = attestation_response->tpm2_quote.tpm2_signature,
+            .len = attestation_response->tpm2_quote.tpm2_signature_len};
     QCBOREncode_AddBytes(&ec, tpm2_signature);
+
+    /* close array: tpm2_quote */
+    QCBOREncode_CloseArray(&ec);
+
+    /* array pcr-logs */
+    QCBOREncode_OpenArray(&ec);
+
+    for (uint32_t i = 0; i < attestation_response->pcr_log_len; ++i) {
+        /* array pcr-log */
+        QCBOREncode_OpenArray(&ec);
+
+        /* encode information element identifier */
+        QCBOREncode_AddUInt64(&ec, CHARRA_TAP_IE_PCR_LOG);
+
+        /* encode identifier */
+        UsefulBufC identifier = {
+                .ptr = attestation_response->pcr_logs[i].identifier,
+                .len = strlen(attestation_response->pcr_logs[i].identifier)};
+        QCBOREncode_AddText(&ec, identifier);
+
+        /* encode start */
+        QCBOREncode_AddUInt64(&ec, attestation_response->pcr_logs[i].start);
+
+        /* encode count */
+        QCBOREncode_AddUInt64(&ec, attestation_response->pcr_logs[i].count);
+
+        /* encode content */
+        UsefulBufC content = {.ptr = attestation_response->pcr_logs[i].content,
+                .len = attestation_response->pcr_logs[i].content_len};
+        QCBOREncode_AddBytes(&ec, content);
+
+        /* close array: pcr-log */
+        QCBOREncode_CloseArray(&ec);
+    }
+
+    /* close array: pcr-logs */
+    QCBOREncode_CloseArray(&ec);
 
     /* close array: root_array_encoder */
     QCBOREncode_CloseArray(&ec);
@@ -354,8 +424,8 @@ CHARRA_RC charra_tap_marshal_attestation_response(
 
     /* verify input */
     assert(attestation_response != NULL);
-    assert(attestation_response->attestation_data != NULL);
-    assert(attestation_response->tpm2_signature != NULL);
+    assert(attestation_response->tpm2_quote.attestation_data != NULL);
+    assert(attestation_response->tpm2_quote.tpm2_signature != NULL);
 
     /* compute size of marshaled data */
     UsefulBuf buf_in = {.len = 0, .ptr = NULL};
@@ -399,11 +469,15 @@ CHARRA_RC charra_tap_unmarshal_attestation_response(
     QCBORItem item = {0};
     UsefulBufC item_str_buf = {0};
     uint64_t ie_identifier = 0;
+    uint64_t log_ie_identifier = 0;
     uint64_t attestation_subtype = 0;
 
     QCBORDecode_Init(&dc, marshaled_data_buf, QCBOR_DECODE_MODE_NORMAL);
 
     /* parse root array */
+    QCBORDecode_EnterArray(&dc, &item);
+
+    /* parse tpm2-quote array */
     QCBORDecode_EnterArray(&dc, &item);
 
     /* parse information element identifier */
@@ -414,13 +488,64 @@ CHARRA_RC charra_tap_unmarshal_attestation_response(
 
     /* parse "attestation-data" (bytes) */
     QCBORDecode_GetByteString(&dc, &item_str_buf);
-    res.attestation_data_len = item_str_buf.len;
-    memcpy(&(res.attestation_data), item_str_buf.ptr, res.attestation_data_len);
+    res.tpm2_quote.attestation_data_len = item_str_buf.len;
+    memcpy(&(res.tpm2_quote.attestation_data), item_str_buf.ptr,
+            res.tpm2_quote.attestation_data_len);
 
     /* parse "tpm2-signature" (bytes) */
     QCBORDecode_GetByteString(&dc, &item_str_buf);
-    res.tpm2_signature_len = item_str_buf.len;
-    memcpy(&(res.tpm2_signature), item_str_buf.ptr, res.tpm2_signature_len);
+    res.tpm2_quote.tpm2_signature_len = item_str_buf.len;
+    memcpy(&(res.tpm2_quote.tpm2_signature), item_str_buf.ptr,
+            res.tpm2_quote.tpm2_signature_len);
+
+    /* exit tpm2_quote array */
+    QCBORDecode_ExitArray(&dc);
+
+    /* parse array pcr-logs */
+    QCBORDecode_EnterArray(&dc, &item);
+    res.pcr_log_len = item.val.uCount;
+    res.pcr_logs = calloc(res.pcr_log_len, sizeof(pcr_log_response_dto));
+    for (uint32_t i = 0; i < res.pcr_log_len; ++i) {
+        /* parse array pcr-log */
+        QCBORDecode_EnterArray(&dc, &item);
+
+        /* parse information element identifier */
+        QCBORDecode_GetUInt64(&dc, &log_ie_identifier);
+        if (log_ie_identifier != CHARRA_TAP_IE_PCR_LOG) {
+            goto cbor_parse_error;
+        }
+
+        /* parse identifier */
+        QCBORDecode_GetTextString(&dc, &item_str_buf);
+        res.pcr_logs[i].identifier = calloc(item_str_buf.len + 1, 1);
+        if (res.pcr_logs[i].identifier == NULL) {
+            goto cbor_parse_error;
+        }
+        memcpy(res.pcr_logs[i].identifier, item_str_buf.ptr,
+                item_str_buf.len);
+
+        /* parse start */
+        QCBORDecode_GetUInt64(&dc, &(res.pcr_logs[i].start));
+
+        /* parse count */
+        QCBORDecode_GetUInt64(&dc, &(res.pcr_logs[i].count));
+
+        /* parse content */
+        QCBORDecode_GetByteString(&dc, &item_str_buf);
+        res.pcr_logs[i].content_len = item_str_buf.len;
+        res.pcr_logs[i].content = malloc(item_str_buf.len);
+        if (res.pcr_logs[i].content == NULL) {
+            goto cbor_parse_error;
+        }
+        memcpy(res.pcr_logs[i].content, item_str_buf.ptr,
+                item_str_buf.len);
+
+        /* exit array pcr-log */
+        QCBORDecode_ExitArray(&dc);
+    }
+
+    /* exit array pcr-logs */
+    QCBORDecode_ExitArray(&dc);
 
     /* exit root array */
     QCBORDecode_ExitArray(&dc);
