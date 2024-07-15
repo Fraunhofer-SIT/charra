@@ -24,6 +24,7 @@
 #include <getopt.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <tss2/tss2_tctildr.h>
@@ -32,7 +33,6 @@
 
 #include "common/charra_log.h"
 #include "common/charra_macro.h"
-#include "core/charra_dto.h"
 #include "core/charra_key_mgr.h"
 #include "core/charra_rim_mgr.h"
 #include "core/charra_tap/charra_tap_cbor.h"
@@ -108,6 +108,10 @@ char* dtls_rpk_public_key_path = "keys/verifier.pub.der";
 char* dtls_rpk_peer_public_key_path = "keys/attester.pub.der";
 bool dtls_rpk_verify_peer_public_key = true;
 
+// for PCR logs
+uint32_t pcr_log_len = 0;
+pcr_log_dto pcr_logs[SUPPORTED_PCR_LOGS_COUNT] = {0};
+
 /* --- function forward declarations -------------------------------------- */
 
 /**
@@ -118,7 +122,7 @@ bool dtls_rpk_verify_peer_public_key = true;
 static void handle_sigint(int signum);
 
 static CHARRA_RC create_attestation_request(
-        msg_attestation_request_dto* attestation_request);
+        charra_tap_msg_attestation_request_dto* attestation_request);
 
 static coap_response_t coap_attest_handler(coap_session_t* session,
         const coap_pdu_t* sent, const coap_pdu_t* received,
@@ -126,7 +130,7 @@ static coap_response_t coap_attest_handler(coap_session_t* session,
 
 /* --- static variables --------------------------------------------------- */
 
-static msg_attestation_request_dto last_request = {0};
+static charra_tap_msg_attestation_request_dto last_request = {0};
 static charra_tap_msg_attestation_response_dto last_response = {0};
 
 /* --- main --------------------------------------------------------------- */
@@ -174,6 +178,8 @@ int main(int argc, char** argv) {
             .ima_event_log_path = &ima_event_log_path,
             .dtls_psk_identity = &dtls_psk_identity,
             .signature_hash_algorithm = &signature_hash_algorithm,
+            .pcr_log_len = &pcr_log_len,
+            .pcr_logs = &pcr_logs
         },
     };
     /* clang-format on */
@@ -322,7 +328,7 @@ int main(int argc, char** argv) {
     }
 
     /* define needed variables */
-    msg_attestation_request_dto req = {0};
+    charra_tap_msg_attestation_request_dto req = {0};
     uint32_t req_buf_len = 0;
     coap_pdu_t* pdu = NULL;
     coap_mid_t mid = COAP_INVALID_MID;
@@ -469,7 +475,7 @@ cleanup:
 static void handle_sigint(int signum CHARRA_UNUSED) { quit = true; }
 
 static CHARRA_RC create_attestation_request(
-        msg_attestation_request_dto* attestation_request) {
+        charra_tap_msg_attestation_request_dto* attestation_request) {
     CHARRA_RC err = CHARRA_RC_ERROR;
 
     /* generate nonce */
@@ -495,7 +501,7 @@ static CHARRA_RC create_attestation_request(
             "                                              0x", "\n", false);
 
     /* build attestation request */
-    msg_attestation_request_dto req = {
+    charra_tap_msg_attestation_request_dto req = {
             .hello = false,
             .sig_key_id_len = TPM_SIG_KEY_ID_LEN,
             .sig_key_id = {0},  // must be memcpy'd, see below
@@ -508,10 +514,8 @@ static CHARRA_RC create_attestation_request(
                     .pcrs_len = tpm_pcr_selection_len[1],
                     .pcrs = {0}  // must be memcpy'd, see below
             }},
-            .event_log_path_len =
-                    (use_ima_event_log) ? strlen(ima_event_log_path) : 0,
-            .event_log_path =
-                    (use_ima_event_log) ? (uint8_t*)ima_event_log_path : NULL,
+            .pcr_log_len = pcr_log_len,
+            .pcr_logs = pcr_logs,
     };
     memcpy(req.sig_key_id, TPM_SIG_KEY_ID, TPM_SIG_KEY_ID_LEN);
     memcpy(req.nonce, nonce, nonce_len);
@@ -576,14 +580,14 @@ static coap_response_t coap_attest_handler(
     last_response = res;
 
     /* verify data */
-    if (res.attestation_data_len > sizeof(TPM2B_ATTEST)) {
+    if (res.tpm2_quote.attestation_data_len > sizeof(TPM2B_ATTEST)) {
         charra_log_error(
                 "[" LOG_NAME
                 "] Length of attestation data exceeds maximum allowed size.");
         attestation_rc = CHARRA_RC_ERROR;
         goto cleanup;
     }
-    if (res.tpm2_signature_len > sizeof(TPMT_SIGNATURE)) {
+    if (res.tpm2_quote.tpm2_signature_len > sizeof(TPMT_SIGNATURE)) {
         charra_log_error("[" LOG_NAME
                          "] Length of signature exceeds maximum allowed size.");
         attestation_rc = CHARRA_RC_ERROR;
@@ -623,11 +627,12 @@ static coap_response_t coap_attest_handler(
     /* prepare verification */
     charra_log_info("[" LOG_NAME "] Preparing TPM2 Quote verification.");
     TPM2B_ATTEST attest = {0};
-    attest.size = res.attestation_data_len;
-    memcpy(attest.attestationData, res.attestation_data,
-            res.attestation_data_len);
+    attest.size = res.tpm2_quote.attestation_data_len;
+    memcpy(attest.attestationData, res.tpm2_quote.attestation_data,
+            res.tpm2_quote.attestation_data_len);
     TPMT_SIGNATURE signature = {0};
-    memcpy(&signature, res.tpm2_signature, res.tpm2_signature_len);
+    memcpy(&signature, res.tpm2_quote.tpm2_signature,
+            res.tpm2_quote.tpm2_signature_len);
 
     /* --- verify attestation signature --- */
     bool attestation_result_signature = false;
@@ -666,7 +671,8 @@ static coap_response_t coap_attest_handler(
         if ((attestation_rc = charra_crypto_rsa_verify_signature(
                      &mbedtls_rsa_pub_key,
                      signature_hash_algorithm.mbedtls_hash_algorithm,
-                     res.attestation_data, (size_t)res.attestation_data_len,
+                     res.tpm2_quote.attestation_data,
+                     (size_t)res.tpm2_quote.attestation_data_len,
                      signature.signature.rsapss.sig.buffer,
                      &tpm2_public_key)) == CHARRA_RC_SUCCESS) {
             charra_log_info(
@@ -680,8 +686,9 @@ static coap_response_t coap_attest_handler(
 
     /* unmarshal attestation data */
     TPMS_ATTEST attest_struct = {0};
-    attestation_rc = charra_unmarshal_tpm2_quote(
-            res.attestation_data_len, res.attestation_data, &attest_struct);
+    attestation_rc =
+            charra_unmarshal_tpm2_quote(res.tpm2_quote.attestation_data_len,
+                    res.tpm2_quote.attestation_data, &attest_struct);
     if (attestation_rc != CHARRA_RC_SUCCESS) {
         charra_log_error("[" LOG_NAME "] Error while unmarshaling TPM2 Quote.");
         goto cleanup;
@@ -750,6 +757,16 @@ static coap_response_t coap_attest_handler(
         }
     }
 
+    /* check pcr logs */
+    if (res.pcr_log_len == 0) {
+        charra_log_info("[" LOG_NAME "] No PCR logs received.");
+    }
+
+    for (uint32_t i = 0; i < res.pcr_log_len; i++) {
+        charra_log_info("[" LOG_NAME "] Received PCR log %s [%lu Bytes]",
+                pcr_logs[i].identifier, res.pcr_logs[i].content_len);
+    }
+
     // TODO(any): Implement real verification.
 
     /* --- output result --- */
@@ -770,6 +787,10 @@ static coap_response_t coap_attest_handler(
     charra_log_info("[" LOG_NAME "] +----------------------------+");
 
 cleanup:
+    /* free heap objects*/
+    // charra_free_if_not_null(res.pcclient_log.pcr_log);
+    // charra_free_if_not_null(res.ima_log.pcr_log);
+
     /* flush handles */
     if (sig_key_handle != ESYS_TR_NONE) {
         if (Esys_FlushContext(esys_ctx, sig_key_handle) != TSS2_RC_SUCCESS) {

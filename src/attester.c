@@ -23,6 +23,7 @@
 #include <coap3/coap.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,15 +32,18 @@
 #include <tss2/tss2_tctildr.h>
 #include <tss2/tss2_tpm2_types.h>
 
+#include "common/charra_error.h"
 #include "common/charra_log.h"
 #include "common/charra_macro.h"
-#include "core/charra_dto.h"
 #include "core/charra_helper.h"
 #include "core/charra_key_mgr.h"
 #include "core/charra_tap/charra_tap_cbor.h"
+#include "core/charra_tap/charra_tap_dto.h"
 #include "util/cli/cli_util_attester.h"
+#include "util/cli/cli_util_common.h"
 #include "util/coap_util.h"
 #include "util/io_util.h"
+#include "util/parser_util.h"
 #include "util/tpm2_util.h"
 
 #define CHARRA_UNUSED __attribute__((unused))
@@ -60,9 +64,6 @@ static cli_config cli_attester_config = {0};
 static const char LISTEN_ADDRESS[] = "0.0.0.0";
 static unsigned int port = COAP_DEFAULT_PORT;  // default port 5683
 #define CBOR_ENCODER_BUFFER_LENGTH 20480       // 20 KiB should be sufficient
-bool use_ima_event_log = false;
-char* ima_event_log_path =
-        "/sys/kernel/security/ima/binary_runtime_measurements";
 bool use_dtls_psk = false;
 char* dtls_psk_key = "Charra DTLS Key";
 char* dtls_psk_hint = "Charra Attester";
@@ -127,6 +128,8 @@ int main(int argc, char** argv) {
             .dtls_psk_hint = &dtls_psk_hint,
             .attestation_key_format = CLI_UTIL_ATTESTATION_KEY_FORMAT_FILE,
             .attestation_key.ctx_path = NULL,
+            .ima_log_path = NULL,
+            .tcg_boot_log_path = NULL,
         },
     };
     /* clang-format on */
@@ -315,7 +318,7 @@ static void coap_attest_handler(struct coap_resource_t* resource,
 
     /* unmarshal data */
     charra_log_info("[" LOG_NAME "] Parsing received CBOR data.");
-    msg_attestation_request_dto req = {0};
+    charra_tap_msg_attestation_request_dto req = {0};
     if ((charra_r = charra_tap_unmarshal_attestation_request(
                  data_len, data, &req)) != CHARRA_RC_SUCCESS) {
         charra_log_error("[" LOG_NAME "] Could not parse CBOR data.");
@@ -390,8 +393,22 @@ static void coap_attest_handler(struct coap_resource_t* resource,
 
     /* --- send response data --- */
 
+    pcr_log_response_dto* pcr_log_responses = NULL;
+    pcr_log_responses = malloc(req.pcr_log_len * sizeof(pcr_log_response_dto));
+    /* TODO don't forget to free the allocated memory */
+
+    /* parse log files if requested */
+    for (uint32_t i = 0; i < req.pcr_log_len; i++) {
+        parse_pcr_log_request(LOG_NAME,
+                cli_attester_config.specific_config.attester_config
+                        .ima_log_path,
+                cli_attester_config.specific_config.attester_config
+                        .tcg_boot_log_path,
+                req.pcr_logs + i, pcr_log_responses + i);
+    }
+
     /* read IMA event log if requested */
-    uint8_t* ima_event_log = NULL;
+    /*uint8_t* ima_event_log = NULL;
     size_t ima_event_log_len = 0;
     if (req.event_log_path_len != 0) {
         charra_log_info("[" LOG_NAME "] Reading IMA event log.");
@@ -410,21 +427,29 @@ static void coap_attest_handler(struct coap_resource_t* resource,
                             "] IMA event log has a size of %d bytes.",
                     ima_event_log_len);
         }
-    }
+    }*/
 
     /* prepare response */
     charra_log_info("[" LOG_NAME "] Preparing response.");
 
     /* prepare response DTO */
     charra_tap_msg_attestation_response_dto res = {
-            .attestation_data_len = attest_buf->size,
-            .attestation_data = {0},  // must be memcpy'd, see below
-            .tpm2_signature_len = sizeof(*signature),
-            .tpm2_signature = {0},  // must be memcpy'd, see below
+            .tpm2_quote =
+                    {
+                            .attestation_data_len = attest_buf->size,
+                            .attestation_data =
+                                    {0},  // must be memcpy'd, see below
+                            .tpm2_signature_len = sizeof(*signature),
+                            .tpm2_signature =
+                                    {0},  // must be memcpy'd, see below
+                    },
+            .pcr_log_len = req.pcr_log_len,
+            .pcr_logs = pcr_log_responses,
     };
-    memcpy(res.attestation_data, attest_buf->attestationData,
-            res.attestation_data_len);
-    memcpy(res.tpm2_signature, signature, res.tpm2_signature_len);
+    memcpy(res.tpm2_quote.attestation_data, attest_buf->attestationData,
+            res.tpm2_quote.attestation_data_len);
+    memcpy(res.tpm2_quote.tpm2_signature, signature,
+            res.tpm2_quote.tpm2_signature_len);
 
     /* clean up */
     charra_free_and_null(signature);
@@ -462,7 +487,7 @@ error:
     /* free heap objects */
     charra_free_if_not_null(signature);
     charra_free_if_not_null(attest_buf);
-    charra_io_free_continuous_file_buffer(&ima_event_log);
+    // charra_io_free_continuous_file_buffer(&ima_event_log);
 
     /* flush handles */
     if (sig_key_handle != ESYS_TR_NONE) {
