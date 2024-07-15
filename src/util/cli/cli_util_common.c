@@ -290,6 +290,9 @@ int cli_util_common_parse_option_as_ulong(
         const char* const option, int base, uint64_t* value) {
     char* endptr = NULL;
     errno = 0;
+    if (option[0] == '-') {
+        return -1;
+    }
     *value = strtoul(option, &endptr, base);
     if (errno != 0 || *endptr != '\0') {
         return -1;

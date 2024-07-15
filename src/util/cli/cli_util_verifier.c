@@ -24,6 +24,7 @@
 #include "cli_util_common.h"
 #include <bits/getopt_core.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -43,7 +44,7 @@ typedef enum {
     CLI_VERIFIER_PSK_IDENTITY = 'i',
     CLI_VERIFIER_IP = 'a',
     CLI_VERIFIER_TIMEOUT = 't',
-    CLI_VERIFIER_ATTESTATION_PUBLIC_KEY = '5',
+    CLI_VERIFIER_ATTESTATION_PUBLIC_KEY = '6',
     CLI_VERIFIER_PCR_FILE = 'f',
     CLI_VERIFIER_PCR_SELECTION = 's',
     CLI_VERIFIER_IMA = 'm',
@@ -59,6 +60,8 @@ static const struct option verifier_options[] = {
         {CLI_COMMON_HELP_LONG, no_argument, 0, CLI_COMMON_HELP},
         /* port only has a specific help message */
         {CLI_COMMON_PORT_LONG, required_argument, 0, CLI_COMMON_PORT},
+        /* pcr-log has only the same name */
+        {CLI_COMMON_PCR_LOG_LONG, required_argument, 0, CLI_COMMON_PCR_LOG},
         /* common rpk group-options */
         {CLI_COMMON_RPK_LONG, no_argument, 0, CLI_COMMON_RPK},
         {CLI_COMMON_RPK_PRIVATE_KEY_LONG, required_argument, 0,
@@ -181,7 +184,91 @@ static void print_verifier_help_message(const cli_config* const variables) {
             CLI_VERIFIER_PSK_IDENTITY, CLI_VERIFIER_PSK_IDENTITY_LONG);
 }
 
-static void cli_verifer_identity(const cli_config* variables) {
+static int parse_pcr_log_start_count(
+        char* const value, uint64_t* start, uint64_t* count) {
+    char* number1 = NULL;
+    char* number2 = NULL;
+    number1 = strtok(value, ",");
+    number2 = strtok(NULL, ",");
+    /* check if there is a comma */
+    if (number2 == NULL) {
+        return -1;
+    }
+    /* parse start and count */
+    if (cli_util_common_parse_option_as_ulong(number1, 10, start) != 0) {
+        return -1;
+    }
+    if (cli_util_common_parse_option_as_ulong(number2, 10, count) != 0) {
+        return -1;
+    }
+    return 0;
+}
+
+static int check_pcr_log_format(const char* const format) {
+    if (strcmp(format, "ima") == 0 || strcmp(format, "tcg-boot") == 0) {
+        return 0;
+    }
+    return -1;
+}
+
+static uint32_t calculate_index_and_update_length(
+        cli_config* variables, const char* const identifier) {
+    size_t len = strlen(identifier);
+    uint32_t index = 0;
+    pcr_log_dto* pcr_logs =
+            *(variables->specific_config.verifier_config.pcr_logs);
+    uint32_t* pcr_log_len =
+            variables->specific_config.verifier_config.pcr_log_len;
+    while (index < SUPPORTED_PCR_LOGS_COUNT) {
+        /* identifier is new */
+        if (pcr_logs[index].identifier == NULL) {
+            *pcr_log_len = (*pcr_log_len) + 1;
+            break;
+        }
+        /* identifier is already in the list and should be overridden */
+        if (strncmp(identifier, pcr_logs[index].identifier, len) == 0) {
+            break;
+        }
+        index++;
+    }
+    return index;
+}
+
+static int cli_verifier_pcr_log(cli_config* variables) {
+    char* format = NULL;
+    char* value = NULL;
+    uint64_t start = 0;
+    uint64_t count = 0;
+    if (cli_util_common_split_option_string(optarg, &format, &value) != 0) {
+        charra_log_error("[%s] Argument syntax error: please use "
+                         "'--%s=FORMAT:START,COUNT'",
+                LOG_NAME, CLI_COMMON_PCR_LOG_LONG);
+        return -1;
+    }
+    if (parse_pcr_log_start_count(value, &start, &count) != 0) {
+        charra_log_error("[%s] Argument syntax error: please use "
+                         "'--%s=FORMAT:START,COUNT'",
+                LOG_NAME, CLI_COMMON_PCR_LOG_LONG);
+        return -1;
+    }
+    if (check_pcr_log_format(format) != 0) {
+        charra_log_error("[%s] Unknown format '%s'", LOG_NAME, format);
+        return -1;
+    }
+    uint32_t index = calculate_index_and_update_length(variables, format);
+    if (index >= SUPPORTED_PCR_LOGS_COUNT) {
+        charra_log_error("[%s] Too many pcr logs. This should never happen.", LOG_NAME);
+        return -1;
+    }
+    pcr_log_dto* pcr_logs =
+            *(variables->specific_config.verifier_config.pcr_logs);
+    pcr_logs[index].identifier = format;
+    pcr_logs[index].start = start;
+    pcr_logs[index].count = count;
+    return 0;
+}
+
+static void cli_verifier_identity(const cli_config* variables) {
     *variables->common_config.use_dtls_psk = true;
     *(variables->specific_config.verifier_config.dtls_psk_identity) = optarg;
 }
@@ -445,9 +532,12 @@ int parse_command_line_verifier_arguments(
         case -1:
             rc = check_required_options(variables);
             goto cleanup;
+        case CLI_COMMON_PCR_LOG:
+            rc = cli_verifier_pcr_log(variables);
+            break;
         /* parse specific options */
         case CLI_VERIFIER_PSK_IDENTITY:
-            cli_verifer_identity(variables);
+            cli_verifier_identity(variables);
             break;
         case CLI_VERIFIER_IP:
             rc = cli_verifier_ip(variables);

@@ -34,7 +34,7 @@
 
 typedef enum {
     CLI_ATTESTER_PSK_HINT = 'h',
-    CLI_ATTESTER_ATTESTATION_KEY = '5',
+    CLI_ATTESTER_ATTESTATION_KEY = '6',
 } cli_util_attester_args_e;
 
 static const struct option attester_options[] = {
@@ -46,6 +46,8 @@ static const struct option attester_options[] = {
         {CLI_COMMON_HELP_LONG, no_argument, 0, CLI_COMMON_HELP},
         /* port only has a specific help message */
         {CLI_COMMON_PORT_LONG, required_argument, 0, CLI_COMMON_PORT},
+        /* pcr-log has only the same name */
+        {CLI_COMMON_PCR_LOG_LONG, required_argument, 0, CLI_COMMON_PCR_LOG},
         /* common rpk group-options */
         {CLI_COMMON_RPK_LONG, no_argument, 0, CLI_COMMON_RPK},
         {CLI_COMMON_RPK_PRIVATE_KEY_LONG, required_argument, 0,
@@ -93,6 +95,9 @@ static void print_attester_help_message(const cli_config* const variables) {
     printf("     --%s=PORT:                Open PORT instead of "
            "port %u.\n",
             CLI_COMMON_PORT_LONG, *(variables->common_config.port));
+    printf("     --%s=FORMAT:FILE:      Specifies the path to the PCR log "
+           "file. Available formats are: ima, tcg-boot.\n",
+            CLI_COMMON_PCR_LOG_LONG);
 
     /* print DTLS-PSK grouped options */
     printf("DTLS-PSK Options:\n");
@@ -108,6 +113,34 @@ static void print_attester_help_message(const cli_config* const variables) {
     printf(" -%c, --%s=HINT:            Use HINT as hint for "
            "DTLS. Implicitly enables DTLS-PSK.\n",
             CLI_ATTESTER_PSK_HINT, CLI_ATTESTER_PSK_HINT_LONG);
+}
+
+static int cli_attester_pcr_log(cli_config* variables) {
+    char* format = NULL;
+    char* value = NULL;
+    if (cli_util_common_split_option_string(optarg, &format, &value) != 0) {
+        charra_log_error("[%s] Argument syntax error: please use "
+                         "'--%s=FORMAT:FILE'",
+                LOG_NAME, CLI_COMMON_PCR_LOG_LONG);
+        return -1;
+    }
+    /* check if file is exists */
+    if (charra_io_file_exists(value) != CHARRA_RC_SUCCESS) {
+        charra_log_error(
+                "[%s] PCR log: file '%s' does not exist.", LOG_NAME, value);
+        return -1;
+    }
+    /* check if format is valid */
+    if (strcmp(format, "tcg-boot") == 0) {
+        variables->specific_config.attester_config.tcg_boot_log_path = value;
+    } else if (strcmp(format, "ima") == 0) {
+        variables->specific_config.attester_config.ima_log_path = value;
+    } else {
+        charra_log_error(
+                "[%s] PCR log format '%s' is not supported.", LOG_NAME, format);
+        return -1;
+    }
+    return 0;
 }
 
 static cli_config_attester_attestation_key_format_e
@@ -126,7 +159,7 @@ static int cli_attester_attestation_key(cli_config* variables) {
     uint64_t handle_value = 0;
     if (cli_util_common_split_option_string(optarg, &format, &value) != 0) {
         charra_log_error("[%s] Argument syntax error: please use "
-                         "'--%s=FORMAT:VALUE:'",
+                         "'--%s=FORMAT:VALUE'",
                 LOG_NAME, CLI_ATTESTER_ATTESTATION_KEY_LONG);
         return -1;
     }
@@ -177,6 +210,9 @@ int parse_command_line_attester_arguments(
         case -1:
             rc = check_required_options(variables);
             goto cleanup;
+        case CLI_COMMON_PCR_LOG:
+            rc = cli_attester_pcr_log(variables);
+            break;
         /* parse specific options */
         case CLI_ATTESTER_ATTESTATION_KEY:
             rc = cli_attester_attestation_key(variables);
