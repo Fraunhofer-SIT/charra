@@ -23,10 +23,12 @@
 #define CLI_UTIL_COMMON_H
 
 #include "../../common/charra_log.h"
+#include "../../core/charra_tap/charra_tap_dto.h"
 #include <coap3/coap.h>
 #include <getopt.h>
 #include <mbedtls/md.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <tss2/tss2_esys.h>
@@ -38,6 +40,7 @@
 #define CLI_COMMON_COAP_LOG_LEVEL_LONG "coap-log-level"
 #define CLI_COMMON_HELP_LONG "help"
 #define CLI_COMMON_PORT_LONG "port"
+#define CLI_COMMON_PCR_LOG_LONG "pcr-log"
 
 /* common rpk group-options (long) */
 #define CLI_COMMON_RPK_LONG "rpk"
@@ -68,6 +71,7 @@ typedef enum {
     CLI_COMMON_RPK_VERIFY_PEER = '4',
     CLI_COMMON_PSK = 'p',
     CLI_COMMON_PSK_KEY = 'k',
+    CLI_COMMON_PCR_LOG = '5',
 } cli_util_common_args_e;
 
 /**
@@ -107,6 +111,8 @@ typedef struct {
         char* ctx_path;
         ESYS_TR tpm2_handle;
     } attestation_key;
+    char* ima_log_path;
+    char* tcg_boot_log_path;
 } cli_config_attester;
 
 #define TPM2_PCR_BANK_COUNT 4  // sha1, sha256, sha384, sha512
@@ -131,6 +137,8 @@ typedef struct {
     char** ima_event_log_path;
     char** dtls_psk_identity;
     cli_config_signature_hash_algorithm* signature_hash_algorithm;
+    uint32_t* pcr_log_len;
+    pcr_log_dto (*pcr_logs)[SUPPORTED_PCR_LOGS_COUNT];
 } cli_config_verifier;
 
 /**
