@@ -395,7 +395,6 @@ static void coap_attest_handler(struct coap_resource_t* resource,
 
     pcr_log_response_dto* pcr_log_responses = NULL;
     pcr_log_responses = malloc(req.pcr_log_len * sizeof(pcr_log_response_dto));
-    /* TODO don't forget to free the allocated memory */
 
     /* parse log files if requested */
     for (uint32_t i = 0; i < req.pcr_log_len; i++) {
@@ -487,6 +486,12 @@ error:
     /* free heap objects */
     charra_free_if_not_null(signature);
     charra_free_if_not_null(attest_buf);
+    for (uint32_t i = 0; i < req.pcr_log_len; i++) {
+        charra_free_if_not_null(pcr_log_responses[i].identifier);
+        charra_free_if_not_null(pcr_log_responses[i].content);
+    }
+    charra_free_and_null(req.pcr_logs);
+    charra_free_if_not_null(pcr_log_responses);
     // charra_io_free_continuous_file_buffer(&ima_event_log);
 
     /* flush handles */

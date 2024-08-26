@@ -788,6 +788,11 @@ static coap_response_t coap_attest_handler(
 
 cleanup:
     /* free heap objects*/
+    for (uint32_t i = 0; i < res.pcr_log_len; i++) {
+        charra_free_if_not_null(res.pcr_logs[i].content);
+        charra_free_if_not_null(res.pcr_logs[i].identifier);
+    }
+    charra_free_if_not_null(res.pcr_logs);
     // charra_free_if_not_null(res.pcclient_log.pcr_log);
     // charra_free_if_not_null(res.ima_log.pcr_log);
 
