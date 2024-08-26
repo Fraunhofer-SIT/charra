@@ -258,7 +258,6 @@ CHARRA_RC charra_tap_unmarshal_attestation_request(
     uint32_t pcr_log_count = (uint32_t)item.val.uCount;
     req.pcr_log_len = pcr_log_count;
     req.pcr_logs = calloc(pcr_log_count, sizeof(pcr_log_dto));
-    /* TODO don't forget to free the allocated memory */
 
     for (uint32_t i = 0; i < pcr_log_count; ++i) {
         /* parse array "pcr-log" */
@@ -279,7 +278,6 @@ CHARRA_RC charra_tap_unmarshal_attestation_request(
         /* exit array "pcr-log" */
         QCBORDecode_ExitArray(&dc);
 
-        /* TODO don't forget to free the allocated memory */
         req.pcr_logs[i].identifier = calloc(item_str_buf.len + 1, 1);
         memcpy(req.pcr_logs[i].identifier, item_str_buf.ptr, item_str_buf.len);
         req.pcr_logs[i].start = start;
@@ -521,8 +519,7 @@ CHARRA_RC charra_tap_unmarshal_attestation_response(
         if (res.pcr_logs[i].identifier == NULL) {
             goto cbor_parse_error;
         }
-        memcpy(res.pcr_logs[i].identifier, item_str_buf.ptr,
-                item_str_buf.len);
+        memcpy(res.pcr_logs[i].identifier, item_str_buf.ptr, item_str_buf.len);
 
         /* parse start */
         QCBORDecode_GetUInt64(&dc, &(res.pcr_logs[i].start));
@@ -537,8 +534,7 @@ CHARRA_RC charra_tap_unmarshal_attestation_response(
         if (res.pcr_logs[i].content == NULL) {
             goto cbor_parse_error;
         }
-        memcpy(res.pcr_logs[i].content, item_str_buf.ptr,
-                item_str_buf.len);
+        memcpy(res.pcr_logs[i].content, item_str_buf.ptr, item_str_buf.len);
 
         /* exit array pcr-log */
         QCBORDecode_ExitArray(&dc);
