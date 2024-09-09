@@ -502,6 +502,7 @@ static CHARRA_RC create_attestation_request(
 
     /* build attestation request */
     charra_tap_msg_attestation_request_dto req = {
+            .tap_spec_version = CHARRA_TAP_SPEC_VERSION,
             .hello = false,
             .sig_key_id_len = TPM_SIG_KEY_ID_LEN,
             .sig_key_id = {0},  // must be memcpy'd, see below

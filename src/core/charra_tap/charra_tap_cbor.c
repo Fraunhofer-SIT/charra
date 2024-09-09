@@ -54,6 +54,9 @@ static CHARRA_RC charra_tap_attestation_request_internal(
     /* root array */
     QCBOREncode_OpenArray(&ec);
 
+    /* encode "tap-spec-version" */
+    QCBOREncode_AddUInt64(&ec, attestation_request->tap_spec_version);
+
     /* encode "hello" */
     QCBOREncode_AddBool(&ec, attestation_request->hello);
 
@@ -202,6 +205,9 @@ CHARRA_RC charra_tap_unmarshal_attestation_request(
     /* parse root array */
     QCBORDecode_EnterArray(&dc, &item);
 
+    /* parse "tap-spec-version"*/
+    QCBORDecode_GetUInt64(&dc, &(req.tap_spec_version));
+
     /* parse "hello" (bool) */
     QCBORDecode_GetBool(&dc, &(req.hello));
 
@@ -292,6 +298,13 @@ CHARRA_RC charra_tap_unmarshal_attestation_request(
     if ((cborerr = QCBORDecode_Finish(&dc))) {
         charra_log_error("CBOR parser: expected end of input, but could not "
                          "find it. Continuing.");
+        goto cbor_parse_error;
+    }
+
+    if (req.tap_spec_version != CHARRA_TAP_SPEC_VERSION) {
+        charra_log_error(
+                "CBOR parser: expected TAP version 0x%x, but got 0x%x.",
+                CHARRA_TAP_SPEC_VERSION, req.tap_spec_version);
         goto cbor_parse_error;
     }
 
