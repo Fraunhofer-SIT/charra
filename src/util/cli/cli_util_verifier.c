@@ -154,6 +154,13 @@ static void print_verifier_help_message(const cli_config* const variables) {
     }
 
     printf("\n");
+    printf("     --%s=FORMAT:Start,Count: Specifies the desired PCR log "
+           "format with a starting index and the number of logs. If 'Start' is "
+           "0, an empty log is requested. If 'Count' is 0, all logs beginning "
+           "with 'Start' are requested.\n"
+           "                                 Available formats are: ima, "
+           "tcg-boot.\n",
+            CLI_COMMON_PCR_LOG_LONG);
     printf(" -%c, --%s=ALGORITHM: The hash algorithm used to digest "
            "the tpm quote.\n",
             CLI_VERIFIER_HASH_ALGORITHM, CLI_VERIFIER_HASH_ALGORITHM_LONG);
