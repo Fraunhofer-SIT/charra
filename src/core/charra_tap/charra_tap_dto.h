@@ -28,6 +28,7 @@
 
 #define SIG_KEY_ID_MAXLEN 256
 #define SUPPORTED_PCR_LOGS_COUNT 2
+#define CHARRA_TAP_SPEC_VERSION 0x00000000020200
 
 typedef enum {
     CHARRA_TAP_PCR_LOG_ERROR = 0,
@@ -64,7 +65,11 @@ typedef struct {
 } pcr_log_dto;
 
 typedef struct {
+    uint64_t tap_spec_version;
     bool hello;
+    /* TODO: Integration of TPM ID (if multiple are available) */
+    size_t tpm_id_len;
+    uint8_t* tpm_id;
     size_t sig_key_id_len;
     uint8_t sig_key_id[SIG_KEY_ID_MAXLEN];
     size_t nonce_len;
