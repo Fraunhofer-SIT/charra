@@ -37,7 +37,6 @@
 #define CLI_VERIFIER_ATTESTATION_PUBLIC_KEY_LONG "attestation-public-key"
 #define CLI_VERIFIER_PCR_FILE_LONG "pcr-file"
 #define CLI_VERIFIER_PCR_SELECTION_LONG "pcr-selection"
-#define CLI_VERIFIER_IMA_LONG "ima"
 #define CLI_VERIFIER_HASH_ALGORITHM_LONG "hash-algorithm"
 
 typedef enum {
@@ -47,7 +46,6 @@ typedef enum {
     CLI_VERIFIER_ATTESTATION_PUBLIC_KEY = '6',
     CLI_VERIFIER_PCR_FILE = 'f',
     CLI_VERIFIER_PCR_SELECTION = 's',
-    CLI_VERIFIER_IMA = 'm',
     CLI_VERIFIER_HASH_ALGORITHM = 'g',
 } cli_util_verifier_args_e;
 
@@ -88,7 +86,6 @@ static const struct option verifier_options[] = {
                 CLI_VERIFIER_PCR_FILE},
         {CLI_VERIFIER_PCR_SELECTION_LONG, required_argument, 0,
                 CLI_VERIFIER_PCR_SELECTION},
-        {CLI_VERIFIER_IMA_LONG, optional_argument, 0, CLI_VERIFIER_IMA},
         {CLI_VERIFIER_HASH_ALGORITHM_LONG, required_argument, 0,
                 CLI_VERIFIER_HASH_ALGORITHM},
         {0}};
@@ -157,13 +154,6 @@ static void print_verifier_help_message(const cli_config* const variables) {
     }
 
     printf("\n");
-    printf("     --%s[=PATH]:               Request the attester "
-           "to include an IMA event log in the attestation "
-           "response. By default IMA requests the file\n",
-            CLI_VERIFIER_IMA_LONG);
-    printf("                                 '%s'. Alternatives "
-           "can be passed.\n",
-            *(variables->specific_config.verifier_config.ima_event_log_path));
     printf(" -%c, --%s=ALGORITHM: The hash algorithm used to digest "
            "the tpm quote.\n",
             CLI_VERIFIER_HASH_ALGORITHM, CLI_VERIFIER_HASH_ALGORITHM_LONG);
@@ -257,7 +247,8 @@ static int cli_verifier_pcr_log(cli_config* variables) {
     }
     uint32_t index = calculate_index_and_update_length(variables, format);
     if (index >= SUPPORTED_PCR_LOGS_COUNT) {
-        charra_log_error("[%s] Too many pcr logs. This should never happen.", LOG_NAME);
+        charra_log_error(
+                "[%s] Too many pcr logs. This should never happen.", LOG_NAME);
         return -1;
     }
     pcr_log_dto* pcr_logs =
@@ -488,14 +479,6 @@ static int cli_verifier_pcr_selection(const cli_config* variables) {
     return 0;
 }
 
-static void cli_verifier_ima(const cli_config* variables) {
-    *(variables->specific_config.verifier_config.use_ima_event_log) = true;
-    if (optarg != NULL) {
-        *(variables->specific_config.verifier_config.ima_event_log_path) =
-                optarg;
-    }
-}
-
 static int cli_verifier_hash_algorithm(cli_config* variables) {
     cli_config_signature_hash_algorithm* hash_algo =
             variables->specific_config.verifier_config.signature_hash_algorithm;
@@ -553,9 +536,6 @@ int parse_command_line_verifier_arguments(
             break;
         case CLI_VERIFIER_PCR_SELECTION:
             rc = cli_verifier_pcr_selection(variables);
-            break;
-        case CLI_VERIFIER_IMA:
-            cli_verifier_ima(variables);
             break;
         case CLI_VERIFIER_HASH_ALGORITHM:
             rc = cli_verifier_hash_algorithm(variables);

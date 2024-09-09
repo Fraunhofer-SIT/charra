@@ -406,28 +406,6 @@ static void coap_attest_handler(struct coap_resource_t* resource,
                 req.pcr_logs + i, pcr_log_responses + i);
     }
 
-    /* read IMA event log if requested */
-    /*uint8_t* ima_event_log = NULL;
-    size_t ima_event_log_len = 0;
-    if (req.event_log_path_len != 0) {
-        charra_log_info("[" LOG_NAME "] Reading IMA event log.");
-        char* path = malloc(sizeof(char) * (req.event_log_path_len + 1));
-        memcpy(path, req.event_log_path, req.event_log_path_len);
-        path[req.event_log_path_len + 1] = '\n';
-        CHARRA_RC rc = charra_io_read_continuous_binary_file(
-                path, &ima_event_log, &ima_event_log_len);
-        if (rc != CHARRA_RC_SUCCESS) {
-            charra_log_error("[" LOG_NAME "] Error while reading IMA event "
-                             "log. Sending empty event log!");
-            ima_event_log_len = 0;
-            ima_event_log = NULL;
-        } else {
-            charra_log_info("[" LOG_NAME
-                            "] IMA event log has a size of %d bytes.",
-                    ima_event_log_len);
-        }
-    }*/
-
     /* prepare response */
     charra_log_info("[" LOG_NAME "] Preparing response.");
 

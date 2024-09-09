@@ -133,8 +133,6 @@ typedef struct {
     char** reference_pcr_file_path;
     uint8_t (*tpm_pcr_selection)[TPM2_MAX_PCRS];
     uint32_t* tpm_pcr_selection_len;
-    bool* use_ima_event_log;
-    char** ima_event_log_path;
     char** dtls_psk_identity;
     cli_config_signature_hash_algorithm* signature_hash_algorithm;
     uint32_t* pcr_log_len;
