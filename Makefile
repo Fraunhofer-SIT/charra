@@ -126,7 +126,7 @@ SOURCES = $(shell find $(SRCDIR) -name '*.c')
 INCLUDE = -I$(INCDIR)
 
 OBJECTS =  $(addsuffix .o, $(addprefix $(OBJDIR)/common/, charra_log))
-OBJECTS += $(addsuffix .o, $(addprefix $(OBJDIR)/core/, charra_helper charra_key_mgr charra_rim_mgr charra_marshaling))
+OBJECTS += $(addsuffix .o, $(addprefix $(OBJDIR)/core/, charra_helper charra_key_mgr charra_rim_mgr))
 OBJECTS += $(addsuffix .o, $(addprefix $(OBJDIR)/core/charra_tap/, charra_tap_cbor))
 OBJECTS += $(addsuffix .o, $(addprefix $(OBJDIR)/util/, charra_util coap_util crypto_util io_util tpm2_tools_util tpm2_util parser_util))
 OBJECTS += $(addsuffix .o, $(addprefix $(OBJDIR)/util/cli/, cli_util_attester cli_util_verifier cli_util_common))
