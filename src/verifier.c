@@ -89,9 +89,6 @@ uint16_t attestation_response_timeout =
         30;  // timeout when waiting for attestation answer in seconds
 char* reference_pcr_file_path = NULL;
 char* attestation_public_key_path = NULL;
-bool use_ima_event_log = false;
-char* ima_event_log_path =
-        "/sys/kernel/security/ima/binary_runtime_measurements";
 cli_config_signature_hash_algorithm signature_hash_algorithm = {
         .mbedtls_hash_algorithm = MBEDTLS_MD_SHA256,
         .tpm2_hash_algorithm = TPM2_ALG_SHA256};
@@ -174,8 +171,6 @@ int main(int argc, char** argv) {
             .reference_pcr_file_path = &reference_pcr_file_path,
             .tpm_pcr_selection = tpm_pcr_selection,
             .tpm_pcr_selection_len = tpm_pcr_selection_len,
-            .use_ima_event_log = &use_ima_event_log,
-            .ima_event_log_path = &ima_event_log_path,
             .dtls_psk_identity = &dtls_psk_identity,
             .signature_hash_algorithm = &signature_hash_algorithm,
             .pcr_log_len = &pcr_log_len,
@@ -217,12 +212,6 @@ int main(int argc, char** argv) {
         } else {
             charra_log_log_raw(CHARRA_LOG_DEBUG, "%d\n", tpm_pcr_selection[i]);
         }
-    }
-    charra_log_debug("[" LOG_NAME "]     IMA event log attestation enabled: %s",
-            (use_ima_event_log == true) ? "true" : "false");
-    if (use_ima_event_log) {
-        charra_log_debug("[" LOG_NAME "]         IMA event log path: '%s'",
-                ima_event_log_path);
     }
     charra_log_debug("[" LOG_NAME "]     DTLS with PSK enabled: %s",
             (use_dtls_psk == true) ? "true" : "false");
@@ -794,8 +783,6 @@ cleanup:
         charra_free_if_not_null(res.pcr_logs[i].identifier);
     }
     charra_free_if_not_null(res.pcr_logs);
-    // charra_free_if_not_null(res.pcclient_log.pcr_log);
-    // charra_free_if_not_null(res.ima_log.pcr_log);
 
     /* flush handles */
     if (sig_key_handle != ESYS_TR_NONE) {
