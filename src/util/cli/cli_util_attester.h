@@ -33,7 +33,7 @@
 arguments.
 * @return 0 on success, -1 on parse error, 1 when help message was displayed
 */
-int parse_command_line_attester_arguments(
-        int argc, char** argv, cli_config* variables);
+int charra_parse_command_line_attester_arguments(
+        const int argc, char** const argv, cli_config* const variables);
 
 #endif /* CLI_UTIL_ATTESTER_H */

@@ -184,7 +184,7 @@ int main(int argc, char** argv) {
     coap_set_log_level(coap_log_level);
 
     /* parse CLI arguments */
-    if ((result = parse_command_line_verifier_arguments(
+    if ((result = charra_parse_command_line_verifier_arguments(
                  argc, argv, &cli_config)) != 0) {
         // 1 means help message was displayed (thus exit), -1 means error
         return (result == 1) ? CHARRA_RC_SUCCESS : CHARRA_RC_CLI_ERROR;

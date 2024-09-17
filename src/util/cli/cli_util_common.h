@@ -160,7 +160,7 @@ typedef struct {
  * @param[out] value The parsed value
  * @return 0 on success, -1 on error
  */
-int cli_util_common_parse_option_as_ulong(
+int charra_cli_util_common_parse_option_as_ulong(
         const char* const option, int base, uint64_t* value);
 
 /**
@@ -171,7 +171,7 @@ int cli_util_common_parse_option_as_ulong(
  * @param[out] value The value
  * @return 0 on success, -1 on error
  */
-int cli_util_common_split_option_string(
+int charra_cli_util_common_split_option_string(
         char* option, char** format, char** value);
 
 /**
@@ -185,8 +185,8 @@ int cli_util_common_split_option_string(
  * of the specific options
  * @return 0 on success, -1 on parse error, 1 when help message was displayed
  */
-int cli_util_common_parse_command_line_argument(const int identifier,
-        const cli_config* variables, const char* const log_name,
+int charra_cli_util_common_parse_command_line_argument(const int identifier,
+        cli_config* const variables, const char* const log_name,
         void (*print_specific_help_message)(const cli_config* const variables));
 
 #endif /* CLI_UTIL_COMMON_H */
