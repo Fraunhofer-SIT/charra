@@ -77,7 +77,7 @@ static const struct option attester_options[] = {
  * @param LOG_NAME the log name
  * @param variables the cli config variables
  */
-static int check_required_options(const cli_config* const variables) {
+static int charra_check_required_options(const cli_config* const variables) {
     /* check if attestation key file was specified */
     if (variables->specific_config.attester_config.attestation_key.ctx_path ==
             NULL) {
@@ -87,7 +87,8 @@ static int check_required_options(const cli_config* const variables) {
     return 0;
 }
 
-static void print_attester_help_message(const cli_config* const variables) {
+static void charra_print_attester_help_message(
+        const cli_config* const variables) {
     /* print specific attester options */
     printf("     --%s=FORMAT:VALUE:     Specifies the path to "
            "the attestation key. Available are: context, handle.\n",
@@ -115,10 +116,11 @@ static void print_attester_help_message(const cli_config* const variables) {
             CLI_ATTESTER_PSK_HINT, CLI_ATTESTER_PSK_HINT_LONG);
 }
 
-static int cli_attester_pcr_log(cli_config* variables) {
+static int charra_cli_attester_pcr_log(cli_config* const variables) {
     char* format = NULL;
     char* value = NULL;
-    if (cli_util_common_split_option_string(optarg, &format, &value) != 0) {
+    if (charra_cli_util_common_split_option_string(optarg, &format, &value) !=
+            0) {
         charra_log_error("[%s] Argument syntax error: please use "
                          "'--%s=FORMAT:FILE'",
                 LOG_NAME, CLI_COMMON_PCR_LOG_LONG);
@@ -144,7 +146,7 @@ static int cli_attester_pcr_log(cli_config* variables) {
 }
 
 static cli_config_attester_attestation_key_format_e
-parse_attestation_key_format(const char* const format) {
+charra_parse_attestation_key_format(const char* const format) {
     if (strcmp(format, "context") == 0) {
         return CLI_UTIL_ATTESTATION_KEY_FORMAT_FILE;
     } else if (strcmp(format, "handle") == 0) {
@@ -153,18 +155,19 @@ parse_attestation_key_format(const char* const format) {
     return CLI_UTIL_ATTESTATION_KEY_FORMAT_UNKNOWN;
 }
 
-static int cli_attester_attestation_key(cli_config* variables) {
+static int charra_cli_attester_attestation_key(cli_config* const variables) {
     char* format = NULL;
     char* value = NULL;
     uint64_t handle_value = 0;
-    if (cli_util_common_split_option_string(optarg, &format, &value) != 0) {
+    if (charra_cli_util_common_split_option_string(optarg, &format, &value) !=
+            0) {
         charra_log_error("[%s] Argument syntax error: please use "
                          "'--%s=FORMAT:VALUE'",
                 LOG_NAME, CLI_ATTESTER_ATTESTATION_KEY_LONG);
         return -1;
     }
     variables->specific_config.attester_config.attestation_key_format =
-            parse_attestation_key_format(format);
+            charra_parse_attestation_key_format(format);
     switch (variables->specific_config.attester_config.attestation_key_format) {
     case CLI_UTIL_ATTESTATION_KEY_FORMAT_FILE:
         if (charra_io_file_exists(value) != CHARRA_RC_SUCCESS) {
@@ -176,8 +179,8 @@ static int cli_attester_attestation_key(cli_config* variables) {
                 value;
         break;
     case CLI_UTIL_ATTESTATION_KEY_FORMAT_HANDLE:
-        if (cli_util_common_parse_option_as_ulong(value, 16, &handle_value) !=
-                0) {
+        if (charra_cli_util_common_parse_option_as_ulong(
+                    value, 16, &handle_value) != 0) {
             charra_log_error(
                     "[%s] Attestation key: handle '%s' cannot be parsed.",
                     LOG_NAME, value);
@@ -194,13 +197,13 @@ static int cli_attester_attestation_key(cli_config* variables) {
     return 0;
 }
 
-static void cli_attester_psk_hint(const cli_config* variables) {
+static void charra_cli_attester_psk_hint(cli_config* const variables) {
     *variables->common_config.use_dtls_psk = true;
     *(variables->specific_config.attester_config.dtls_psk_hint) = optarg;
 }
 
-int parse_command_line_attester_arguments(
-        int argc, char** argv, cli_config* variables) {
+int charra_parse_command_line_attester_arguments(
+        const int argc, char** const argv, cli_config* const variables) {
     int rc = 0;
     for (;;) {
         int index = -1;
@@ -208,22 +211,22 @@ int parse_command_line_attester_arguments(
                 argc, argv, ATTESTER_SHORT_OPTIONS, attester_options, &index);
         switch (identifier) {
         case -1:
-            rc = check_required_options(variables);
+            rc = charra_check_required_options(variables);
             goto cleanup;
         case CLI_COMMON_PCR_LOG:
-            rc = cli_attester_pcr_log(variables);
+            rc = charra_cli_attester_pcr_log(variables);
             break;
         /* parse specific options */
         case CLI_ATTESTER_ATTESTATION_KEY:
-            rc = cli_attester_attestation_key(variables);
+            rc = charra_cli_attester_attestation_key(variables);
             break;
         case CLI_ATTESTER_PSK_HINT:
-            cli_attester_psk_hint(variables);
+            charra_cli_attester_psk_hint(variables);
             break;
         /* parse common options */
         default:
-            rc = cli_util_common_parse_command_line_argument(identifier,
-                    variables, LOG_NAME, print_attester_help_message);
+            rc = charra_cli_util_common_parse_command_line_argument(identifier,
+                    variables, LOG_NAME, charra_print_attester_help_message);
             break;
         }
         if (rc != 0) {

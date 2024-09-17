@@ -97,7 +97,7 @@ static const struct option verifier_options[] = {
  * @param LOG_NAME the log name
  * @param variables the cli config variables
  */
-static int check_required_options(const cli_config* const variables) {
+static int charra_check_required_options(const cli_config* const variables) {
     /* check if PCR reference file was specified */
     if (*(variables->specific_config.verifier_config.reference_pcr_file_path) ==
             NULL) {
@@ -114,7 +114,8 @@ static int check_required_options(const cli_config* const variables) {
     return 0;
 }
 
-static void print_verifier_help_message(const cli_config* const variables) {
+static void charra_print_verifier_help_message(
+        const cli_config* const variables) {
     /* print specific verifier options */
     printf("     --%s=IP:                    Connect to IP instead "
            "of doing the attestation on localhost.\n",
@@ -181,7 +182,7 @@ static void print_verifier_help_message(const cli_config* const variables) {
             CLI_VERIFIER_PSK_IDENTITY, CLI_VERIFIER_PSK_IDENTITY_LONG);
 }
 
-static int parse_pcr_log_start_count(
+static int charra_parse_pcr_log_start_count(
         char* const value, uint64_t* start, uint64_t* count) {
     char* number1 = NULL;
     char* number2 = NULL;
@@ -192,24 +193,24 @@ static int parse_pcr_log_start_count(
         return -1;
     }
     /* parse start and count */
-    if (cli_util_common_parse_option_as_ulong(number1, 10, start) != 0) {
+    if (charra_cli_util_common_parse_option_as_ulong(number1, 10, start) != 0) {
         return -1;
     }
-    if (cli_util_common_parse_option_as_ulong(number2, 10, count) != 0) {
+    if (charra_cli_util_common_parse_option_as_ulong(number2, 10, count) != 0) {
         return -1;
     }
     return 0;
 }
 
-static int check_pcr_log_format(const char* const format) {
+static int charra_check_pcr_log_format(const char* const format) {
     if (strcmp(format, "ima") == 0 || strcmp(format, "tcg-boot") == 0) {
         return 0;
     }
     return -1;
 }
 
-static uint32_t calculate_index_and_update_length(
-        cli_config* variables, const char* const identifier) {
+static uint32_t charra_calculate_index_and_update_length(
+        cli_config* const variables, const char* const identifier) {
     size_t len = strlen(identifier);
     uint32_t index = 0;
     pcr_log_dto* pcr_logs =
@@ -231,28 +232,30 @@ static uint32_t calculate_index_and_update_length(
     return index;
 }
 
-static int cli_verifier_pcr_log(cli_config* variables) {
+static int charra_cli_verifier_pcr_log(cli_config* const variables) {
     char* format = NULL;
     char* value = NULL;
     uint64_t start = 0;
     uint64_t count = 0;
-    if (cli_util_common_split_option_string(optarg, &format, &value) != 0) {
+    if (charra_cli_util_common_split_option_string(optarg, &format, &value) !=
+            0) {
         charra_log_error("[%s] Argument syntax error: please use "
                          "'--%s=FORMAT:START,COUNT'",
                 LOG_NAME, CLI_COMMON_PCR_LOG_LONG);
         return -1;
     }
-    if (parse_pcr_log_start_count(value, &start, &count) != 0) {
+    if (charra_parse_pcr_log_start_count(value, &start, &count) != 0) {
         charra_log_error("[%s] Argument syntax error: please use "
                          "'--%s=FORMAT:START,COUNT'",
                 LOG_NAME, CLI_COMMON_PCR_LOG_LONG);
         return -1;
     }
-    if (check_pcr_log_format(format) != 0) {
+    if (charra_check_pcr_log_format(format) != 0) {
         charra_log_error("[%s] Unknown format '%s'", LOG_NAME, format);
         return -1;
     }
-    uint32_t index = calculate_index_and_update_length(variables, format);
+    uint32_t index =
+            charra_calculate_index_and_update_length(variables, format);
     if (index >= SUPPORTED_PCR_LOGS_COUNT) {
         charra_log_error(
                 "[%s] Too many pcr logs. This should never happen.", LOG_NAME);
@@ -266,12 +269,12 @@ static int cli_verifier_pcr_log(cli_config* variables) {
     return 0;
 }
 
-static void cli_verifier_identity(const cli_config* variables) {
+static void charra_cli_verifier_identity(cli_config* const variables) {
     *variables->common_config.use_dtls_psk = true;
     *(variables->specific_config.verifier_config.dtls_psk_identity) = optarg;
 }
 
-static int cli_verifier_ip(const cli_config* variables) {
+static int charra_cli_verifier_ip(cli_config* const variables) {
     int argument_length = strlen(optarg);
     if (argument_length > 15) {
         charra_log_error("[%s] Error while parsing '--%s': Input too long "
@@ -283,7 +286,7 @@ static int cli_verifier_ip(const cli_config* variables) {
     return 0;
 }
 
-static int cli_verifier_timeout(const cli_config* variables) {
+static int charra_cli_verifier_timeout(cli_config* const variables) {
     char* end;
     *(variables->specific_config.verifier_config.timeout) =
             (uint16_t)strtoul(optarg, &end, 10);
@@ -297,7 +300,8 @@ static int cli_verifier_timeout(const cli_config* variables) {
     return 0;
 }
 
-static int cli_verifier_attestation_public_key(const cli_config* variables) {
+static int charra_cli_verifier_attestation_public_key(
+        cli_config* const variables) {
     if (charra_io_file_exists(optarg) != CHARRA_RC_SUCCESS) {
         charra_log_error("[%s] Attestation key: file '%s' does not exist.",
                 LOG_NAME, optarg);
@@ -308,7 +312,7 @@ static int cli_verifier_attestation_public_key(const cli_config* variables) {
     return 0;
 }
 
-static int cli_verifier_pcr_file(const cli_config* variables) {
+static int charra_cli_verifier_pcr_file(cli_config* const variables) {
     char* token = NULL;
     const char delimiter[] = ":";
     char* format = NULL;
@@ -347,7 +351,7 @@ static int cli_verifier_pcr_file(const cli_config* variables) {
     }
 }
 
-static char* cli_verifier_strtok(
+static char* charra_cli_verifier_strtok(
         char* str, const char* const delim, char** saveptr) {
     char* token = NULL;
 
@@ -377,7 +381,7 @@ static char* cli_verifier_strtok(
     return token;
 }
 
-static int cli_verifier_parse_pcr_bank(uint8_t* tpm_pcr_selection_bank,
+static int charra_cli_verifier_parse_pcr_bank(uint8_t* tpm_pcr_selection_bank,
         uint32_t* tpm_pcr_selection_len, char* pcr_list) {
     if (strcmp(pcr_list, "all") == 0) {
         for (uint8_t i = 0; i < TPM2_MAX_PCRS; i++) {
@@ -392,8 +396,9 @@ static int cli_verifier_parse_pcr_bank(uint8_t* tpm_pcr_selection_bank,
     uint8_t pcr = 0;
     uint64_t parse_value = 0;
     /* fill the hash_set with  */
-    while ((pcr_token = cli_verifier_strtok(NULL, ",", &next_token)) != NULL) {
-        if (cli_util_common_parse_option_as_ulong(
+    while ((pcr_token = charra_cli_verifier_strtok(NULL, ",", &next_token)) !=
+            NULL) {
+        if (charra_cli_util_common_parse_option_as_ulong(
                     pcr_token, 10, &parse_value) != 0) {
             charra_log_error("[%s] Could not parse '%s'.", LOG_NAME, pcr_token);
             return -1;
@@ -418,7 +423,8 @@ static int cli_verifier_parse_pcr_bank(uint8_t* tpm_pcr_selection_bank,
     return 0;
 }
 
-static int cli_verifier_parse_pcr_bank_to_index(const char* const pcr_bank) {
+static int charra_cli_verifier_parse_pcr_bank_to_index(
+        const char* const pcr_bank) {
     if (strcmp(pcr_bank, "sha1") == 0) {
         return 0;
     } else if (strcmp(pcr_bank, "sha256") == 0) {
@@ -431,8 +437,8 @@ static int cli_verifier_parse_pcr_bank_to_index(const char* const pcr_bank) {
     return -1;
 }
 
-static int cli_verifier_parse_pcr_selection(
-        const cli_config* variables, char* pcr_selections) {
+static int charra_cli_verifier_parse_pcr_selection(
+        cli_config* const variables, char* pcr_selections) {
     /*
     Syntax of PCR selections is: "bank1:pcr1,pcr2,pcr3+bank2:pcr4,pcr5"
     best way to parse is by splitting the string by '+' for each bank
@@ -442,18 +448,19 @@ static int cli_verifier_parse_pcr_selection(
     char* bank_name = NULL;
     char* pcr_list = NULL;
     int bank = -1;
-    while ((bank_token = cli_verifier_strtok(NULL, "+", &next_token)) != NULL) {
-        bank_name = cli_verifier_strtok(bank_token, ":", &pcr_list);
+    while ((bank_token = charra_cli_verifier_strtok(NULL, "+", &next_token)) !=
+            NULL) {
+        bank_name = charra_cli_verifier_strtok(bank_token, ":", &pcr_list);
         if (bank_name == NULL) {
             charra_log_error("[%s] No bank defined '%s'", LOG_NAME);
             return -1;
         }
-        bank = cli_verifier_parse_pcr_bank_to_index(bank_name);
+        bank = charra_cli_verifier_parse_pcr_bank_to_index(bank_name);
         if (bank < 0 || bank >= TPM2_PCR_BANK_COUNT) {
             charra_log_error("[%s] Invalid PCR bank '%s'", LOG_NAME, bank_name);
             return -1;
         }
-        if (cli_verifier_parse_pcr_bank(
+        if (charra_cli_verifier_parse_pcr_bank(
                     variables->specific_config.verifier_config
                             .tpm_pcr_selection[bank],
                     &variables->specific_config.verifier_config
@@ -465,7 +472,7 @@ static int cli_verifier_parse_pcr_selection(
     return 0;
 }
 
-static int cli_verifier_pcr_selection(const cli_config* variables) {
+static int charra_cli_verifier_pcr_selection(cli_config* const variables) {
     uint8_t(*tpm_pcr_selection)[TPM2_MAX_PCRS] =
             variables->specific_config.verifier_config.tpm_pcr_selection;
     uint32_t* tpm_pcr_selection_len =
@@ -480,14 +487,14 @@ static int cli_verifier_pcr_selection(const cli_config* variables) {
         }
         tpm_pcr_selection_len[i] = 0;
     }
-    if (cli_verifier_parse_pcr_selection(variables, optarg) != 0) {
+    if (charra_cli_verifier_parse_pcr_selection(variables, optarg) != 0) {
         return -1;
     }
     return 0;
 }
 
-static int cli_verifier_hash_algorithm(cli_config* variables) {
-    cli_config_signature_hash_algorithm* hash_algo =
+static int charra_cli_verifier_hash_algorithm(cli_config* const variables) {
+    cli_config_signature_hash_algorithm* const hash_algo =
             variables->specific_config.verifier_config.signature_hash_algorithm;
     if (strcmp(optarg, "sha1") == 0) {
         hash_algo->mbedtls_hash_algorithm = MBEDTLS_MD_SHA1;
@@ -511,8 +518,8 @@ static int cli_verifier_hash_algorithm(cli_config* variables) {
     return 0;
 }
 
-int parse_command_line_verifier_arguments(
-        int argc, char** argv, cli_config* variables) {
+int charra_parse_command_line_verifier_arguments(
+        const int argc, char** const argv, cli_config* const variables) {
     int rc = 0;
     for (;;) {
         int index = -1;
@@ -520,37 +527,37 @@ int parse_command_line_verifier_arguments(
                 argc, argv, VERIFIER_SHORT_OPTIONS, verifier_options, &index);
         switch (identifier) {
         case -1:
-            rc = check_required_options(variables);
+            rc = charra_check_required_options(variables);
             goto cleanup;
         case CLI_COMMON_PCR_LOG:
-            rc = cli_verifier_pcr_log(variables);
+            rc = charra_cli_verifier_pcr_log(variables);
             break;
         /* parse specific options */
         case CLI_VERIFIER_PSK_IDENTITY:
-            cli_verifier_identity(variables);
+            charra_cli_verifier_identity(variables);
             break;
         case CLI_VERIFIER_IP:
-            rc = cli_verifier_ip(variables);
+            rc = charra_cli_verifier_ip(variables);
             break;
         case CLI_VERIFIER_TIMEOUT:
-            rc = cli_verifier_timeout(variables);
+            rc = charra_cli_verifier_timeout(variables);
             break;
         case CLI_VERIFIER_ATTESTATION_PUBLIC_KEY:
-            rc = cli_verifier_attestation_public_key(variables);
+            rc = charra_cli_verifier_attestation_public_key(variables);
             break;
         case CLI_VERIFIER_PCR_FILE:
-            rc = cli_verifier_pcr_file(variables);
+            rc = charra_cli_verifier_pcr_file(variables);
             break;
         case CLI_VERIFIER_PCR_SELECTION:
-            rc = cli_verifier_pcr_selection(variables);
+            rc = charra_cli_verifier_pcr_selection(variables);
             break;
         case CLI_VERIFIER_HASH_ALGORITHM:
-            rc = cli_verifier_hash_algorithm(variables);
+            rc = charra_cli_verifier_hash_algorithm(variables);
             break;
         /* parse common options */
         default:
-            rc = cli_util_common_parse_command_line_argument(identifier,
-                    variables, LOG_NAME, print_verifier_help_message);
+            rc = charra_cli_util_common_parse_command_line_argument(identifier,
+                    variables, LOG_NAME, charra_print_verifier_help_message);
             break;
         }
         if (rc != 0) {

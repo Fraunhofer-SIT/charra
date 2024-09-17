@@ -135,7 +135,7 @@ int main(int argc, char** argv) {
     /* clang-format on */
 
     /* parse CLI arguments */
-    if ((result = parse_command_line_attester_arguments(
+    if ((result = charra_parse_command_line_attester_arguments(
                  argc, argv, &cli_attester_config)) != 0) {
         // 1 means help message is displayed, -1 means error
         return (result == 1) ? EXIT_SUCCESS : EXIT_FAILURE;

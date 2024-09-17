@@ -26,7 +26,8 @@
 #include <errno.h>
 #include <stdlib.h>
 
-static void print_dtls_rpk_help_message(const cli_config* const variables) {
+static void charra_print_dtls_rpk_help_message(
+        const cli_config* const variables) {
     printf("DTLS-RPK Options:\n");
     printf("                                 Charra includes default "
            "'keys' in the keys folder, but these are only intended for "
@@ -74,7 +75,8 @@ static void print_dtls_rpk_help_message(const cli_config* const variables) {
            "'CHARRA_TCTI' environment variable accordingly.\n");
 }
 
-static void cli_util_common_print_help_message(const char* const log_name,
+static void charra_cli_util_common_print_help_message(
+        const char* const log_name,
         void (*print_specific_help_message)(const cli_config* const variables),
         const cli_config* const variables) {
     /* print help messages of common arguments */
@@ -98,16 +100,16 @@ static void cli_util_common_print_help_message(const char* const log_name,
         print_specific_help_message(variables);
     }
 
-    print_dtls_rpk_help_message(variables);
+    charra_print_dtls_rpk_help_message(variables);
 }
 
-static void cli_util_common_verbose(const cli_config* variables) {
+static void charra_cli_util_common_verbose(cli_config* const variables) {
     *(variables->common_config.charra_log_level) = CHARRA_LOG_DEBUG;
     *(variables->common_config.coap_log_level) = LOG_DEBUG;
 }
 
-static int cli_util_common_charra_log_level(
-        const cli_config* variables, const char* const log_name) {
+static int charra_cli_util_common_charra_log_level(
+        const cli_config* const variables, const char* const log_name) {
     int result = charra_log_level_from_str(
             optarg, variables->common_config.charra_log_level);
     if (result != 0) {
@@ -120,8 +122,8 @@ static int cli_util_common_charra_log_level(
     return 0;
 }
 
-static int cli_util_common_coap_log_level(
-        const cli_config* variables, const char* const log_name) {
+static int charra_cli_util_common_coap_log_level(
+        const cli_config* const variables, const char* const log_name) {
     int result = charra_coap_log_level_from_str(
             optarg, variables->common_config.coap_log_level);
     if (result != 0) {
@@ -134,8 +136,8 @@ static int cli_util_common_coap_log_level(
     return 0;
 }
 
-static int cli_util_common_port(
-        const cli_config* variables, const char* const log_name) {
+static int charra_cli_util_common_port(
+        cli_config* const variables, const char* const log_name) {
     char* end;
     *(variables->common_config.port) = (unsigned int)strtoul(optarg, &end, 10);
     if (*(variables->common_config.port) == 0 || end == optarg) {
@@ -147,21 +149,21 @@ static int cli_util_common_port(
     return 0;
 }
 
-static void cli_util_common_psk(const cli_config* variables) {
+static void charra_cli_util_common_psk(cli_config* const variables) {
     *variables->common_config.use_dtls_psk = true;
 }
 
-static void cli_util_common_psk_key(const cli_config* variables) {
+static void charra_cli_util_common_psk_key(cli_config* const variables) {
     *variables->common_config.use_dtls_psk = true;
     *(variables->common_config.dtls_psk_key) = optarg;
 }
 
-static void cli_util_common_rpk(const cli_config* variables) {
+static void charra_cli_util_common_rpk(cli_config* const variables) {
     *variables->common_config.use_dtls_rpk = true;
 }
 
-static int cli_util_common_dtls_rpk_private_key(
-        const cli_config* variables, const char* const log_name) {
+static int charra_cli_util_common_dtls_rpk_private_key(
+        cli_config* const variables, const char* const log_name) {
     *variables->common_config.use_dtls_rpk = true;
     char* path = optarg;
     if (charra_io_file_exists(path) == CHARRA_RC_SUCCESS) {
@@ -174,8 +176,8 @@ static int cli_util_common_dtls_rpk_private_key(
     }
 }
 
-static int cli_util_common_dtls_rpk_public_key(
-        const cli_config* variables, const char* const log_name) {
+static int charra_cli_util_common_dtls_rpk_public_key(
+        cli_config* const variables, const char* const log_name) {
     *variables->common_config.use_dtls_rpk = true;
     char* path = optarg;
     if (charra_io_file_exists(path) == CHARRA_RC_SUCCESS) {
@@ -188,8 +190,8 @@ static int cli_util_common_dtls_rpk_public_key(
     }
 }
 
-static int cli_util_common_dtls_rpk_peer_public_key(
-        const cli_config* variables, const char* const log_name) {
+static int charra_cli_util_common_dtls_rpk_peer_public_key(
+        cli_config* const variables, const char* const log_name) {
     *variables->common_config.use_dtls_rpk = true;
     char* path = optarg;
     if (charra_io_file_exists(path) == CHARRA_RC_SUCCESS) {
@@ -203,8 +205,8 @@ static int cli_util_common_dtls_rpk_peer_public_key(
     }
 }
 
-static int cli_util_common_verify_rpk_peer_public_key(
-        const cli_config* variables, const char* const log_name) {
+static int charra_cli_util_common_verify_rpk_peer_public_key(
+        cli_config* const variables, const char* const log_name) {
     if (strcmp("0", optarg) == 0) {
         *variables->common_config.dtls_rpk_verify_peer_public_key = false;
     } else if (strcmp("1", optarg) == 0) {
@@ -218,41 +220,43 @@ static int cli_util_common_verify_rpk_peer_public_key(
     return 0;
 }
 
-int cli_util_common_parse_command_line_argument(const int identifier,
-        const cli_config* variables, const char* const log_name,
+int charra_cli_util_common_parse_command_line_argument(const int identifier,
+        cli_config* const variables, const char* const log_name,
         void (*print_specific_help_message)(
                 const cli_config* const variables)) {
     switch (identifier) {
     case CLI_COMMON_HELP:
     case '?':
-        cli_util_common_print_help_message(
+        charra_cli_util_common_print_help_message(
                 log_name, print_specific_help_message, variables);
         return (identifier == '?') ? -1 : 1;
     case CLI_COMMON_VERBOSE:
-        cli_util_common_verbose(variables);
+        charra_cli_util_common_verbose(variables);
         return 0;
     case CLI_COMMON_LOG_LEVEL:
-        return cli_util_common_charra_log_level(variables, log_name);
+        return charra_cli_util_common_charra_log_level(variables, log_name);
     case CLI_COMMON_COAP_LOG_LEVEL:
-        return cli_util_common_coap_log_level(variables, log_name);
+        return charra_cli_util_common_coap_log_level(variables, log_name);
     case CLI_COMMON_RPK_PEER_PUBLIC_KEY:
-        return cli_util_common_dtls_rpk_peer_public_key(variables, log_name);
+        return charra_cli_util_common_dtls_rpk_peer_public_key(
+                variables, log_name);
     case CLI_COMMON_RPK_PRIVATE_KEY:
-        return cli_util_common_dtls_rpk_private_key(variables, log_name);
+        return charra_cli_util_common_dtls_rpk_private_key(variables, log_name);
     case CLI_COMMON_RPK_VERIFY_PEER:
-        return cli_util_common_verify_rpk_peer_public_key(variables, log_name);
+        return charra_cli_util_common_verify_rpk_peer_public_key(
+                variables, log_name);
     case CLI_COMMON_RPK:
-        cli_util_common_rpk(variables);
+        charra_cli_util_common_rpk(variables);
         return 0;
     case CLI_COMMON_RPK_PUBLIC_KEY:
-        return cli_util_common_dtls_rpk_public_key(variables, log_name);
+        return charra_cli_util_common_dtls_rpk_public_key(variables, log_name);
     case CLI_COMMON_PSK:
-        cli_util_common_psk(variables);
+        charra_cli_util_common_psk(variables);
         return 0;
     case CLI_COMMON_PORT:
-        return cli_util_common_port(variables, log_name);
+        return charra_cli_util_common_port(variables, log_name);
     case CLI_COMMON_PSK_KEY:
-        cli_util_common_psk_key(variables);
+        charra_cli_util_common_psk_key(variables);
         return 0;
     default:
         // undefined behaviour, probably because getopt_long returned an
@@ -264,7 +268,7 @@ int cli_util_common_parse_command_line_argument(const int identifier,
     }
 }
 
-int cli_util_common_split_option_string(
+int charra_cli_util_common_split_option_string(
         char* option, char** format, char** value) {
     if (option == NULL) {
         return -1;
@@ -286,7 +290,7 @@ int cli_util_common_split_option_string(
     return 0;
 }
 
-int cli_util_common_parse_option_as_ulong(
+int charra_cli_util_common_parse_option_as_ulong(
         const char* const option, int base, uint64_t* value) {
     char* endptr = NULL;
     errno = 0;
