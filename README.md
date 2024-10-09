@@ -38,7 +38,7 @@ Inside the container, change to the `~/charra/` folder, build it, and run it:
     cd ~/charra/
     make -j
     ./generate-ak.sh
-    (bin/attester --attestation-key tpm_keys/rsa_ak.ctx &); sleep .2 ; bin/verifier -f yaml:reference-pcrs.yml --attestation-public-key tpm_keys/rsa_ak.pub ; sleep 1 ; pkill -SIGINT attester
+    (bin/attester --attestation-key context:tpm_keys/rsa_ak.ctx &); sleep .2 ; bin/verifier -f yaml:reference-pcrs.yml --attestation-public-key tpm_keys/rsa_ak.pub ; sleep 1 ; pkill -SIGINT attester
 
 ## How it Works: Protocol Flow
 
@@ -74,4 +74,3 @@ You find the changelog in [`CHANGELOG.md`](CHANGELOG.md).
 * Introduce semantic versioning as CHARRA develops along the way to become stable.
 
 *The order of the list is entirely arbitrary and does not reflect any priorities.*
-

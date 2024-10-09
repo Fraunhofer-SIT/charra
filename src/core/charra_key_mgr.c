@@ -30,18 +30,25 @@
 #include "../common/charra_log.h"
 #include "../util/tpm2_util.h"
 
-CHARRA_RC charra_load_tpm2_key(ESYS_CONTEXT* ctx, const uint32_t key_len,
-        const uint8_t* key, ESYS_TR* key_handle, const char* path) {
+CHARRA_RC charra_load_tpm2_key(ESYS_CONTEXT* const ctx,
+        ESYS_TR* const key_handle, cli_config_attester* config) {
     TSS2_RC r = TSS2_RC_SUCCESS;
-    if (memcmp(key, "PK.RSA.default", key_len) == 0) {
-        charra_log_info("Loading key \"PK.RSA.default\".");
-        r = tpm2_load_tpm_context_from_path(ctx, key_handle, path);
-        if (r != TSS2_RC_SUCCESS) {
-            charra_log_error("Loading of key \"PK.RSA.default\" failed.");
-            return CHARRA_RC_ERROR;
-        }
-    } else {
-        charra_log_error("TPM key not found.");
+
+    /* load TPM2 attestation key */
+    switch (config->attestation_key_format) {
+    case CLI_UTIL_ATTESTATION_KEY_FORMAT_FILE:
+        r = tpm2_load_tpm_context_from_path(
+                ctx, key_handle, config->attestation_key.ctx_path);
+        break;
+    case CLI_UTIL_ATTESTATION_KEY_FORMAT_HANDLE:
+        r = tpm2_load_tpm_context_from_handle(
+                ctx, config->attestation_key.tpm2_handle, key_handle);
+        break;
+    case CLI_UTIL_ATTESTATION_KEY_FORMAT_UNKNOWN:
+        charra_log_error("Unknown format for TPM key.");
+        return CHARRA_RC_ERROR;
+    }
+    if (r != TSS2_RC_SUCCESS) {
         return CHARRA_RC_ERROR;
     }
 
@@ -60,10 +67,9 @@ CHARRA_RC charra_load_external_public_key(ESYS_CONTEXT* ctx,
         charra_log_error("Invalid pointer for external public key.");
         return CHARRA_RC_ERROR;
     }
-    charra_log_info("Loading TPM key from file.");
-    if (tpm2_load_external_public_key_from_path(path, external_public_key)) {
-        charra_log_info("Loaded external public key.");
-    } else {
+
+    // charra_log_info("Loading TPM key from file.");
+    if (!tpm2_load_external_public_key_from_path(path, external_public_key)) {
         charra_log_error("Loading external public key from file failed.");
         return CHARRA_RC_ERROR;
     }

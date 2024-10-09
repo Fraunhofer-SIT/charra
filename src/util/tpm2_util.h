@@ -39,6 +39,17 @@ TSS2_RC tpm2_create_primary_key_rsa2048(
         ESYS_CONTEXT* ctx, ESYS_TR* primary_handle, TPM2B_PUBLIC** out_public);
 
 /**
+ * @brief Creates a primary key in the endorsement/user hierarchy in the TPM.
+ *
+ * @param[in,out] ctx The TSS ESAPI context.
+ * @param[in] tr_handle The TSS key handle of the persistent key.
+ * @param[out] key_handle The TSS key handle of the loaded context.
+ * @return TSS2_RC The TSS return code.
+ */
+TSS2_RC tpm2_load_tpm_context_from_handle(
+        ESYS_CONTEXT* context, ESYS_TR tr_handle, ESYS_TR* key_handle);
+
+/**
  * Loads a ESAPI TPM object context from disk or an ESAPI serialized ESYS_TR
  * object.
  * @param context

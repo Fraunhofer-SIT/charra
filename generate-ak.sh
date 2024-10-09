@@ -6,7 +6,7 @@ exit_with_error() {
     exit 1
 }
 
-mkdir tpm_keys
+mkdir -p tpm_keys
 cd tpm_keys
 
 # create endorsement key
