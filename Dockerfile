@@ -110,7 +110,7 @@ RUN git clone --recursive -b "${libcoap_version}" \
 WORKDIR /tmp/libcoap
 RUN ./autogen.sh \
     && ./configure --disable-tests --disable-documentation --disable-manpages \
-        --enable-dtls --with-tinydtls --enable-fast-install \
+    --enable-dtls --with-tinydtls --enable-fast-install \
     && make -j \
     && make install
 WORKDIR /
@@ -169,21 +169,21 @@ RUN python3 -m pip install \
 ## see: <https://github.com/tpm2-software/tpm2-tss/blob/master/Makefile.am#L841>
 RUN bash -c ' \
     if test -z "${DESTDIR}"; then \
-        if type -p groupadd > /dev/null; then \
-            id -g tss 2>/dev/null || groupadd --system tss; \
-        else \
-            id -g tss 2>/dev/null || \
-            addgroup --system tss; \
-        fi && \
-        if type -p useradd > /dev/null; then \
-            id -u tss 2>/dev/null || \
-            useradd --system --home-dir / --shell `type -p nologin` \
-                             --no-create-home -g tss tss; \
-        else \
-            id -u tss 2>/dev/null || \
-            adduser --system --home / --shell `type -p nologin` \
-                    --no-create-home --ingroup tss tss; \
-        fi; \
+    if type -p groupadd > /dev/null; then \
+    id -g tss 2>/dev/null || groupadd --system tss; \
+    else \
+    id -g tss 2>/dev/null || \
+    addgroup --system tss; \
+    fi && \
+    if type -p useradd > /dev/null; then \
+    id -u tss 2>/dev/null || \
+    useradd --system --home-dir / --shell `type -p nologin` \
+    --no-create-home -g tss tss; \
+    else \
+    id -u tss 2>/dev/null || \
+    adduser --system --home / --shell `type -p nologin` \
+    --no-create-home --ingroup tss tss; \
+    fi; \
     fi \
     '
 
@@ -206,7 +206,7 @@ RUN jq --argjson ekCertLess '{"ek_cert_less":"yes"}' '. += $ekCertLess' \
     '/usr/local/etc/tpm2-tss/fapi-config.json' \
     > '/tmp/fapi-config.json' \
     && cat '/tmp/fapi-config.json' \
-        > '/usr/local/etc/tpm2-tss/fapi-config.json' \
+    > '/usr/local/etc/tpm2-tss/fapi-config.json' \
     && rm -f '/tmp/fapi-config.json'
 
 
@@ -285,6 +285,10 @@ USER "${uid}:${gid}"
 ENV HOME /home/"${user}"
 WORKDIR /home/"${user}"
 
+## install Rust Toolchain for user
+RUN apt remove -y rustc
+RUN sudo chown -R ${user}:${user} /home/${user}
+RUN sudo -u ${user} curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
 ## -----------------------------------------------------------------------------
 ## --- postamble ---------------------------------------------------------------
