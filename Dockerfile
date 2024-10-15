@@ -57,15 +57,15 @@ COPY "./docker/dist/etc/default/keyboard" "/etc/default/keyboard"
 ## system reference manuals (manual pages)
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \
-    man-db \
-    manpages-posix \
-    manpages-dev \
+        man-db \
+        manpages-posix \
+        manpages-dev \
     && rm -rf /var/lib/apt/lists/*
 
 ## Bash command completion
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \
-    bash-completion \
+        bash-completion \
     && rm -rf /var/lib/apt/lists/*
 
 
@@ -95,7 +95,7 @@ RUN ln -sf 'libtss2-tcti-mssim.so' '/usr/local/lib/libtss2-tcti-default.so'
 
 ## TPM2 tools
 RUN git clone --depth=1 -b "${tpm2tools_version}" \
-    'https://github.com/tpm2-software/tpm2-tools.git' /tmp/tpm2-tools
+        'https://github.com/tpm2-software/tpm2-tools.git' /tmp/tpm2-tools
 WORKDIR /tmp/tpm2-tools
 RUN ./bootstrap \
     && ./configure \
@@ -106,11 +106,11 @@ RUN rm -rfv /tmp/tpm2-tools
 
 ## libcoap
 RUN git clone --recursive -b "${libcoap_version}" \
-    'https://github.com/obgm/libcoap.git' /tmp/libcoap
+        'https://github.com/obgm/libcoap.git' /tmp/libcoap
 WORKDIR /tmp/libcoap
 RUN ./autogen.sh \
     && ./configure --disable-tests --disable-documentation --disable-manpages \
-    --enable-dtls --with-tinydtls --enable-fast-install \
+        --enable-dtls --with-tinydtls --enable-fast-install \
     && make -j \
     && make install
 WORKDIR /
@@ -119,11 +119,11 @@ RUN rm -rfv /tmp/libcoap
 ## mbed TLS
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \
-    python3-jinja2 \
-    python3-jsonschema \
+        python3-jinja2 \
+        python3-jsonschema \
     && rm -rf /var/lib/apt/lists/*
 RUN git clone --recursive -b "${mbedtls_version}" \
-    'https://github.com/ARMmbed/mbedtls.git' /tmp/mbedtls
+        'https://github.com/ARMmbed/mbedtls.git' /tmp/mbedtls
 WORKDIR /tmp/mbedtls
 RUN make -j lib SHARED=true \
     && make install
@@ -132,7 +132,7 @@ RUN rm -rfv /tmp/mbedtls
 
 ## QCBOR
 RUN git clone --depth=1 --recursive -b "${qcbor_version}" \
-    'https://github.com/laurencelundblade/QCBOR.git' /tmp/qcbor
+        'https://github.com/laurencelundblade/QCBOR.git' /tmp/qcbor
 WORKDIR /tmp/qcbor
 RUN make -j all so \
     && make install install_so
@@ -141,7 +141,7 @@ RUN rm -rfv /tmp/qcbor
 
 ## t_cose
 RUN git clone --depth=1 --recursive -b "${tcose_version}" \
-    'https://github.com/laurencelundblade/t_cose.git' /tmp/t_cose
+        'https://github.com/laurencelundblade/t_cose.git' /tmp/t_cose
 WORKDIR /tmp/t_cose
 RUN make -j -f Makefile.psa libt_cose.a libt_cose.so \
     &&  make -f Makefile.psa install install_so
@@ -158,7 +158,7 @@ RUN python3 -m pip install --upgrade pip
 
 ## install py-tss
 RUN python3 -m pip install \
-    "git+https://github.com/tpm2-software/tpm2-pytss.git@${pytss_version}"
+        "git+https://github.com/tpm2-software/tpm2-pytss.git@${pytss_version}"
 
 
 ## -----------------------------------------------------------------------------
@@ -169,21 +169,21 @@ RUN python3 -m pip install \
 ## see: <https://github.com/tpm2-software/tpm2-tss/blob/master/Makefile.am#L841>
 RUN bash -c ' \
     if test -z "${DESTDIR}"; then \
-    if type -p groupadd > /dev/null; then \
-    id -g tss 2>/dev/null || groupadd --system tss; \
-    else \
-    id -g tss 2>/dev/null || \
-    addgroup --system tss; \
-    fi && \
-    if type -p useradd > /dev/null; then \
-    id -u tss 2>/dev/null || \
-    useradd --system --home-dir / --shell `type -p nologin` \
-    --no-create-home -g tss tss; \
-    else \
-    id -u tss 2>/dev/null || \
-    adduser --system --home / --shell `type -p nologin` \
-    --no-create-home --ingroup tss tss; \
-    fi; \
+        if type -p groupadd > /dev/null; then \
+            id -g tss 2>/dev/null || groupadd --system tss; \
+        else \
+            id -g tss 2>/dev/null || \
+            addgroup --system tss; \
+        fi && \
+        if type -p useradd > /dev/null; then \
+            id -u tss 2>/dev/null || \
+            useradd --system --home-dir / --shell `type -p nologin` \
+                --no-create-home -g tss tss; \
+        else \
+            id -u tss 2>/dev/null || \
+            adduser --system --home / --shell `type -p nologin` \
+                --no-create-home --ingroup tss tss; \
+        fi; \
     fi \
     '
 
@@ -198,15 +198,15 @@ RUN mkdir -p '/usr/local/var/lib/tpm2-tss' \
 ## install jq tool for JSON manipulation
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \
-    jq \
+        jq \
     && rm -rf /var/lib/apt/lists/*
 
 ## configure TSS FAPI to not check EK certificates since we use a TPM simulator
 RUN jq --argjson ekCertLess '{"ek_cert_less":"yes"}' '. += $ekCertLess' \
-    '/usr/local/etc/tpm2-tss/fapi-config.json' \
-    > '/tmp/fapi-config.json' \
+        '/usr/local/etc/tpm2-tss/fapi-config.json' \
+            > '/tmp/fapi-config.json' \
     && cat '/tmp/fapi-config.json' \
-    > '/usr/local/etc/tpm2-tss/fapi-config.json' \
+            > '/usr/local/etc/tpm2-tss/fapi-config.json' \
     && rm -f '/tmp/fapi-config.json'
 
 
@@ -217,12 +217,12 @@ RUN jq --argjson ekCertLess '{"ek_cert_less":"yes"}' '. += $ekCertLess' \
 ## install debugging tools
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \
-    clang \
-    clang-tools \
-    cgdb \
-    gdb \
-    tmux \
-    valgrind \
+        clang \
+        clang-tools \
+        cgdb \
+        gdb \
+        tmux \
+        valgrind \
     && rm -rf /var/lib/apt/lists/*
 
 
@@ -233,15 +233,15 @@ RUN apt-get update \
 ## install sudo and gosu
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \
-    gosu \
-    sudo \
+        gosu \
+        sudo \
     && rm -rf /var/lib/apt/lists/*
 
 ## create non-root user and grant sudo permission
 RUN export user="${user}" uid="${uid}" gid="${gid}" \
     && addgroup --gid "${gid}" "${user}" \
     && adduser --home /home/"${user}" --uid "${uid}" --gid "${gid}" \
-    --disabled-password --gecos '' "${user}" \
+        --disabled-password --gecos '' "${user}" \
     && mkdir -vp /etc/sudoers.d/ \
     && echo "${user}     ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/"${user}" \
     && chmod 0440 /etc/sudoers.d/"${user}" \
