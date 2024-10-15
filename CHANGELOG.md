@@ -13,6 +13,16 @@
 
 The following lists the changes CHARRA received over time.
 
+## Changelog 2024-10-15
+
+* Adjustments to `Dockerfile`
+
+  * Added Rust toolchain for the User
+
+* Implemented a Rust example for tss
+
+  * Simple RNG in rust with the TPM via tss-esapi
+
 ## Changelog 2024-06-12
 
 * Adjustments to `cli_util`
