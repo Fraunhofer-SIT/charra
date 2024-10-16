@@ -11,17 +11,13 @@
 
 # Changelog
 
-The following lists the changes CHARRA received over time.
+The following lists the changes that CHARRA received over time.
 
 ## Changelog 2024-10-15
 
-* Adjustments to `Dockerfile`
+* Added Rust toolchain for the container user (adjustments to `Dockerfile`)
 
-  * Added Rust toolchain for the User
-
-* Implemented a Rust example for tss
-
-  * Simple RNG in rust with the TPM via tss-esapi
+* Rust example for generating a random number with the TPM 2.0 using the `tss-esapi` crate
 
 ## Changelog 2024-06-12
 
@@ -31,17 +27,17 @@ The following lists the changes CHARRA received over time.
 
   * Prefixed `DTLS-RPK` and `DTLS_PSK` options with rpk/psk
 
-  * fixed undefined behavior while parsing command line error when using option `-h`
+  * Fixed undefined behavior while parsing command line error when using option `-h`
 
 * Adjustments to `--attestation-key`
 
-  * an attestation key can now be loaded with a TPM handle
+  * An attestation key can now be loaded with a TPM handle
 
   * `--attestation-key` will now require a FORMAT. Available are: `context` and `handle`
 
 * `--pcr-selection` will now require a list of PCR banks as with the `tpm2-tools`
 
-  * there is currently only support for `sha256` (other pcr banks will be ignored)
+  * There is currently only support for `sha256` (other PCR banks are ignored)
 
 * Adjustments to `verifier`
 

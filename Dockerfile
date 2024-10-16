@@ -262,6 +262,7 @@ ENV TSS2_LOG=all+none
 #ENV TSS2_LOGFILE=none
 
 ## set TPM2 tools environment variables
+ENV TPM2TOOLS_TCTI=mssim
 ENV TPM2TOOLS_TCTI_NAME=socket
 ENV TPM2TOOLS_SOCKET_ADDRESS=127.0.0.1
 ENV TPM2TOOLS_SOCKET_PORT=2321
@@ -285,10 +286,22 @@ USER "${uid}:${gid}"
 ENV HOME /home/"${user}"
 WORKDIR /home/"${user}"
 
-## install rust toolchain for standard user
-RUN apt remove -y rustc
-RUN sudo chown -R ${user}:${user} /home/${user}
-RUN sudo -u ${user} curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+## -----------------------------------------------------------------------------
+## --- user-specific stuff -----------------------------------------------------
+## -----------------------------------------------------------------------------
+
+## install Rust toolchain for user
+RUN apt remove --purge -y \
+        rustc \
+        cargo \
+    || true
+RUN sudo chown -R "${user}:${user}" /home/"${user}"
+RUN sudo -u "${user}" curl --proto '=https' --tlsv1.2 -sSf \
+        'https://sh.rustup.rs' | sh -s -- -y
+
+## install Rust crates for code examples
+RUN cd "/home/${user}/code-examples/tpm2-rstss/" \
+        && sudo -u "${user}" "/home/${user}/.cargo/bin/cargo" build
 
 ## -----------------------------------------------------------------------------
 ## --- postamble ---------------------------------------------------------------
