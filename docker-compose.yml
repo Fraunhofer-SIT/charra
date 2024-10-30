@@ -9,7 +9,7 @@ services:
         user: bob
         uid: 1000
         gid: 1000
-    image: fraunhofer-sit/charra-dev-env:2.4.0
+    image: fraunhofer-sit/charra-dev-env:2.5.0
     container_name: charra-dev-env
     restart: unless-stopped
     volumes:
