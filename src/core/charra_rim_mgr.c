@@ -21,7 +21,6 @@
 
 #include "charra_rim_mgr.h"
 
-#include <ctype.h>
 #include <yaml.h>
 
 #include "../common/charra_error.h"
@@ -30,6 +29,9 @@
 #include "../util/crypto_util.h"
 #include "../util/io_util.h"
 #include "../util/parser_util.h"
+
+#define SKIP_BLOCK_MAPPING_START_TOKEN(token_type)                             \
+    ((token_type) == YAML_BLOCK_MAPPING_START_TOKEN)
 
 static uint32_t pcr_selection_index = 0;
 static uint32_t pcr_set_index = 0;
@@ -213,6 +215,8 @@ mapping_error:
  * previously parsed a `YAML_DOCUMENT_START_TOKEN`.
  *
  * @param parser a pointer to the parser
+ * @param skip_block_mapping_start_token this function should skip the first
+ * `YAML_BLOCK_MAPPING_START_TOKEN` if set to `true`
  * @param reference_pcrs the 2D array holding all PCR values needed for the
  * PCR composite digest
  * @param reference_pcr_selection the array holding the PCR indexes used for
@@ -221,7 +225,8 @@ mapping_error:
  * computation of the digest, also the length of both arrays
  * @returns CHARRA_RC_SUCCESS on success, CHARRA_RC_ERROR on errors.
  */
-static CHARRA_RC parse_document(yaml_parser_t* parser, uint8_t** reference_pcrs,
+static CHARRA_RC parse_document(yaml_parser_t* parser,
+        bool skip_block_mapping_start_token, uint8_t** reference_pcrs,
         const uint8_t* reference_pcr_selection,
         const uint32_t reference_pcr_selection_len) {
     CHARRA_RC charra_rc = CHARRA_RC_ERROR;
@@ -229,14 +234,21 @@ static CHARRA_RC parse_document(yaml_parser_t* parser, uint8_t** reference_pcrs,
     bool document_end = false;
     bool mapping_started = false;
     yaml_token_type_t expected_token = YAML_BLOCK_MAPPING_START_TOKEN;
+    /* YAML_BLOCK_MAPPING_START_TOKEN is already parsed */
+    if (skip_block_mapping_start_token) {
+        expected_token = YAML_KEY_TOKEN;
+        mapping_started = true;
+    }
 
     /* the parser should parse:
-     * YAML_BLOCK_MAPPING_START_TOKEN,
-     * YAML_KEY_TOKEN, YAML_SCALAR_TOKEN: ("sha256"),
-     * YAML_VALUE_TOKEN,
-     * YAML_BLOCK_MAPPING_START_TOKEN: (pcr list), ...,
-     * YAML_BLOCK_END_TOKEN (end of root mapping),
-     * YAML_DOCUMENT_END_TOKEN */
+     * - YAML_BLOCK_MAPPING_START_TOKEN (depending on
+     * skip_block_mapping_start_token)
+     * - YAML_KEY_TOKEN
+     * - YAML_SCALAR_TOKEN: ("sha256")
+     * - YAML_VALUE_TOKEN
+     * - YAML_BLOCK_MAPPING_START_TOKEN: (pcr list)
+     * - ...
+     * - YAML_BLOCK_END_TOKEN (end of root mapping) */
     do {
         charra_rc = parse_token(parser, &token);
         if (charra_rc != CHARRA_RC_SUCCESS) {
@@ -275,9 +287,6 @@ static CHARRA_RC parse_document(yaml_parser_t* parser, uint8_t** reference_pcrs,
             expected_token = YAML_BLOCK_MAPPING_START_TOKEN;
             break;
         case YAML_BLOCK_END_TOKEN:
-            expected_token = YAML_DOCUMENT_END_TOKEN;
-            break;
-        case YAML_DOCUMENT_END_TOKEN:
             document_end = true;
             break;
         /* all other tokens should not be parsed in this stage */
@@ -350,9 +359,12 @@ CHARRA_RC charra_check_pcr_digest_against_reference(const char* filename,
             switch (token.type) {
             case YAML_STREAM_START_TOKEN:
                 break;
-            case YAML_DOCUMENT_START_TOKEN:
-                charra_rc = parse_document(&parser, reference_pcrs,
-                        reference_pcr_selection, reference_pcr_selection_len);
+            case YAML_DOCUMENT_START_TOKEN:  // optional token
+            case YAML_BLOCK_MAPPING_START_TOKEN:
+                charra_rc = parse_document(&parser,
+                        SKIP_BLOCK_MAPPING_START_TOKEN(token.type),
+                        reference_pcrs, reference_pcr_selection,
+                        reference_pcr_selection_len);
                 if (charra_rc != CHARRA_RC_SUCCESS) {
                     goto returns;
                 }
@@ -368,6 +380,8 @@ CHARRA_RC charra_check_pcr_digest_against_reference(const char* filename,
                 }
                 pcr_selection_index = 0;
                 pcr_set_index++;
+                break;
+            case YAML_DOCUMENT_END_TOKEN:  // optional token
                 break;
             case YAML_STREAM_END_TOKEN:
                 stream_end = true;
