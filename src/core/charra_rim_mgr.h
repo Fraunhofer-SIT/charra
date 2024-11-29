@@ -44,8 +44,8 @@
  * Entries are identified by the number at the start of the line.
  * Entries are allowed to be missing if they are not in the
  * reference_pcr_selection. Entries are expected to be in order.
- * Each set of PCR states starts with a YAML document start token `---` and
- * ends with a YAML document end token `...`.
+ * Each set of PCR states may start with a YAML document start token `---` and
+ * may end with a YAML document end token `...`.
  *
  * @param[in] filename The path of the file which holds the reference PCR values
  * @param[in] reference_pcr_selection An array of PCRs indexes that we need.
