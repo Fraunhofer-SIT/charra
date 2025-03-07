@@ -38,7 +38,7 @@ static uint32_t pcr_set_index = 0;
 static uint32_t pcr_set_ending_line = 0;
 
 static void free_reference_pcrs(
-        uint8_t** reference_pcrs, uint32_t reference_pcr_selection_len) {
+        uint8_t** const reference_pcrs, uint32_t reference_pcr_selection_len) {
     for (uint32_t i = 0; i < reference_pcr_selection_len; i++) {
         free(reference_pcrs[i]);
     }
@@ -60,8 +60,8 @@ static void free_reference_pcrs(
  * @returns CHARRA_RC_SUCCESS on success, CHARRA_RC_NO_MATCH when the digests
  * did not match, CHARRA_RC_ERROR on errors.
  */
-static CHARRA_RC handle_end_of_pcr_set(uint8_t** reference_pcrs,
-        const uint8_t* reference_pcr_selection,
+static CHARRA_RC handle_end_of_pcr_set(uint8_t** const reference_pcrs,
+        const uint8_t* const reference_pcr_selection,
         const uint32_t reference_pcr_selection_len,
         const TPMS_ATTEST* const attest_struct) {
     if (pcr_selection_index < reference_pcr_selection_len) {
@@ -98,7 +98,8 @@ static CHARRA_RC handle_end_of_pcr_set(uint8_t** reference_pcrs,
  * @param token a pointer to the YAML token
  * @returns CHARRA_RC_SUCCESS on success, CHARRA_RC_ERROR on errors.
  */
-static CHARRA_RC parse_token(yaml_parser_t* parser, yaml_token_t* token) {
+static CHARRA_RC parse_token(
+        yaml_parser_t* const parser, yaml_token_t* const token) {
     if (yaml_parser_scan(parser, token) == 0) {
         if (parser->problem_mark.line || parser->problem_mark.column) {
             charra_log_error("Parse error: %s [Line: %lu, Column: %lu]",
@@ -127,8 +128,9 @@ static CHARRA_RC parse_token(yaml_parser_t* parser, yaml_token_t* token) {
  * computation of the digest, also the length of both arrays
  * @returns CHARRA_RC_SUCCESS on success, CHARRA_RC_ERROR on errors.
  */
-static CHARRA_RC parse_pcr_mapping(yaml_parser_t* parser,
-        uint8_t** reference_pcrs, const uint8_t* reference_pcr_selection,
+static CHARRA_RC parse_pcr_mapping(yaml_parser_t* const parser,
+        uint8_t** const reference_pcrs,
+        const uint8_t* const reference_pcr_selection,
         const uint32_t reference_pcr_selection_len) {
     CHARRA_RC charra_rc = CHARRA_RC_ERROR;
     yaml_token_t token = {0};
@@ -225,9 +227,9 @@ mapping_error:
  * computation of the digest, also the length of both arrays
  * @returns CHARRA_RC_SUCCESS on success, CHARRA_RC_ERROR on errors.
  */
-static CHARRA_RC parse_document(yaml_parser_t* parser,
-        bool skip_block_mapping_start_token, uint8_t** reference_pcrs,
-        const uint8_t* reference_pcr_selection,
+static CHARRA_RC parse_document(yaml_parser_t* const parser,
+        bool skip_block_mapping_start_token, uint8_t** const reference_pcrs,
+        const uint8_t* const reference_pcr_selection,
         const uint32_t reference_pcr_selection_len) {
     CHARRA_RC charra_rc = CHARRA_RC_ERROR;
     yaml_token_t token = {0};
@@ -308,8 +310,8 @@ document_error:
     return charra_rc;
 }
 
-CHARRA_RC charra_check_pcr_digest_against_reference(const char* filename,
-        const uint8_t* reference_pcr_selection,
+CHARRA_RC charra_check_pcr_digest_against_reference(const char* const filename,
+        const uint8_t* const reference_pcr_selection,
         const uint32_t reference_pcr_selection_len,
         const TPMS_ATTEST* const attest_struct) {
     /* sanity check */
