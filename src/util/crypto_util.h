@@ -90,7 +90,7 @@ CHARRA_RC charra_crypto_rsa_verify_signature(
  * @returns CHARRA_RC_SUCCESS on matching digests, CHARRA_RC_NO_MATCH
  * on non-matching digests, CHARRA_RC_ERROR on error
  */
-CHARRA_RC compute_and_check_PCR_digest(uint8_t** pcr_values,
+CHARRA_RC compute_and_check_PCR_digest(uint8_t** const pcr_values,
         uint32_t pcr_value_len, const TPMS_ATTEST* const attest_struct);
 
 #endif /* SITIMA_CRYPTO_H */

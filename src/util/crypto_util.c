@@ -341,7 +341,7 @@ error:
     return charra_r;
 }
 
-CHARRA_RC compute_and_check_PCR_digest(uint8_t** pcr_values,
+CHARRA_RC compute_and_check_PCR_digest(uint8_t** const pcr_values,
         uint32_t pcr_values_len, const TPMS_ATTEST* const attest_struct) {
     uint8_t pcr_composite_digest[TPM2_SHA256_DIGEST_SIZE] = {0};
     /* TODO use crypto-agile (generic) version

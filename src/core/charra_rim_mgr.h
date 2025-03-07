@@ -23,6 +23,7 @@
 #define CHARRA_RIM_MGR_H
 
 #include <inttypes.h>
+
 #include <tss2/tss2_esys.h>
 #include <tss2/tss2_tpm2_types.h>
 
@@ -57,8 +58,8 @@
  * none of the reference PCR states matched the attestation state,
  * CHARRA_RC_ERROR on errors.
  */
-CHARRA_RC charra_check_pcr_digest_against_reference(const char* filename,
-        const uint8_t* reference_pcr_selection,
+CHARRA_RC charra_check_pcr_digest_against_reference(const char* const filename,
+        const uint8_t* const reference_pcr_selection,
         const uint32_t reference_pcr_selection_len,
         const TPMS_ATTEST* const attest_struct);
 
