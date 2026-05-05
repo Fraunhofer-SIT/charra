@@ -38,12 +38,10 @@
 #include "core/charra_tap/charra_tap_cbor.h"
 #include "core/charra_tap/charra_tap_dto.h"
 #include "util/charra_util.h"
-#include "util/cli/cli_util_verifier.h"
 #include "util/coap_util.h"
+#include "util/config/config_verifier_util.h"
 #include "util/crypto_util.h"
 #include "util/io_util.h"
-#include "util/tpm2_tools_util.h"
-#include "util/tpm2_util.h"
 
 #define CHARRA_UNUSED __attribute__((unused))
 
@@ -56,58 +54,12 @@ static CHARRA_RC attestation_rc = CHARRA_RC_ERROR;
 
 /* logging */
 #define LOG_NAME "verifier"
-coap_log_t coap_log_level = LOG_INFO;
 // #define LOG_LEVEL_CBOR LOG_DEBUG
-charra_log_t charra_log_level = CHARRA_LOG_INFO;
 
 /* config */
-char dst_host[16] = "127.0.0.1";      // 15 characters for IPv4 plus \0
-unsigned int dst_port = 5683;         // default port
-#define COAP_IO_PROCESS_TIME_MS 2000  // CoAP IO process time in milliseconds
+static config_verifier config = {0};
 #define PERIODIC_ATTESTATION_WAIT_TIME_S                                       \
     2  // Wait time between attestations in seconds
-static const bool USE_TPM_FOR_RANDOM_NONCE_GENERATION = false;
-
-#define TPM_SIG_KEY_ID_LEN 14
-#define TPM_SIG_KEY_ID "PK.RSA.default"
-// TODO: Make PCR selection configurable via CLI
-// TODO: Implement integration of all PCR banks
-static uint8_t tpm_pcr_selection[TPM2_PCR_BANK_COUNT][TPM2_MAX_PCRS] = {
-        /* sha1 */
-        {0},
-        /* sha256 */
-        {0, 1, 2, 3, 4, 5, 6, 7, 10},
-        /* sha384 */
-        {0},
-        /* sha512 */
-        {0}};
-static uint32_t tpm_pcr_selection_len[TPM2_PCR_BANK_COUNT] = {0,  // sha1
-        9,                                                        // sha256
-        0,                                                        // sha384
-        0};                                                       // sha512
-uint16_t attestation_response_timeout =
-        30;  // timeout when waiting for attestation answer in seconds
-char* reference_pcr_file_path = NULL;
-char* attestation_public_key_path = NULL;
-cli_config_signature_hash_algorithm signature_hash_algorithm = {
-        .mbedtls_hash_algorithm = MBEDTLS_MD_SHA256,
-        .tpm2_hash_algorithm = TPM2_ALG_SHA256};
-
-// for DTLS-PSK
-bool use_dtls_psk = false;
-char* dtls_psk_key = "Charra DTLS Key";
-char* dtls_psk_identity = "Charra Verifier";
-
-// for DTLS-RPK
-bool use_dtls_rpk = false;
-char* dtls_rpk_private_key_path = "keys/verifier.der";
-char* dtls_rpk_public_key_path = "keys/verifier.pub.der";
-char* dtls_rpk_peer_public_key_path = "keys/attester.pub.der";
-bool dtls_rpk_verify_peer_public_key = true;
-
-// for PCR logs
-uint32_t pcr_log_len = 0;
-pcr_log_dto pcr_logs[SUPPORTED_PCR_LOGS_COUNT] = {0};
 
 /* --- function forward declarations -------------------------------------- */
 
@@ -138,99 +90,20 @@ int main(int argc, char** argv) {
     /* handle SIGINT */
     signal(SIGINT, handle_sigint);
 
-    /* check environment variables */
-    charra_log_level_from_str(
-            (const char*)getenv("LOG_LEVEL_CHARRA"), &charra_log_level);
-    charra_coap_log_level_from_str(
-            (const char*)getenv("LOG_LEVEL_COAP"), &coap_log_level);
-
-    /* initialize structures to pass to the CLI parser */
-    /* clang-format off */
-    cli_config cli_config = {
-        .caller = VERIFIER,
-        .common_config = {
-            .charra_log_level = &charra_log_level,
-            .coap_log_level = &coap_log_level,
-            .port = &dst_port,
-            .use_dtls_psk = &use_dtls_psk,
-            .dtls_psk_key = &dtls_psk_key,
-            .use_dtls_rpk = &use_dtls_rpk,
-            .dtls_rpk_private_key_path =
-                    &dtls_rpk_private_key_path,
-            .dtls_rpk_public_key_path =
-                    &dtls_rpk_public_key_path,
-            .dtls_rpk_peer_public_key_path =
-                    &dtls_rpk_peer_public_key_path,
-            .dtls_rpk_verify_peer_public_key =
-                    &dtls_rpk_verify_peer_public_key,
-        },
-        .specific_config.verifier_config = {
-            .dst_host = dst_host,
-            .timeout = &attestation_response_timeout,
-            .attestation_public_key_path = &attestation_public_key_path,
-            .reference_pcr_file_path = &reference_pcr_file_path,
-            .tpm_pcr_selection = tpm_pcr_selection,
-            .tpm_pcr_selection_len = tpm_pcr_selection_len,
-            .dtls_psk_identity = &dtls_psk_identity,
-            .signature_hash_algorithm = &signature_hash_algorithm,
-            .pcr_log_len = &pcr_log_len,
-            .pcr_logs = &pcr_logs
-        },
-    };
-    /* clang-format on */
-
     /* set log level before parsing CLI to be able to print errors. */
-    charra_log_set_level(charra_log_level);
-    coap_set_log_level(coap_log_level);
+    charra_log_set_level(CHARRA_LOG_INFO);
 
-    /* parse CLI arguments */
-    if ((result = charra_parse_command_line_verifier_arguments(
-                 argc, argv, &cli_config)) != 0) {
+    /* load config from env-vars, files and cli */
+    if ((result = load_verifier_config(argc, argv, &config)) != 0) {
         // 1 means help message was displayed (thus exit), -1 means error
         return (result == 1) ? CHARRA_RC_SUCCESS : CHARRA_RC_CLI_ERROR;
     }
 
     /* set CHARRA and libcoap log levels again in case CLI changed these */
-    charra_log_set_level(charra_log_level);
-    coap_set_log_level(coap_log_level);
+    charra_log_set_level(config.charra_log_level);
+    coap_set_log_level(config.coap_log_level);
 
-    charra_log_debug("[" LOG_NAME "] Verifier Configuration:");
-    charra_log_debug("[" LOG_NAME "]     Destination port: %d", dst_port);
-    charra_log_debug("[" LOG_NAME "]     Destination host: %s", dst_host);
-    charra_log_debug("[" LOG_NAME
-                     "]     Timeout when waiting for attestation response: %ds",
-            attestation_response_timeout);
-    charra_log_debug("[" LOG_NAME "]     Reference PCR file path: '%s'",
-            reference_pcr_file_path);
-    charra_log_debug("[" LOG_NAME "]     PCR selection with length %d:",
-            tpm_pcr_selection_len);
-    charra_log_log_raw(CHARRA_LOG_DEBUG,
-            "                                                      ");
-    for (uint32_t i = 0; i < tpm_pcr_selection_len[1]; i++) {
-        if (i != tpm_pcr_selection_len[1] - 1) {
-            charra_log_log_raw(CHARRA_LOG_DEBUG, "%d, ", tpm_pcr_selection[i]);
-        } else {
-            charra_log_log_raw(CHARRA_LOG_DEBUG, "%d\n", tpm_pcr_selection[i]);
-        }
-    }
-    charra_log_debug("[" LOG_NAME "]     DTLS with PSK enabled: %s",
-            (use_dtls_psk == true) ? "true" : "false");
-    if (use_dtls_psk) {
-        charra_log_debug(
-                "[" LOG_NAME "]         Pre-shared key: '%s'", dtls_psk_key);
-        charra_log_debug(
-                "[" LOG_NAME "]         Identity: '%s'", dtls_psk_identity);
-    }
-    charra_log_debug("[" LOG_NAME "]     DTLS-RPK enabled: %s",
-            (use_dtls_rpk == true) ? "true" : "false");
-    if (use_dtls_rpk) {
-        charra_log_debug("[" LOG_NAME "]         Private key path: '%s'",
-                dtls_rpk_private_key_path);
-        charra_log_debug("[" LOG_NAME "]         Public key path: '%s'",
-                dtls_rpk_public_key_path);
-        charra_log_debug("[" LOG_NAME "]         Peers' public key path: '%s'",
-                dtls_rpk_peer_public_key_path);
-    }
+    trace_log_verifier_config(&config);
 
     /* set varaibles here such that they are valid in case of an 'goto cleanup'
      */
@@ -239,19 +112,19 @@ int main(int argc, char** argv) {
     coap_optlist_t* coap_options = NULL;
     uint8_t* req_buf = NULL;  // TODO(any): make dynamic
 
-    if (use_dtls_psk && use_dtls_rpk) {
+    if (config.use_dtls_psk && config.use_dtls_rpk) {
         charra_log_error(
                 "[" LOG_NAME "] Configuration enables both DTSL with PSK "
                 "and DTSL with PKI. Aborting!");
         goto cleanup;
     }
 
-    if (use_dtls_psk || use_dtls_rpk) {
+    if (config.use_dtls_psk || config.use_dtls_rpk) {
         // print TLS version when in debug mode
         coap_show_tls_version(LOG_DEBUG);
     }
 
-    if (use_dtls_psk && !coap_dtls_is_supported()) {
+    if (config.use_dtls_psk && !coap_dtls_is_supported()) {
         charra_log_error("[" LOG_NAME "] CoAP does not support DTLS but the "
                          "configuration enables DTLS. Aborting!");
         goto cleanup;
@@ -270,26 +143,29 @@ int main(int argc, char** argv) {
     charra_log_info("[" LOG_NAME "] Registering CoAP response handler.");
     coap_register_response_handler(coap_context, coap_attest_handler);
 
-    if (use_dtls_psk) {
+    if (config.use_dtls_psk) {
         charra_log_info("[" LOG_NAME
                         "] Creating CoAP client session using DTLS with PSK.");
         if ((coap_session = charra_coap_new_client_session_psk(coap_context,
-                     dst_host, dst_port, COAP_PROTO_DTLS, dtls_psk_identity,
-                     (uint8_t*)dtls_psk_key, strlen(dtls_psk_key))) == NULL) {
+                     config.dst_host, config.dst_port, COAP_PROTO_DTLS,
+                     config.dtls_psk_identity, (uint8_t*)config.dtls_psk_key,
+                     strlen(config.dtls_psk_key))) == NULL) {
             charra_log_error(
                     "[" LOG_NAME
                     "] Cannot create client session based on DTLS-PSK.");
             result = CHARRA_RC_ERROR;
             goto cleanup;
         }
-    } else if (use_dtls_rpk) {
+    } else if (config.use_dtls_rpk) {
         charra_log_info(
                 "[" LOG_NAME "] Creating CoAP client session using DTLS-RPK.");
         coap_dtls_pki_t dtls_pki = {0};
 
         result = charra_coap_setup_dtls_pki_for_rpk(&dtls_pki,
-                dtls_rpk_private_key_path, dtls_rpk_public_key_path,
-                dtls_rpk_peer_public_key_path, dtls_rpk_verify_peer_public_key);
+                config.dtls_rpk_private_key_path,
+                config.dtls_rpk_public_key_path,
+                config.dtls_rpk_peer_public_key_path,
+                config.dtls_rpk_verify_peer_public_key);
         if (result != CHARRA_RC_SUCCESS) {
             charra_log_error("[" LOG_NAME
                              "] Error while setting up DTLS-RPK structure.");
@@ -297,7 +173,8 @@ int main(int argc, char** argv) {
         }
 
         if ((coap_session = charra_coap_new_client_session_pki(coap_context,
-                     dst_host, dst_port, COAP_PROTO_DTLS, &dtls_pki)) == NULL) {
+                     config.dst_host, config.dst_port, COAP_PROTO_DTLS,
+                     &dtls_pki)) == NULL) {
             charra_log_error(
                     "[" LOG_NAME
                     "] Cannot create client session based on DTLS-RPK.");
@@ -308,7 +185,8 @@ int main(int argc, char** argv) {
         charra_log_info(
                 "[" LOG_NAME "] Creating CoAP client session using UDP.");
         if ((coap_session = charra_coap_new_client_session(coap_context,
-                     dst_host, dst_port, COAP_PROTO_UDP)) == NULL) {
+                     config.dst_host, config.dst_port, COAP_PROTO_UDP)) ==
+                NULL) {
             charra_log_error("[" LOG_NAME
                              "] Cannot create client session based on UDP.");
             result = CHARRA_RC_COAP_ERROR;
@@ -396,7 +274,7 @@ int main(int argc, char** argv) {
     }
 
     /* set timeout length */
-    coap_fixed_point_t coap_timeout = {attestation_response_timeout, 0};
+    coap_fixed_point_t coap_timeout = {config.attestation_response_timeout, 0};
     coap_session_set_ack_timeout(coap_session, coap_timeout);
 
     /* send CoAP PDU */
@@ -413,7 +291,7 @@ int main(int argc, char** argv) {
     while (!processing_response && coap_io_pending(coap_context)) {
         /* process CoAP I/O */
         if ((coap_io_process_time = coap_io_process(
-                     coap_context, COAP_IO_PROCESS_TIME_MS)) == -1) {
+                     coap_context, config.io_process_time_ms)) == -1) {
             charra_log_error(
                     "[" LOG_NAME "] Error during CoAP I/O processing.");
             result = CHARRA_RC_COAP_ERROR;
@@ -423,7 +301,8 @@ int main(int argc, char** argv) {
          * time inside the coap_io_process function. But should be good enough.
          */
         response_wait_time += coap_io_process_time;
-        if (response_wait_time >= (attestation_response_timeout * 1000)) {
+        if (response_wait_time >=
+                (config.attestation_response_timeout * 1000)) {
             charra_log_error("[" LOG_NAME
                              "] Timeout after %d ms while waiting for or "
                              "processing attestation response.",
@@ -470,7 +349,7 @@ static CHARRA_RC create_attestation_request(
     /* generate nonce */
     const uint32_t nonce_len = 20;
     uint8_t nonce[nonce_len];
-    if (USE_TPM_FOR_RANDOM_NONCE_GENERATION) {
+    if (config.use_tpm_for_random_nonce_generation) {
         if ((err = charra_random_bytes_from_tpm(nonce_len, nonce) !=
                     CHARRA_RC_SUCCESS)) {
             charra_log_error("Could not get random bytes from TPM for nonce.");
@@ -493,7 +372,7 @@ static CHARRA_RC create_attestation_request(
     charra_tap_msg_attestation_request_dto req = {
             .tap_spec_version = CHARRA_TAP_SPEC_VERSION,
             .hello = false,
-            .sig_key_id_len = TPM_SIG_KEY_ID_LEN,
+            .sig_key_id_len = config.tpm2_sig_key_id_len,
             .sig_key_id = {0},  // must be memcpy'd, see below
             .nonce_len = nonce_len,
             .nonce = {0},  // must be memcpy'd, see below
@@ -501,17 +380,17 @@ static CHARRA_RC create_attestation_request(
             .pcr_selections = {{
                     .tcg_hash_alg_id = TPM2_ALG_SHA256,
                     /* TODO: add other PCR banks */
-                    .pcrs_len = tpm_pcr_selection_len[1],
+                    .pcrs_len = config.tpm_pcr_selection_len[1],
                     .pcrs = {0}  // must be memcpy'd, see below
             }},
-            .pcr_log_len = pcr_log_len,
-            .pcr_logs = pcr_logs,
+            .pcr_log_len = config.pcr_log_len,
+            .pcr_logs = config.pcr_logs,
     };
-    memcpy(req.sig_key_id, TPM_SIG_KEY_ID, TPM_SIG_KEY_ID_LEN);
+    memcpy(req.sig_key_id, config.tpm_sig_key_id, config.tpm2_sig_key_id_len);
     memcpy(req.nonce, nonce, nonce_len);
     /* TODO: add other PCR banks */
-    memcpy(req.pcr_selections->pcrs, tpm_pcr_selection[1],
-            tpm_pcr_selection_len[1]);
+    memcpy(req.pcr_selections->pcrs, config.tpm_pcr_selection[1],
+            config.tpm_pcr_selection_len[1]);
 
     /* set output param(s) */
     *attestation_request = req;
@@ -607,7 +486,7 @@ static coap_response_t coap_attest_handler(
     TPM2B_PUBLIC tpm2_public_key = {0};  // (TPM2B_PUBLIC*)res.tpm2_public_key;
     if ((attestation_rc = charra_load_external_public_key(esys_ctx,
                  &tpm2_public_key, &sig_key_handle,
-                 attestation_public_key_path)) != CHARRA_RC_SUCCESS) {
+                 config.attestation_public_key_path)) != CHARRA_RC_SUCCESS) {
         charra_log_error("[" LOG_NAME "] Loading external public key failed.");
         goto cleanup;
     } else {
@@ -632,8 +511,8 @@ static coap_response_t coap_attest_handler(
         /* verify attestation signature with TPM */
         if ((attestation_rc = charra_verify_tpm2_quote_signature_with_tpm(
                      esys_ctx, sig_key_handle,
-                     signature_hash_algorithm.tpm2_hash_algorithm, &attest,
-                     &signature, &validation)) == CHARRA_RC_SUCCESS) {
+                     config.signature_hash_algorithm.tpm2_hash_algorithm,
+                     &attest, &signature, &validation)) == CHARRA_RC_SUCCESS) {
             charra_log_info(
                     "[" LOG_NAME "]     => TPM2 Quote signature is valid!");
             attestation_result_signature = true;
@@ -660,7 +539,7 @@ static coap_response_t coap_attest_handler(
                         "] Verifying TPM2 Quote signature with mbedTLS ...");
         if ((attestation_rc = charra_crypto_rsa_verify_signature(
                      &mbedtls_rsa_pub_key,
-                     signature_hash_algorithm.mbedtls_hash_algorithm,
+                     config.signature_hash_algorithm.mbedtls_hash_algorithm,
                      res.tpm2_quote.attestation_data,
                      (size_t)res.tpm2_quote.attestation_data_len,
                      signature.signature.rsapss.sig.buffer,
@@ -732,8 +611,8 @@ static coap_response_t coap_attest_handler(
                 false);
         /* TODO: add support for other hash algorithms */
         CHARRA_RC pcr_check = charra_check_pcr_digest_against_reference(
-                reference_pcr_file_path, tpm_pcr_selection[1],
-                tpm_pcr_selection_len[1], &attest_struct);
+                config.reference_pcr_file_path, config.tpm_pcr_selection[1],
+                config.tpm_pcr_selection_len[1], &attest_struct);
         if (pcr_check == CHARRA_RC_SUCCESS) {
             charra_log_info(
                     "[" LOG_NAME "]     => PCR composite digest is valid!");
@@ -754,7 +633,7 @@ static coap_response_t coap_attest_handler(
 
     for (uint32_t i = 0; i < res.pcr_log_len; i++) {
         charra_log_info("[" LOG_NAME "] Received PCR log %s [%lu Bytes]",
-                pcr_logs[i].identifier, res.pcr_logs[i].content_len);
+                config.pcr_logs[i].identifier, res.pcr_logs[i].content_len);
     }
 
     // TODO(any): Implement real verification.
@@ -780,7 +659,6 @@ cleanup:
     /* free heap objects*/
     for (uint32_t i = 0; i < res.pcr_log_len; i++) {
         charra_free_if_not_null(res.pcr_logs[i].content);
-        charra_free_if_not_null(res.pcr_logs[i].identifier);
     }
     charra_free_if_not_null(res.pcr_logs);
 

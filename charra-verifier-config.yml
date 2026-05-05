@@ -1,0 +1,40 @@
+charra-verifier:
+    lock-config: false
+    target-host: "127.0.0.1"
+    target-port: 5683
+    log-level: INFO # TRACE, DEBUG, INFO, WARN, ERROR, FATAL
+    coap:
+        log-level: INFO # EMERG, ALERT, CRIT, ERR, WARNING, NOTICE, INFO, DEBUG, CIPHERS
+        io-process-time-ms: 2000
+        udp:
+            dtls-psk:
+                enable: false
+                identity: "CHARRA Verifier"
+                key: "CHARRA DTLS Key"
+            dtls-rpk:
+                enable: false
+                private-key-path: "./keys/verifier.der"
+                public-key-path: "./keys/verifier.pub.der"
+                verify-peer-public-key: true
+                peer-public-key-path: "./keys/attester.pub.der"
+    attestation:
+        response-timeout: 30
+        use-tpm-for-random-nonce-generation: false
+        tpm-sig-key-id: "PK.RSA.default"
+        tpm-quote-signature-hash-algorithm: sha256
+        public-key-path: "./tpm_keys/rsa_ak.pub"
+        reference-pcr-file:
+            path: "./reference-pcrs.yml"
+            format: yaml # yaml
+        tpm-pcr-selection:
+            sha1: []
+            sha256: [0, 1, 2, 3, 4, 5, 6, 7, 10]
+            sha384: []
+            sha512: []
+        pcr-log:
+            ima:
+                start: 1
+                count: 0
+            tcg-boot:
+                start: 1
+                count: 0

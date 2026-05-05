@@ -128,8 +128,10 @@ INCLUDE = -I$(INCDIR)
 OBJECTS =  $(addsuffix .o, $(addprefix $(OBJDIR)/common/, charra_log))
 OBJECTS += $(addsuffix .o, $(addprefix $(OBJDIR)/core/, charra_helper charra_key_mgr charra_rim_mgr))
 OBJECTS += $(addsuffix .o, $(addprefix $(OBJDIR)/core/charra_tap/, charra_tap_cbor))
-OBJECTS += $(addsuffix .o, $(addprefix $(OBJDIR)/util/, charra_util coap_util crypto_util io_util tpm2_tools_util tpm2_util parser_util))
-OBJECTS += $(addsuffix .o, $(addprefix $(OBJDIR)/util/cli/, cli_util_attester cli_util_verifier cli_util_common))
+OBJECTS += $(addsuffix .o, $(addprefix $(OBJDIR)/util/, charra_util coap_util crypto_util io_util tpm2_tools_util tpm2_util parser_util yaml_util))
+OBJECTS += $(addsuffix .o, $(addprefix $(OBJDIR)/util/config/, config_verifier_util config_attester_util))
+OBJECTS += $(addsuffix .o, $(addprefix $(OBJDIR)/util/config/cli/, cli_util_attester cli_util_verifier cli_options))
+OBJECTS += $(addsuffix .o, $(addprefix $(OBJDIR)/util/config/file/, config_verifier_file_util config_attester_file_util))
 
 TARGETS = $(addprefix $(BINDIR)/, attester verifier)
 
@@ -177,7 +179,15 @@ $(OBJDIR)/util/%.o: $(SRCDIR)/util/%.c
 	@mkdir -p $(@D)
 	$(CC) $< $(INCLUDE) $(LIBINCLUDE) $(LDPATH) $(LDFLAGS) $(CFLAGS) -g -o $@ -c $(link_mode)
 
-$(OBJDIR)/util/%.o: $(SRCDIR)/util/cli/%.c
+$(OBJDIR)/util/%.o: $(SRCDIR)/util/config/%.c
+	@mkdir -p $(@D)
+	$(CC) $< $(INCLUDE) $(LIBINCLUDE) $(LDPATH) $(LDFLAGS) $(CFLAGS) -g -o $@ -c $(link_mode)
+
+$(OBJDIR)/util/%.o: $(SRCDIR)/util/config/cli/%.c
+	@mkdir -p $(@D)
+	$(CC) $< $(INCLUDE) $(LIBINCLUDE) $(LDPATH) $(LDFLAGS) $(CFLAGS) -g -o $@ -c $(link_mode)
+
+$(OBJDIR)/util/%.o: $(SRCDIR)/util/config/file/%.c
 	@mkdir -p $(@D)
 	$(CC) $< $(INCLUDE) $(LIBINCLUDE) $(LDPATH) $(LDFLAGS) $(CFLAGS) -g -o $@ -c $(link_mode)
 
@@ -191,5 +201,7 @@ clean:
 	$(RM) obj/core/*.*
 	$(RM) obj/core/charra_tap/*.*
 	$(RM) obj/util/*.*
-	$(RM) obj/util/cli/*.*
+	$(RM) obj/util/config/*.*
+	$(RM) obj/util/config/cli/*.*
+	$(RM) obj/util/config/file/*.*
 	$(RM) obj/*.*

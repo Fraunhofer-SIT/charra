@@ -21,7 +21,6 @@
 
 #include "../common/charra_error.h"
 #include "../core/charra_tap/charra_tap_dto.h"
-#include <stdint.h>
 
 /**
  * @brief Parses PCR value from a string. Expects the PCR value to
@@ -36,11 +35,13 @@
 CHARRA_RC parse_pcr_value(char* start, size_t length, uint8_t* pcr_value);
 
 /**
- * @brief parse PCR index at the position given by index_start. Returns a
- * negative number in case of an error, including if the parsed index is too
- * big for a PCR index.
+ * @brief parse PCR index at the position given by index_start.
+ *
+ * @param index_start pointer to the string to be parsed
+ * @param index pointer to the index which holds the parsed value
+ * @returns CHARRA_RC_SUCCESS on success, otherwise CHARRA_RC_ERROR
  */
-int parse_pcr_index(char* index_start);
+CHARRA_RC parse_pcr_index(const char* const index_start, uint8_t* const index);
 
 /**
  * @brief Parses a request for a PCR log into a response.
@@ -54,3 +55,24 @@ int parse_pcr_index(char* index_start);
 CHARRA_RC parse_pcr_log_request(const char* const log_name,
         const char* const ima_log_path, const char* const tcg_boot_log_path,
         const pcr_log_dto* const request, pcr_log_response_dto* response);
+
+/**
+ * @brief Parses a string into a long value.
+ *
+ * @param string pointer to the string to be parsed
+ * @param base base of the number system (e.g. 10 for decimal, 16 for hex)
+ * @param value pointer to the long value to be written
+ * @returns CHARRA_RC_SUCCESS on success, otherwise CHARRA_RC_ERROR
+ */
+CHARRA_RC parse_long(const char* const string, int base, int64_t* const value);
+
+/**
+ * @brief Parses a string into an unsigned long value.
+ *
+ * @param string pointer to the string to be parsed
+ * @param base base of the number system (e.g. 10 for decimal, 16 for hex)
+ * @param value pointer to the unsigned long value to be written
+ * @returns CHARRA_RC_SUCCESS on success, otherwise CHARRA_RC_ERROR
+ */
+CHARRA_RC parse_ulong(
+        const char* const string, int base, uint64_t* const value);

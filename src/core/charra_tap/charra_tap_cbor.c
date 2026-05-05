@@ -18,18 +18,19 @@
  * BSD-3-Clause).
  */
 
+#include "charra_tap_cbor.h"
+
 #include <assert.h>
-#include <qcbor/UsefulBuf.h>
-#include <qcbor/qcbor.h>
-#include <qcbor/qcbor_encode.h>
-#include <qcbor/qcbor_spiffy_decode.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include <qcbor/UsefulBuf.h>
+#include <qcbor/qcbor.h>
+#include <qcbor/qcbor_encode.h>
+#include <qcbor/qcbor_spiffy_decode.h>
+
 #include "../../common/charra_log.h"
-#include "../../common/charra_macro.h"
-#include "charra_tap_cbor.h"
 #include "charra_tap_dto.h"
 #include "charra_tap_types.h"
 
@@ -284,7 +285,10 @@ CHARRA_RC charra_tap_unmarshal_attestation_request(
         /* exit array "pcr-log" */
         QCBORDecode_ExitArray(&dc);
 
-        req.pcr_logs[i].identifier = calloc(item_str_buf.len + 1, 1);
+        if (item_str_buf.len >= CHARRA_TAP_PCR_LOG_IDENTIFIER_MAXLEN) {
+            charra_log_error("CBOR parser: pcr-log identifier is too long.");
+            goto cbor_parse_error;
+        }
         memcpy(req.pcr_logs[i].identifier, item_str_buf.ptr, item_str_buf.len);
         req.pcr_logs[i].start = start;
         req.pcr_logs[i].count = count;
@@ -528,8 +532,8 @@ CHARRA_RC charra_tap_unmarshal_attestation_response(
 
         /* parse identifier */
         QCBORDecode_GetTextString(&dc, &item_str_buf);
-        res.pcr_logs[i].identifier = calloc(item_str_buf.len + 1, 1);
-        if (res.pcr_logs[i].identifier == NULL) {
+        if (item_str_buf.len >= CHARRA_TAP_PCR_LOG_IDENTIFIER_MAXLEN) {
+            charra_log_error("CBOR parser: pcr-log identifier is too long.");
             goto cbor_parse_error;
         }
         memcpy(res.pcr_logs[i].identifier, item_str_buf.ptr, item_str_buf.len);

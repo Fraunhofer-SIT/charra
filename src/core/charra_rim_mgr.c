@@ -21,292 +21,214 @@
 
 #include "charra_rim_mgr.h"
 
-#include <yaml.h>
+#include <stdint.h>
+#include <string.h>
+#include <sys/types.h>
 
-#include "../common/charra_error.h"
 #include "../common/charra_log.h"
-#include "../common/charra_macro.h"
 #include "../util/crypto_util.h"
-#include "../util/io_util.h"
 #include "../util/parser_util.h"
+#include "../util/yaml_util.h"
 
-#define SKIP_BLOCK_MAPPING_START_TOKEN(token_type)                             \
-    ((token_type) == YAML_BLOCK_MAPPING_START_TOKEN)
+#define BUFFER_LEN 1024
+#define KEY_SHA1 "sha1"
+#define KEY_SHA256 "sha256"
+#define KEY_SHA384 "sha384"
+#define KEY_SHA512 "sha512"
 
-static uint32_t pcr_selection_index = 0;
-static uint32_t pcr_set_index = 0;
-static uint32_t pcr_set_ending_line = 0;
+typedef struct {
+    uint8_t reference_pcrs[TPM2_MAX_PCRS][TPM2_SHA256_DIGEST_SIZE];
+    bool reference_pcrs_set[TPM2_MAX_PCRS];
+    const uint8_t* const reference_pcr_selection;
+    const uint32_t reference_pcr_selection_len;
+    const TPMS_ATTEST* const attest_struct;
+    uint32_t pcr_set_index;
+    bool are_pcrs_valid;
+} attest_verification_t;
 
-static void free_reference_pcrs(
-        uint8_t** const reference_pcrs, uint32_t reference_pcr_selection_len) {
+static bool check_if_index_is_in_selection(
+        const uint8_t* const reference_pcr_selection,
+        const uint32_t reference_pcr_selection_len, const uint8_t index) {
     for (uint32_t i = 0; i < reference_pcr_selection_len; i++) {
-        free(reference_pcrs[i]);
+        if (reference_pcr_selection[i] == index) {
+            return true;
+        }
     }
-    free(reference_pcrs);
+    return false;
+}
+
+static bool check_if_all_reference_pcrs_are_found(
+        const uint8_t* const reference_pcr_selection,
+        const uint32_t reference_pcr_selection_len,
+        const bool* const reference_pcrs_set) {
+    for (uint32_t i = 0; i < reference_pcr_selection_len; i++) {
+        if (!reference_pcrs_set[reference_pcr_selection[i]]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void format_reference_pcrs_for_verification(
+        const uint8_t* const reference_pcr_selection,
+        const uint32_t reference_pcr_selection_len,
+        uint8_t reference_pcrs[TPM2_MAX_PCRS][TPM2_SHA256_DIGEST_SIZE],
+        uint8_t* formatted_pcrs[TPM2_SHA256_DIGEST_SIZE]) {
+    for (uint32_t i = 0; i < reference_pcr_selection_len; i++) {
+        uint8_t pcr_index = reference_pcr_selection[i];
+        formatted_pcrs[i] = reference_pcrs[pcr_index];
+    }
 }
 
 /**
  * @brief Check that the last reference PCR set was complete and then compute
- * its digest and compare it against the digest given in the attest_struct.
+ * its digest and compare it against the digest given in the attest_struct. If
+ * there is a valid PCR set, are_pcrs_valid is set to true.
  *
- * @param reference_pcrs the 2D array holding all PCR values needed for the
- * PCR composite digest
- * @param reference_pcr_selection the array holding the PCR indexes used for
- * to compute the digest. Only used for logging purposes.
- * @param reference_pcr_selection_len the number of PCR indexes used for the
- * computation of the digest, also the length of both arrays
- * @param attest_struct The struct holding the attestation data from the
- * attester, including the PCR digest.
- * @returns CHARRA_RC_SUCCESS on success, CHARRA_RC_NO_MATCH when the digests
- * did not match, CHARRA_RC_ERROR on errors.
+ * @param attest_verification The attest_verification struct holding the
+ * reference PCRs and the attest struct
  */
-static CHARRA_RC handle_end_of_pcr_set(uint8_t** const reference_pcrs,
-        const uint8_t* const reference_pcr_selection,
-        const uint32_t reference_pcr_selection_len,
-        const TPMS_ATTEST* const attest_struct) {
-    if (pcr_selection_index < reference_pcr_selection_len) {
-        // we found an empty newline, but the previous set of PCRs was not
-        // complete.
-        charra_log_error(
-                "Error while parsing reference PCRs: "
-                "PCR set ending in line %d does not hold selected PCR %d.",
-                pcr_set_ending_line,
-                reference_pcr_selection[pcr_selection_index]);
-        return CHARRA_RC_ERROR;
+static void handle_end_of_pcr_set(
+        attest_verification_t* const attest_verification) {
+
+    if (!check_if_all_reference_pcrs_are_found(
+                attest_verification->reference_pcr_selection,
+                attest_verification->reference_pcr_selection_len,
+                attest_verification->reference_pcrs_set)) {
+        charra_log_warn("Not all requested PCRs are set in the reference PCR "
+                        "file at index: %u",
+                attest_verification->pcr_set_index);
     }
 
+    uint8_t* formatted_pcrs[TPM2_MAX_PCRS] = {0};
+
+    format_reference_pcrs_for_verification(
+            attest_verification->reference_pcr_selection,
+            attest_verification->reference_pcr_selection_len,
+            attest_verification->reference_pcrs, formatted_pcrs);
+
     charra_log_debug("Checking PCR composite digest at PCR set index %d:",
-            pcr_set_index);
-    CHARRA_RC rc = compute_and_check_PCR_digest(
-            reference_pcrs, reference_pcr_selection_len, attest_struct);
+            attest_verification->pcr_set_index);
+
+    CHARRA_RC rc = compute_and_check_PCR_digest(formatted_pcrs,
+            attest_verification->reference_pcr_selection_len,
+            attest_verification->attest_struct);
     if (rc == CHARRA_RC_ERROR) {
         charra_log_error("Unexpected error while computing PCR digest at index "
                          "%d of the PCR sets",
-                pcr_set_index);
+                attest_verification->pcr_set_index);
     } else if (rc == CHARRA_RC_SUCCESS) {
         charra_log_info("Found matching PCR composite digest at index %d of "
                         "the PCR sets.",
-                pcr_set_index);
+                attest_verification->pcr_set_index);
+        attest_verification->are_pcrs_valid = true;
     }
-    return rc;
 }
 
-/**
- * @brief Parses a YAML token from the input file.
- *
- * @param parser a pointer to the parser
- * @param token a pointer to the YAML token
- * @returns CHARRA_RC_SUCCESS on success, CHARRA_RC_ERROR on errors.
- */
-static CHARRA_RC parse_token(
-        yaml_parser_t* const parser, yaml_token_t* const token) {
-    if (yaml_parser_scan(parser, token) == 0) {
-        if (parser->problem_mark.line || parser->problem_mark.column) {
-            charra_log_error("Parse error: %s [Line: %lu, Column: %lu]",
-                    parser->problem, parser->problem_mark.line + 1,
-                    parser->problem_mark.column + 1);
-        } else {
-            charra_log_error("Parse error: %s", parser->problem);
-        }
-        return CHARRA_RC_ERROR;
+static CHARRA_RC not_implemented_hash_field_handler(
+        charra_yaml_parser_state_t* parser_state, const char* const key,
+        void* data __attribute__((unused))) {
+    CHARRA_RC charra_rc = CHARRA_RC_SUCCESS;
+    char string_value[BUFFER_LEN] = {0};
+    uint8_t pcr_index = 0;
+
+    charra_rc = parse_pcr_index(key, &pcr_index);
+    if (charra_rc != CHARRA_RC_SUCCESS) {
+        CHARRA_YAML_PARSER_ERROR_LOG(
+                parser_state->parser, "invalid index value");
+        return charra_rc;
     }
-    return CHARRA_RC_SUCCESS;
+    charra_rc = parse_yaml_string_value(parser_state, string_value, BUFFER_LEN);
+    return charra_rc;
 }
 
-/**
- * @brief Parses a YAML mapping containing a PCR list. All PCR values whose
- * indexes are included in `reference_pcr_selection` will be parsed and stored
- * in `reference_pcrs`. This function should only be called if the parser has
- * previously parsed a `YAML_BLOCK_MAPPING_START_TOKEN`.
- *
- * @param parser a pointer to the parser
- * @param reference_pcrs the 2D array holding all PCR values needed for the
- * PCR composite digest
- * @param reference_pcr_selection the array holding the PCR indexes used for
- * to compute the digest.
- * @param reference_pcr_selection_len the number of PCR indexes used for the
- * computation of the digest, also the length of both arrays
- * @returns CHARRA_RC_SUCCESS on success, CHARRA_RC_ERROR on errors.
- */
-static CHARRA_RC parse_pcr_mapping(yaml_parser_t* const parser,
-        uint8_t** const reference_pcrs,
-        const uint8_t* const reference_pcr_selection,
-        const uint32_t reference_pcr_selection_len) {
-    CHARRA_RC charra_rc = CHARRA_RC_ERROR;
-    yaml_token_t token = {0};
-    bool mapping_end = false;
-    bool is_key_scalar = false;
-    int file_pcr_index = 0;
+static CHARRA_RC sha256_field_handler(charra_yaml_parser_state_t* parser_state,
+        const char* const key, void* data) {
+    CHARRA_RC charra_rc = CHARRA_RC_SUCCESS;
+    attest_verification_t* attest_verification = (attest_verification_t*)data;
 
-    do {
-        charra_rc = parse_token(parser, &token);
+    char string_value[BUFFER_LEN] = {0};
+    uint8_t pcr_index = 0;
+
+    charra_rc = parse_pcr_index(key, &pcr_index);
+    if (charra_rc != CHARRA_RC_SUCCESS) {
+        CHARRA_YAML_PARSER_ERROR_LOG(
+                parser_state->parser, "invalid index value");
+        return charra_rc;
+    }
+    charra_rc = parse_yaml_string_value(parser_state, string_value, BUFFER_LEN);
+    if (charra_rc != CHARRA_RC_SUCCESS) {
+        return charra_rc;
+    }
+
+    if (!check_if_index_is_in_selection(
+                attest_verification->reference_pcr_selection,
+                attest_verification->reference_pcr_selection_len, pcr_index)) {
+        return charra_rc;
+    }
+    charra_rc = parse_pcr_value(string_value, strlen(string_value),
+            attest_verification->reference_pcrs[pcr_index]);
+    if (charra_rc != CHARRA_RC_SUCCESS) {
+        CHARRA_YAML_PARSER_ERROR_LOG_F(
+                parser_state->parser, "invalid pcr value '%s'", string_value);
+        return charra_rc;
+    }
+    attest_verification->reference_pcrs_set[pcr_index] = true;
+    return charra_rc;
+}
+
+static CHARRA_RC reference_pcr_file_field_handler(
+        charra_yaml_parser_state_t* parser_state, const char* const key,
+        void* data) {
+    CHARRA_RC charra_rc = CHARRA_RC_SUCCESS;
+    attest_verification_t* attest_verification = (attest_verification_t*)data;
+
+    if (strncmp(key, KEY_SHA1, sizeof(KEY_SHA1)) == 0) {
+        charra_rc = parse_yaml_mapping(parser_state,
+                not_implemented_hash_field_handler, attest_verification);
         if (charra_rc != CHARRA_RC_SUCCESS) {
-            goto mapping_error;
+            goto cleanup;
         }
-        switch (token.type) {
-        case YAML_KEY_TOKEN:
-            is_key_scalar = true;
-            break;
-        case YAML_VALUE_TOKEN:
-            is_key_scalar = false;
-            break;
-        case YAML_SCALAR_TOKEN:
-            if (pcr_selection_index >= reference_pcr_selection_len) {
-                // only parse the line if we actually need another PCR for our
-                // digest, otherwise just skip it
-                break;
-            }
-            if (is_key_scalar) {
-                file_pcr_index =
-                        parse_pcr_index((char*)token.data.scalar.value);
-                if (file_pcr_index < 0 ||
-                        token.data.scalar.style != YAML_PLAIN_SCALAR_STYLE) {
-                    charra_log_error("Error while parsing line %d from "
-                                     "reference PCR file: "
-                                     "Unparseable PCR Index.",
-                            token.start_mark.line + 1);
-                    charra_rc = CHARRA_RC_ERROR;
-                    goto mapping_error;
-                }
-            } else if (file_pcr_index ==
-                       reference_pcr_selection[pcr_selection_index]) {
-                // PCR in current line is part of the PCR selection
-                charra_rc = parse_pcr_value((char*)token.data.scalar.value,
-                        token.data.scalar.length,
-                        reference_pcrs[pcr_selection_index]);
-                if (token.data.scalar.style != YAML_PLAIN_SCALAR_STYLE) {
-                    charra_rc = CHARRA_RC_ERROR;
-                }
-                if (charra_rc != CHARRA_RC_SUCCESS) {
-                    charra_log_error("Error while parsing PCR value in "
-                                     "line %d from reference PCR file.",
-                            token.start_mark.line + 1);
-                    goto mapping_error;
-                }
-
-                // current selected PCR parsed, increase index
-                pcr_selection_index++;
-            }
-            break;
-        case YAML_BLOCK_END_TOKEN:
-            mapping_end = true;
-            pcr_set_ending_line = token.end_mark.line + 1;
-            break;
-        /* all other tokens should not be parsed in this stage */
-        default:
-            goto mapping_parse_error;
+        /* TODO: implement SHA1 verification */
+        charra_log_warn("PCR bank SHA1 is not implemented yet");
+    } else if (strncmp(key, KEY_SHA256, sizeof(KEY_SHA256)) == 0) {
+        charra_rc = parse_yaml_mapping(
+                parser_state, sha256_field_handler, attest_verification);
+        if (charra_rc != CHARRA_RC_SUCCESS) {
+            goto cleanup;
         }
-        yaml_token_delete(&token);
-    } while (!mapping_end);
 
-    return charra_rc;
-
-mapping_parse_error:
-    charra_rc = CHARRA_RC_ERROR;
-    charra_log_error("Parser error: invalid representation [Line: %lu, "
-                     "Column: %lu]",
-            token.start_mark.line + 1, token.start_mark.column + 1);
-mapping_error:
-    yaml_token_delete(&token);
-    return charra_rc;
-}
-
-/**
- * @brief Parses a YAML document containing a mapping with a mapping as value
- * containing a PCR list. This function should only be called if the parser has
- * previously parsed a `YAML_DOCUMENT_START_TOKEN`.
- *
- * @param parser a pointer to the parser
- * @param skip_block_mapping_start_token this function should skip the first
- * `YAML_BLOCK_MAPPING_START_TOKEN` if set to `true`
- * @param reference_pcrs the 2D array holding all PCR values needed for the
- * PCR composite digest
- * @param reference_pcr_selection the array holding the PCR indexes used for
- * to compute the digest.
- * @param reference_pcr_selection_len the number of PCR indexes used for the
- * computation of the digest, also the length of both arrays
- * @returns CHARRA_RC_SUCCESS on success, CHARRA_RC_ERROR on errors.
- */
-static CHARRA_RC parse_document(yaml_parser_t* const parser,
-        bool skip_block_mapping_start_token, uint8_t** const reference_pcrs,
-        const uint8_t* const reference_pcr_selection,
-        const uint32_t reference_pcr_selection_len) {
-    CHARRA_RC charra_rc = CHARRA_RC_ERROR;
-    yaml_token_t token = {0};
-    bool document_end = false;
-    bool mapping_started = false;
-    yaml_token_type_t expected_token = YAML_BLOCK_MAPPING_START_TOKEN;
-    /* YAML_BLOCK_MAPPING_START_TOKEN is already parsed */
-    if (skip_block_mapping_start_token) {
-        expected_token = YAML_KEY_TOKEN;
-        mapping_started = true;
+        handle_end_of_pcr_set(attest_verification);
+    } else if (strncmp(key, KEY_SHA384, sizeof(KEY_SHA384)) == 0) {
+        charra_rc = parse_yaml_mapping(parser_state,
+                not_implemented_hash_field_handler, attest_verification);
+        if (charra_rc != CHARRA_RC_SUCCESS) {
+            goto cleanup;
+        }
+        /* TODO: implement SHA384 verification */
+        charra_log_warn("PCR bank SHA384 is not implemented yet");
+    } else if (strncmp(key, KEY_SHA512, sizeof(KEY_SHA512)) == 0) {
+        charra_rc = parse_yaml_mapping(parser_state,
+                not_implemented_hash_field_handler, attest_verification);
+        if (charra_rc != CHARRA_RC_SUCCESS) {
+            goto cleanup;
+        }
+        /* TODO: implement SHA512 verification */
+        charra_log_warn("PCR bank SHA512 is not implemented yet");
+    } else {
+        charra_rc = CHARRA_RC_ERROR;
+        CHARRA_YAML_PARSER_ERROR_LOG_F(
+                parser_state->parser, "unknown field '%s'", key);
     }
 
-    /* the parser should parse:
-     * - YAML_BLOCK_MAPPING_START_TOKEN (depending on
-     * skip_block_mapping_start_token)
-     * - YAML_KEY_TOKEN
-     * - YAML_SCALAR_TOKEN: ("sha256")
-     * - YAML_VALUE_TOKEN
-     * - YAML_BLOCK_MAPPING_START_TOKEN: (pcr list)
-     * - ...
-     * - YAML_BLOCK_END_TOKEN (end of root mapping) */
-    do {
-        charra_rc = parse_token(parser, &token);
-        if (charra_rc != CHARRA_RC_SUCCESS) {
-            goto document_error;
-        }
-        if (token.type != expected_token) {
-            goto document_parse_error;
-        }
-        switch (token.type) {
-        case YAML_BLOCK_MAPPING_START_TOKEN:
-            if (mapping_started) {
-                charra_rc = parse_pcr_mapping(parser, reference_pcrs,
-                        reference_pcr_selection, reference_pcr_selection_len);
-                if (charra_rc != CHARRA_RC_SUCCESS) {
-                    goto document_error;
-                }
-                expected_token = YAML_BLOCK_END_TOKEN;
-            } else {
-                expected_token = YAML_KEY_TOKEN;
-                mapping_started = true;
-            }
-            break;
-        case YAML_KEY_TOKEN:
-            expected_token = YAML_SCALAR_TOKEN;
-            break;
-        case YAML_SCALAR_TOKEN:
-            // TODO(any): Allow other hashing algorithms
-            /* root mapping key should be the pcr digest algorithm */
-            if (strncmp((const char*)token.data.scalar.value, "sha256",
-                        token.data.scalar.length) != 0) {
-                goto document_parse_error;
-            }
-            expected_token = YAML_VALUE_TOKEN;
-            break;
-        case YAML_VALUE_TOKEN:
-            expected_token = YAML_BLOCK_MAPPING_START_TOKEN;
-            break;
-        case YAML_BLOCK_END_TOKEN:
-            document_end = true;
-            break;
-        /* all other tokens should not be parsed in this stage */
-        default:
-            goto document_parse_error;
-        }
-        yaml_token_delete(&token);
-    } while (!document_end);
+cleanup:
+    // resetting reference PCRs for the next set of PCRs
+    memset(attest_verification->reference_pcrs, 0,
+            sizeof(attest_verification->reference_pcrs));
+    memset(attest_verification->reference_pcrs_set, 0,
+            sizeof(attest_verification->reference_pcrs_set));
 
-    return charra_rc;
-
-document_parse_error:
-    charra_rc = CHARRA_RC_ERROR;
-    charra_log_error("Parser error: invalid representation [Line: %lu, "
-                     "Column: %lu]",
-            token.start_mark.line + 1, token.start_mark.column + 1);
-document_error:
-    yaml_token_delete(&token);
+    attest_verification->pcr_set_index++;
     return charra_rc;
 }
 
@@ -314,104 +236,28 @@ CHARRA_RC charra_check_pcr_digest_against_reference(const char* const filename,
         const uint8_t* const reference_pcr_selection,
         const uint32_t reference_pcr_selection_len,
         const TPMS_ATTEST* const attest_struct) {
-    /* sanity check */
-    if (reference_pcr_selection_len >= TPM2_MAX_PCRS) {
-        charra_log_error(
-                "Bad PCR selection length: %d.", reference_pcr_selection_len);
-        return CHARRA_RC_BAD_ARGUMENT;
-    }
-
-    // allocate memory for the pcr values read from the file
-    uint8_t** reference_pcrs =
-            malloc(reference_pcr_selection_len * sizeof(uint8_t*));
-    for (uint32_t i = 0; i < reference_pcr_selection_len; i++) {
-        reference_pcrs[i] = malloc(TPM2_SHA256_DIGEST_SIZE * sizeof(uint8_t));
-    }
-
     CHARRA_RC charra_rc = CHARRA_RC_ERROR;
 
-    yaml_parser_t parser = {0};
-    yaml_token_t token = {0};
-    FILE* yaml_file = NULL;
-    bool no_digest_match = true;
+    attest_verification_t attest_verification = {
+            .reference_pcrs_set = {0},
+            .reference_pcr_selection = reference_pcr_selection,
+            .reference_pcr_selection_len = reference_pcr_selection_len,
+            .attest_struct = attest_struct,
+            .pcr_set_index = 0,
+            .are_pcrs_valid = false,
+    };
+    memset(attest_verification.reference_pcrs, 0,
+            sizeof(attest_verification.reference_pcrs));
 
-    if (filename != NULL) {
-        /* open YAML file*/
-        if ((yaml_file = fopen(filename, "rb")) == NULL) {
-            charra_log_error("Cannot open file '%s'.", filename);
-            charra_rc = CHARRA_RC_ERROR;
-            goto returns;
-        }
-
-        /* initialize YAML parser with file */
-        if (yaml_parser_initialize(&parser) == 0) {
-            charra_log_error("Could not initialize YAML parser");
-            charra_rc = CHARRA_RC_ERROR;
-            goto returns;
-        }
-        yaml_parser_set_input_file(&parser, yaml_file);
-
-        /* parse YAML file*/
-        bool stream_end = false;
-        do {
-            charra_rc = parse_token(&parser, &token);
-            if (charra_rc != CHARRA_RC_SUCCESS) {
-                goto returns;
-            }
-            switch (token.type) {
-            case YAML_STREAM_START_TOKEN:
-                break;
-            case YAML_DOCUMENT_START_TOKEN:  // optional token
-            case YAML_BLOCK_MAPPING_START_TOKEN:
-                charra_rc = parse_document(&parser,
-                        SKIP_BLOCK_MAPPING_START_TOKEN(token.type),
-                        reference_pcrs, reference_pcr_selection,
-                        reference_pcr_selection_len);
-                if (charra_rc != CHARRA_RC_SUCCESS) {
-                    goto returns;
-                }
-                /* check if digests match */
-                charra_rc = handle_end_of_pcr_set(reference_pcrs,
-                        reference_pcr_selection, reference_pcr_selection_len,
-                        attest_struct);
-                // do not return when digests don't match, we have more PCR sets
-                // to try out
-                if (charra_rc != CHARRA_RC_NO_MATCH) {
-                    no_digest_match = false;
-                    goto returns;
-                }
-                pcr_selection_index = 0;
-                pcr_set_index++;
-                break;
-            case YAML_DOCUMENT_END_TOKEN:  // optional token
-                break;
-            case YAML_STREAM_END_TOKEN:
-                stream_end = true;
-                break;
-            /* all other tokens should not be parsed in this stage */
-            default:
-                charra_rc = CHARRA_RC_ERROR;
-                goto returns;
-            }
-            yaml_token_delete(&token);
-        } while (!stream_end);
-    } else {
-        /* filename is NULL */
-        charra_log_error("No reference PCR file specified");
-        charra_rc = CHARRA_RC_ERROR;
-        goto returns;
-    }
-
-returns:
-    if (charra_rc != CHARRA_RC_ERROR && no_digest_match) {
-        // no match until end of reference PCR file, verification failed.
+    charra_rc = parse_yaml_file(
+            filename, reference_pcr_file_field_handler, &attest_verification);
+    if (attest_verification.are_pcrs_valid) {
+        /* ignore parsing errors in the reference file if the PCR values are
+         * already verified */
+        charra_rc = CHARRA_RC_SUCCESS;
+    } else if (charra_rc != CHARRA_RC_ERROR) {
         charra_rc = CHARRA_RC_VERIFICATION_FAILED;
     }
-    yaml_token_delete(&token);
-    yaml_parser_delete(&parser);
-    if (yaml_file != NULL) {
-        fclose(yaml_file);
-    }
-    free_reference_pcrs(reference_pcrs, reference_pcr_selection_len);
+
     return charra_rc;
 }
