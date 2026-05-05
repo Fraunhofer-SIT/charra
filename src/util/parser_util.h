@@ -29,10 +29,11 @@
  * @param start pointer to the start of the string
  * @param length length of the string
  * @param pcr_value pointer to an array in which the PCR value will be written.
- * Is expected to be able to hold TPM2_SHA256_DIGEST_SIZE values.
+ * @param hash_algorithm the hash algorithm used for the PCR value.
  * @returns CHARRA_RC_SUCCESS on success, otherwise CHARRA_RC_ERROR
  */
-CHARRA_RC parse_pcr_value(char* start, size_t length, uint8_t* pcr_value);
+CHARRA_RC parse_pcr_value(char* start, size_t length, uint8_t* pcr_value,
+        TPM2_ALG_ID hash_algorithm);
 
 /**
  * @brief parse PCR index at the position given by index_start.

@@ -22,6 +22,7 @@
 
 #include <assert.h>
 #include <inttypes.h>
+#include <mbedtls/md.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,7 +40,6 @@
 
 #include "../common/charra_error.h"
 #include "../common/charra_log.h"
-#include "io_util.h"
 #include "tpm2_util.h"
 
 #define CHARRA_UNUSED __attribute__((unused))
@@ -254,24 +254,62 @@ bool charra_verify_tpm2_quote_qualifying_data(
     return true;
 }
 
-/* TODO Add specific versions of this function for all supported hash algos,
- * i.e. charra_compute_pcr_composite_digest_sha256_from_ptr_array, etc.,
- * invoking this generic funtion internally with TPM2_SHA256_DIGEST_SIZE, etc.
- */
-CHARRA_RC charra_compute_pcr_composite_digest_from_ptr_array(
-        uint16_t hash_algo_digest_size CHARRA_UNUSED,
-        const uint8_t* expected_pcr_values[] CHARRA_UNUSED,
-        size_t expected_pcr_values_len CHARRA_UNUSED,
-        uint8_t* pcr_composite_digest CHARRA_UNUSED) {
-    // TODO(any): to be implemented
-    return CHARRA_RC_NOT_YET_IMPLEMENTED;
+CHARRA_RC charra_compute_pcr_composite_digest_from_ptr_pcr_selection(
+        mbedtls_md_type_t hash_algorithm,
+        const uint8_t* const expected_pcr_values[TPM2_PCR_BANK_COUNT]
+                                                [TPM2_MAX_PCRS],
+        const uint32_t* const expected_pcr_values_len,
+        uint8_t* const pcr_composite_digest) {
+    CHARRA_RC r = CHARRA_RC_SUCCESS;
+    const mbedtls_md_info_t* info = NULL;
+    mbedtls_md_context_t ctx = {0};
+    static size_t element_sizes[TPM2_PCR_BANK_COUNT] = {TPM2_SHA1_DIGEST_SIZE,
+            TPM2_SHA256_DIGEST_SIZE, TPM2_SHA384_DIGEST_SIZE,
+            TPM2_SHA512_DIGEST_SIZE};
+
+    info = mbedtls_md_info_from_type(hash_algorithm);
+    if (info == NULL) {
+        return CHARRA_RC_CRYPTO_ERROR;
+    }
+
+    mbedtls_md_init(&ctx);
+
+    /* setup + start */
+    if (mbedtls_md_setup(&ctx, info, 0) != 0) {
+        r = CHARRA_RC_CRYPTO_ERROR;
+        goto cleanup;
+    }
+    if (mbedtls_md_starts(&ctx) != 0) {
+        r = CHARRA_RC_CRYPTO_ERROR;
+        goto cleanup;
+    }
+
+    /* update for every PCR value */
+    for (uint8_t i = 0; i < TPM2_PCR_BANK_COUNT; i++) {
+        for (uint8_t j = 0; j < expected_pcr_values_len[i]; j++) {
+            if (mbedtls_md_update(&ctx, expected_pcr_values[i][j],
+                        element_sizes[i]) != 0) {
+                r = CHARRA_RC_CRYPTO_ERROR;
+                goto cleanup;
+            }
+        }
+    }
+
+    /* finish */
+    if (mbedtls_md_finish(&ctx, pcr_composite_digest) != 0) {
+        r = CHARRA_RC_CRYPTO_ERROR;
+        goto cleanup;
+    }
+
+cleanup:
+    mbedtls_md_free(&ctx);
+    return r;
 }
 
 bool charra_verify_tpm2_quote_pcr_composite_digest(
         const TPMS_ATTEST* const attest_struct,
         const uint8_t* const pcr_composite_digest,
         const uint16_t pcr_composite_digest_len) {
-    // TODO(any): to be used
     /* extract PCR digest from attestation structure */
     TPMS_QUOTE_INFO quote_info = attest_struct->attested.quote;
     const uint8_t* const pcr_digest = quote_info.pcrDigest.buffer;

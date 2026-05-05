@@ -34,12 +34,32 @@
 
 /* a byte is represented as 2 characters in a hex string + 2 bytes for the
  * characters "0x" */
-#define SHA256_HEX_STR_SIZE (TPM2_SHA256_DIGEST_SIZE * 2 + 2)
+#define DIGEST_TO_HEX_STR_SIZE(DIGEST_SIZE) ((DIGEST_SIZE) * 2 + 2)
 
-CHARRA_RC parse_pcr_value(char* start, size_t length, uint8_t* pcr_value) {
-    if (length != SHA256_HEX_STR_SIZE) {
+CHARRA_RC parse_pcr_value(char* start, size_t length, uint8_t* pcr_value,
+        TPM2_ALG_ID hash_algorithm) {
+    uint32_t digest_size = 0;
+    switch (hash_algorithm) {
+    case TPM2_ALG_SHA1:
+        digest_size = TPM2_SHA1_DIGEST_SIZE;
+        break;
+    case TPM2_ALG_SHA256:
+        digest_size = TPM2_SHA256_DIGEST_SIZE;
+        break;
+    case TPM2_ALG_SHA384:
+        digest_size = TPM2_SHA384_DIGEST_SIZE;
+        break;
+    case TPM2_ALG_SHA512:
+        digest_size = TPM2_SHA512_DIGEST_SIZE;
+        break;
+    default:
         return CHARRA_RC_ERROR;
     }
+
+    if (length != DIGEST_TO_HEX_STR_SIZE(digest_size)) {
+        return CHARRA_RC_ERROR;
+    }
+
     /* string should start with 0x */
     if (*start != '0' || *(start + 1) != 'x') {
         return CHARRA_RC_ERROR;
@@ -47,7 +67,7 @@ CHARRA_RC parse_pcr_value(char* start, size_t length, uint8_t* pcr_value) {
     char* hex_start = start + 2;
 
     // iterate over all bytes of the digest
-    for (uint32_t digest_index = 0; digest_index < TPM2_SHA256_DIGEST_SIZE;
+    for (uint32_t digest_index = 0; digest_index < digest_size;
             digest_index++) {
         // hex_index is the byte in string representation at the
         // current digest_index
@@ -59,10 +79,8 @@ CHARRA_RC parse_pcr_value(char* start, size_t length, uint8_t* pcr_value) {
         // would read more than one byte
         memcpy(byte_as_string, hex_index, 2);
         byte_as_string[2] = '\0';
-        errno = 0;
-        char* eol = NULL;
-        uint32_t hex_value = strtoul(byte_as_string, &eol, 16);
-        if (eol == byte_as_string || errno != 0 || hex_value > 255) {
+        uint64_t hex_value = 0;
+        if (parse_ulong(byte_as_string, 16, &hex_value) != CHARRA_RC_SUCCESS) {
             return CHARRA_RC_ERROR;
         }
         pcr_value[digest_index] = (uint8_t)hex_value;

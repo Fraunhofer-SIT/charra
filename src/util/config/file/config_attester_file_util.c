@@ -23,8 +23,10 @@
 
 #include <stdint.h>
 #include <string.h>
+#include <tss2/tss2_tpm2_types.h>
 
 #include "../../coap_util.h"
+#include "../../crypto_util.h"
 #include "../../parser_util.h"
 #include "../../yaml_util.h"
 #include "../config_attester_util.h"
@@ -48,6 +50,8 @@
 #define KEY_IMA "ima"
 #define KEY_TCG_BOOT "tcg-boot"
 #define KEY_PCR_LOG "pcr-log"
+#define KEY_SIGNATURE_SCHEME "tpm-quote-signature-scheme"
+#define KEY_HASH_ALGORITHM "tpm-quote-signature-hash-algorithm"
 #define KEY_LOCK_CONFIG "lock-config"
 #define KEY_LISTEN_IP "listen-ip"
 #define KEY_LISTEN_PORT "listen-port"
@@ -253,6 +257,8 @@ static CHARRA_RC attester_attestation_field_handler(
         charra_yaml_parser_state_t* parser_state, const char* const key,
         void* data) {
     CHARRA_RC charra_rc = CHARRA_RC_SUCCESS;
+    config_attester* config = (config_attester*)data;
+    char string_value[BUFFER_LEN] = {0};
 
     if (strncmp(key, KEY_KEY, sizeof(KEY_KEY)) == 0) {
         charra_rc = parse_yaml_mapping(
@@ -260,6 +266,36 @@ static CHARRA_RC attester_attestation_field_handler(
     } else if (strncmp(key, KEY_PCR_LOG, sizeof(KEY_PCR_LOG)) == 0) {
         charra_rc = parse_yaml_mapping(
                 parser_state, attester_pcr_log_field_handler, data);
+    } else if (strncmp(key, KEY_SIGNATURE_SCHEME,
+                       sizeof(KEY_SIGNATURE_SCHEME)) == 0) {
+        charra_rc =
+                parse_yaml_string_value(parser_state, string_value, BUFFER_LEN);
+        if (charra_rc != CHARRA_RC_SUCCESS) {
+            return charra_rc;
+        }
+        config->signature_scheme =
+                charra_signature_scheme_from_str(string_value);
+        if (config->signature_scheme == TPM2_ALG_NULL) {
+            charra_rc = CHARRA_RC_ERROR;
+            CHARRA_YAML_PARSER_ERROR_LOG_F(parser_state->parser,
+                    "unsupported signature scheme '%s'", string_value);
+            return charra_rc;
+        }
+    } else if (strncmp(key, KEY_HASH_ALGORITHM, sizeof(KEY_HASH_ALGORITHM)) ==
+               0) {
+        charra_rc =
+                parse_yaml_string_value(parser_state, string_value, BUFFER_LEN);
+        if (charra_rc != CHARRA_RC_SUCCESS) {
+            return charra_rc;
+        }
+        config->hash_algorithm =
+                charra_tpm_hash_algorithm_from_str(string_value);
+        if (config->hash_algorithm == TPM2_ALG_NULL) {
+            charra_rc = CHARRA_RC_ERROR;
+            CHARRA_YAML_PARSER_ERROR_LOG_F(parser_state->parser,
+                    "unsupported hash algorithm '%s'", string_value);
+            return charra_rc;
+        }
     } else {
         charra_rc = CHARRA_RC_ERROR;
         CHARRA_YAML_PARSER_ERROR_LOG_F(
@@ -347,7 +383,7 @@ CHARRA_RC load_attester_yaml_config_file(
     CHARRA_RC charra_rc = CHARRA_RC_SUCCESS;
     uint64_t long_value = 0;
 
-    charra_rc = parse_yaml_file(path, attester_field_handler, config);
+    charra_rc = parse_yaml_file(path, attester_field_handler, NULL, config);
     if (charra_rc != CHARRA_RC_SUCCESS) {
         return charra_rc;
     }

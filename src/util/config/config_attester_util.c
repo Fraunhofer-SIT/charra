@@ -21,6 +21,7 @@
 #include "config_attester_util.h"
 
 #include <string.h>
+#include <tss2/tss2_tpm2_types.h>
 
 #include "../coap_util.h"
 #include "../io_util.h"
@@ -40,6 +41,12 @@ static charra_log_t charra_log_level = CHARRA_LOG_INFO;
 /* config */
 #define ATTESTER_DEFAULT_LISTEN_IP "0.0.0.0"
 #define ATTESTER_DEFAULT_PORT COAP_DEFAULT_PORT  // default port 5683
+
+/* TPM2-Quote */
+#define ATTESTER_DEFAULT_SIGNATURE_SCHEME TPM2_ALG_NULL
+#define ATTESTER_DEFAULT_HASH_ALGORITHM TPM2_ALG_SHA256
+
+// for DTLS-PSK
 #define ATTESTER_DEFAULT_USE_DTLS_PSK false
 #define ATTESTER_DEFAULT_DTLS_PSK_KEY "Charra DTLS Key"
 #define ATTESTER_DEFAULT_DTLS_PSK_HINT "Charra Attester"
@@ -106,6 +113,10 @@ void trace_log_attester_config(const config_attester* const config) {
         break;
     }
 
+    // TPM2-quote options
+    charra_log_trace("Signature scheme: 0x%x", config->signature_scheme);
+    charra_log_trace("Hash algorithm: 0x%x", config->hash_algorithm);
+
     // Log paths
     charra_log_trace("IMA log path: %s", config->ima_log_path);
     charra_log_trace("TCG boot log path: %s", config->tcg_boot_log_path);
@@ -145,6 +156,8 @@ static void init_config(config_attester* const config) {
     config->port = ATTESTER_DEFAULT_PORT;
     config->charra_log_level = charra_log_level;
     config->coap_log_level = coap_log_level;
+    config->signature_scheme = ATTESTER_DEFAULT_SIGNATURE_SCHEME;
+    config->hash_algorithm = ATTESTER_DEFAULT_HASH_ALGORITHM;
     config->use_dtls_psk = ATTESTER_DEFAULT_USE_DTLS_PSK;
     strncpy(config->dtls_psk_hint, ATTESTER_DEFAULT_DTLS_PSK_HINT,
             sizeof(config->dtls_psk_hint));

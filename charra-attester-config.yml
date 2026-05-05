@@ -17,6 +17,8 @@ charra-attester:
                 verify-peer-public-key: true
                 peer-public-key-path: "./keys/verifier.pub.der"
     attestation:
+        tpm-quote-signature-scheme: rsapss # rsassa, rsapss, ecdsa
+        tpm-quote-signature-hash-algorithm: sha256 # sha1, sha256, sha384, sha512
         key:
             format: context # context, handle
             path: "./tpm_keys/rsa_ak.ctx"

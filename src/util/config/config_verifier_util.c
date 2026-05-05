@@ -51,7 +51,6 @@ static charra_log_t charra_log_level = CHARRA_LOG_INFO;
 #define VERIFIER_DEFAULT_DST_PORT COAP_DEFAULT_PORT  // default port
 
 // clang-format off
-// TODO: Implement integration of all PCR banks
 static const uint8_t
         VERIFIER_DEFAULT_TPM_PCR_SELECTION[TPM2_PCR_BANK_COUNT][TPM2_MAX_PCRS] = {
                 /* sha1 */
@@ -89,12 +88,6 @@ static const uint32_t
 #define VERIFIER_DEFAULT_DTLS_RPK_PUBLIC_KEY_PATH "keys/verifier.pub.der"
 #define VERIFIER_DEFAULT_DTLS_RPK_PEER_PUBLIC_KEY_PATH "keys/attester.pub.der"
 #define VERIFIER_DEFAULT_DTLS_RPK_VERIFY_PEER_PUBLIC_KEY true
-
-/* hash algorithm strings */
-#define VERIFIER_SHA1_STR "sha1"
-#define VERIFIER_SHA256_STR "sha256"
-#define VERIFIER_SHA384_STR "sha384"
-#define VERIFIER_SHA512_STR "sha512"
 
 /* reference PCR file format strings */
 #define VERIFIER_REFERENCE_PCR_FILE_FORMAT_YAML_STR "yaml"
@@ -314,47 +307,15 @@ locked_arguments:
     return rc;
 }
 
-void charra_config_verifier_pcr_bank_index_from_str(const char* const pcr_bank,
-        config_verifier_pcr_bank_index* const pcr_bank_index) {
-    if (strncmp(pcr_bank, VERIFIER_SHA1_STR, sizeof(VERIFIER_SHA1_STR)) == 0) {
-        *pcr_bank_index = VERIFIER_PCR_BANK_SHA1;
-    } else if (strncmp(pcr_bank, VERIFIER_SHA256_STR,
-                       sizeof(VERIFIER_SHA256_STR)) == 0) {
-        *pcr_bank_index = VERIFIER_PCR_BANK_SHA256;
-    } else if (strncmp(pcr_bank, VERIFIER_SHA384_STR,
-                       sizeof(VERIFIER_SHA384_STR)) == 0) {
-        *pcr_bank_index = VERIFIER_PCR_BANK_SHA384;
-    } else if (strncmp(pcr_bank, VERIFIER_SHA512_STR,
-                       sizeof(VERIFIER_SHA512_STR)) == 0) {
-        *pcr_bank_index = VERIFIER_PCR_BANK_SHA512;
-    } else {
-        *pcr_bank_index = VERIFIER_PCR_BANK_UNKNOWN;
-    }
-}
-
 void charra_config_verifier_hash_algorithm_from_str(const char* const hash,
         config_verifier_signature_hash_algorithm* const hash_algo) {
-    if (strncmp(hash, VERIFIER_SHA1_STR, sizeof(VERIFIER_SHA1_STR)) == 0) {
-        hash_algo->mbedtls_hash_algorithm = MBEDTLS_MD_SHA1;
-        hash_algo->tpm2_hash_algorithm = TPM2_ALG_SHA1;
-    } else if (strncmp(hash, VERIFIER_SHA256_STR,
-                       sizeof(VERIFIER_SHA256_STR)) == 0) {
-        hash_algo->mbedtls_hash_algorithm = MBEDTLS_MD_SHA256;
-        hash_algo->tpm2_hash_algorithm = TPM2_ALG_SHA256;
-    } else if (strncmp(hash, VERIFIER_SHA384_STR,
-                       sizeof(VERIFIER_SHA384_STR)) == 0) {
-        hash_algo->mbedtls_hash_algorithm = MBEDTLS_MD_SHA384;
-        hash_algo->tpm2_hash_algorithm = TPM2_ALG_SHA384;
-    } else if (strncmp(hash, VERIFIER_SHA512_STR,
-                       sizeof(VERIFIER_SHA512_STR)) == 0) {
-        hash_algo->mbedtls_hash_algorithm = MBEDTLS_MD_SHA512;
-        hash_algo->tpm2_hash_algorithm = TPM2_ALG_SHA512;
-    } else {
-        /* This algorithms are not supported by mbedTLS:
-        sm3_256, sha3_256, sha3_384, sha3_512 */
-        hash_algo->mbedtls_hash_algorithm = MBEDTLS_MD_NONE;
-        hash_algo->tpm2_hash_algorithm = TPM2_ALG_ERROR;
+    if (hash == NULL || hash_algo == NULL) {
+        return;
     }
+    hash_algo->tpm2_hash_algorithm = charra_tpm_hash_algorithm_from_str(hash);
+    hash_algo->mbedtls_hash_algorithm =
+            charra_md_hash_algorithm_from_tpm2_alg_id(
+                    hash_algo->tpm2_hash_algorithm);
 }
 
 void charra_config_verifier_reference_pcr_file_format_from_str(

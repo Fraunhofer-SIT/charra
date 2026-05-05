@@ -29,7 +29,6 @@
 #include <tss2/tss2_mu.h>
 #include <tss2/tss2_tpm2_types.h>
 
-#include "../common/charra_error.h"
 #include "../common/charra_log.h"
 #include "tpm2_tools_util.h"
 
@@ -132,7 +131,8 @@ error:
 TSS2_RC tpm2_load_tpm_context_from_handle(
         ESYS_CONTEXT* context, ESYS_TR tr_handle, ESYS_TR* key_handle) {
     TSS2_RC r = TSS2_RC_SUCCESS;
-    r = Esys_TR_FromTPMPublic(context, tr_handle, ESYS_TR_NONE, ESYS_TR_NONE, ESYS_TR_NONE, key_handle);
+    r = Esys_TR_FromTPMPublic(context, tr_handle, ESYS_TR_NONE, ESYS_TR_NONE,
+            ESYS_TR_NONE, key_handle);
     return r;
 }
 
@@ -267,9 +267,70 @@ error:
     return r;
 }
 
+TSS2_RC tpm2_determine_signature_scheme(ESYS_CONTEXT* ctx,
+        const ESYS_TR sign_key_handle, const TPM2_ALG_ID hash_algorithm,
+        const TPM2_ALG_ID sig_scheme_id, TPMT_SIG_SCHEME* sig_scheme) {
+    TSS2_RC r = TSS2_RC_SUCCESS;
+    char* error_msg = NULL;
+    TPM2B_PUBLIC* outPublic = NULL;
+    TPM2B_NAME* name = NULL;
+    TPM2B_NAME* qualifiedName = NULL;
+    if (ctx == NULL) {
+        error_msg = "Bad ESAPI context.";
+        r = TSS2_ESYS_RC_BAD_VALUE;
+        goto error;
+    }
+
+    if (sig_scheme == NULL) {
+        error_msg = "Bad reference to signature scheme (NULL pointer).";
+        r = TSS2_ESYS_RC_BAD_VALUE;
+        goto error;
+    }
+
+    sig_scheme->details.any.hashAlg = hash_algorithm;
+
+    if (sig_scheme_id != TPM2_ALG_NULL) {
+        sig_scheme->scheme = sig_scheme_id;
+        return r;
+    }
+
+    TSS2_RC rc = Esys_ReadPublic(ctx, sign_key_handle, ESYS_TR_NONE,
+            ESYS_TR_NONE, ESYS_TR_NONE, &outPublic, &name, &qualifiedName);
+
+    if (rc != TSS2_RC_SUCCESS) {
+        error_msg = "Esys_ReadPublic";
+        goto error;
+    }
+
+    switch (outPublic->publicArea.type) {
+    case TPM2_ALG_RSA:
+        sig_scheme->scheme = TPM2_ALG_RSASSA;
+        break;
+    case TPM2_ALG_ECC:
+        sig_scheme->scheme = TPM2_ALG_ECDSA;
+        break;
+    default:
+        error_msg = "Unsupported key type.";
+        r = TSS2_ESYS_RC_BAD_VALUE;
+        break;
+    }
+
+error:
+    if (error_msg != NULL) {
+        charra_log_error("%s", error_msg);
+    }
+
+    Esys_Free(outPublic);
+    Esys_Free(name);
+    Esys_Free(qualifiedName);
+
+    return r;
+}
+
 TSS2_RC tpm2_quote(ESYS_CONTEXT* ctx, const ESYS_TR sign_key_handle,
         const TPML_PCR_SELECTION* pcr_selection,
-        const TPM2B_DATA* qualifying_data, TPM2B_ATTEST** attest_buf,
+        const TPM2B_DATA* qualifying_data,
+        const TPMT_SIG_SCHEME* const sig_scheme, TPM2B_ATTEST** attest_buf,
         TPMT_SIGNATURE** signature) {
     TSS2_RC r = TSS2_RC_SUCCESS;
     char* error_msg = NULL;
@@ -289,9 +350,8 @@ TSS2_RC tpm2_quote(ESYS_CONTEXT* ctx, const ESYS_TR sign_key_handle,
     }
 
     /* do the TPM quote*/
-    TPMT_SIG_SCHEME sig_scheme = {.scheme = TPM2_ALG_NULL};
     r = Esys_Quote(ctx, sign_key_handle, ESYS_TR_PASSWORD, ESYS_TR_NONE,
-            ESYS_TR_NONE, qualifying_data, &sig_scheme, pcr_selection,
+            ESYS_TR_NONE, qualifying_data, sig_scheme, pcr_selection,
             attest_buf, signature);
     /* ERROR CHECK */
     if (r != TSS2_RC_SUCCESS) {

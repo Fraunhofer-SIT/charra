@@ -24,14 +24,14 @@
 
 #include <inttypes.h>
 
+#include <mbedtls/md.h>
 #include <tss2/tss2_esys.h>
-#include <tss2/tss2_tpm2_types.h>
 
 #include "../common/charra_error.h"
 
 /**
- * @brief Read all sets of reference PCRs from filename. Check if any of the
- * sets produces the same digest as the digest passed as attester_pcr_digest.
+ * @brief Read all sets of reference PCRs from filename. Check if any document
+ * of PCR sets produces the same digest as the digest passed in attester_struct.
  *
  * the reference pcr file is expected to be formatted in the same way as the
  * output of tpm2_pcrread, e.g.:
@@ -49,18 +49,21 @@
  * may end with a YAML document end token `...`.
  *
  * @param[in] filename The path of the file which holds the reference PCR values
- * @param[in] reference_pcr_selection An array of PCRs indexes that we need.
- * @param[in] reference_pcr_selection_len The number of PCRs indexes that we
- * need.
+ * @param[in] reference_pcr_selection An array of all PCR banks containing the
+ * PCRs indexes that we need.
+ * @param[in] reference_pcr_selection_len An array containing the number of
+ * needed PCRs of each bank.
  * @param[in] attest_struct The struct holding the attestation data from the
  * attester, including the PCR digest.
+ * @param signature_hash_algorithm The hash algorithm used for the digest.
  * @returns CHARRA_RC_SUCCESS on success, CHARRA_RC_VERIFICATION_FAILED when
  * none of the reference PCR states matched the attestation state,
  * CHARRA_RC_ERROR on errors.
  */
 CHARRA_RC charra_check_pcr_digest_against_reference(const char* const filename,
-        const uint8_t* const reference_pcr_selection,
-        const uint32_t reference_pcr_selection_len,
-        const TPMS_ATTEST* const attest_struct);
+        const uint8_t (*const reference_pcr_selection)[TPM2_MAX_PCRS],
+        const uint8_t* const reference_pcr_selection_len,
+        const TPMS_ATTEST* const attest_struct,
+        mbedtls_md_type_t signature_hash_algorithm);
 
 #endif /* CHARRA_RIM_MGR_H */

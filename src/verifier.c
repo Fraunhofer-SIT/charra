@@ -22,6 +22,7 @@
 #include <arpa/inet.h>
 #include <coap3/coap.h>
 #include <getopt.h>
+#include <mbedtls/pk.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -376,21 +377,49 @@ static CHARRA_RC create_attestation_request(
             .sig_key_id = {0},  // must be memcpy'd, see below
             .nonce_len = nonce_len,
             .nonce = {0},  // must be memcpy'd, see below
-            .pcr_selections_len = 1,
-            .pcr_selections = {{
-                    .tcg_hash_alg_id = TPM2_ALG_SHA256,
-                    /* TODO: add other PCR banks */
-                    .pcrs_len = config.tpm_pcr_selection_len[1],
-                    .pcrs = {0}  // must be memcpy'd, see below
-            }},
+            .pcr_selections_len = 0,
             .pcr_log_len = config.pcr_log_len,
             .pcr_logs = config.pcr_logs,
     };
     memcpy(req.sig_key_id, config.tpm_sig_key_id, config.tpm2_sig_key_id_len);
     memcpy(req.nonce, nonce, nonce_len);
-    /* TODO: add other PCR banks */
-    memcpy(req.pcr_selections->pcrs, config.tpm_pcr_selection[1],
-            config.tpm_pcr_selection_len[1]);
+    /* fill pcr selection */
+    for (int i = 0; i < TPM2_PCR_BANK_COUNT; i++) {
+        if (config.tpm_pcr_selection_len[i] == 0) {
+            /* skip bank if no pcr index is selected */
+            continue;
+        }
+        switch (i) {
+        case CHARRA_TPM_PCR_BANK_SHA1:
+            req.pcr_selections[req.pcr_selections_len].tcg_hash_alg_id =
+                    TPM2_ALG_SHA1;
+            break;
+        case CHARRA_TPM_PCR_BANK_SHA256:
+            req.pcr_selections[req.pcr_selections_len].tcg_hash_alg_id =
+                    TPM2_ALG_SHA256;
+            break;
+        case CHARRA_TPM_PCR_BANK_SHA384:
+            req.pcr_selections[req.pcr_selections_len].tcg_hash_alg_id =
+                    TPM2_ALG_SHA384;
+            break;
+        case CHARRA_TPM_PCR_BANK_SHA512:
+            req.pcr_selections[req.pcr_selections_len].tcg_hash_alg_id =
+                    TPM2_ALG_SHA512;
+            break;
+        default:
+            charra_log_error(
+                    "[" LOG_NAME
+                    "] Unknown PCR bank index %d. This should never happen!",
+                    i);
+            return CHARRA_RC_ERROR;
+        }
+        req.pcr_selections[req.pcr_selections_len].pcrs_len =
+                config.tpm_pcr_selection_len[i];
+        /* copy tpm selection of current bank into the request */
+        memcpy(req.pcr_selections[req.pcr_selections_len].pcrs,
+                config.tpm_pcr_selection[i], config.tpm_pcr_selection_len[i]);
+        req.pcr_selections_len++;
+    }
 
     /* set output param(s) */
     *attestation_request = req;
@@ -526,31 +555,30 @@ static coap_response_t coap_attest_handler(
         charra_log_info(
                 "[" LOG_NAME
                 "] Converting TPM2 public key to mbedTLS public key ...");
-        mbedtls_rsa_context mbedtls_rsa_pub_key = {0};
+        mbedtls_pk_context mbedtls_pk_pub_key = {0};
         if ((attestation_rc = charra_crypto_tpm_pub_key_to_mbedtls_pub_key(
-                     &tpm2_public_key, &mbedtls_rsa_pub_key)) !=
+                     &tpm2_public_key, &mbedtls_pk_pub_key)) !=
                 CHARRA_RC_SUCCESS) {
-            charra_log_error("[" LOG_NAME "] mbedTLS RSA error");
+            charra_log_error("[" LOG_NAME "] mbedTLS PK error");
             goto cleanup;
         }
 
         /* verify attestation signature with mbedTLS */
         charra_log_info("[" LOG_NAME
                         "] Verifying TPM2 Quote signature with mbedTLS ...");
-        if ((attestation_rc = charra_crypto_rsa_verify_signature(
-                     &mbedtls_rsa_pub_key,
+        if ((attestation_rc = charra_crypto_verify_tpm_signature(
+                     &mbedtls_pk_pub_key,
                      config.signature_hash_algorithm.mbedtls_hash_algorithm,
                      res.tpm2_quote.attestation_data,
-                     (size_t)res.tpm2_quote.attestation_data_len,
-                     signature.signature.rsapss.sig.buffer,
-                     &tpm2_public_key)) == CHARRA_RC_SUCCESS) {
+                     (size_t)res.tpm2_quote.attestation_data_len, &signature,
+                     signature.sigAlg)) == CHARRA_RC_SUCCESS) {
             charra_log_info(
                     "[" LOG_NAME "]     => TPM2 Quote signature is valid!");
         } else {
             charra_log_error(
                     "[" LOG_NAME "]     => TPM2 Quote signature is NOT valid!");
         }
-        mbedtls_rsa_free(&mbedtls_rsa_pub_key);
+        mbedtls_pk_free(&mbedtls_pk_pub_key);
     }
 
     /* unmarshal attestation data */
@@ -609,10 +637,11 @@ static coap_response_t coap_attest_handler(
                 attest_struct.attested.quote.pcrDigest.buffer,
                 "                                              0x", "\n",
                 false);
-        /* TODO: add support for other hash algorithms */
         CHARRA_RC pcr_check = charra_check_pcr_digest_against_reference(
-                config.reference_pcr_file_path, config.tpm_pcr_selection[1],
-                config.tpm_pcr_selection_len[1], &attest_struct);
+                config.reference_pcr_file_path,
+                (const uint8_t(*const)[TPM2_MAX_PCRS])config.tpm_pcr_selection,
+                config.tpm_pcr_selection_len, &attest_struct,
+                config.signature_hash_algorithm.mbedtls_hash_algorithm);
         if (pcr_check == CHARRA_RC_SUCCESS) {
             charra_log_info(
                     "[" LOG_NAME "]     => PCR composite digest is valid!");

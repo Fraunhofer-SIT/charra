@@ -315,12 +315,23 @@ static void coap_attest_handler(struct coap_resource_t* resource,
         goto error;
     }
 
+    /* determine signature scheme */
+    TPMT_SIG_SCHEME sig_scheme = {0};
+    if ((tss_r = tpm2_determine_signature_scheme(esys_ctx, sig_key_handle,
+                 config.hash_algorithm, config.signature_scheme,
+                 &sig_scheme)) != TSS2_RC_SUCCESS) {
+        charra_log_error("[" LOG_NAME
+                         "] Could not determine signature scheme. Error: %d",
+                tss_r);
+        goto error;
+    }
+
     /* perform TPM quote */
     charra_log_info("[" LOG_NAME "] Perform TPM2 Quote.");
     TPM2B_ATTEST* attest_buf = NULL;
     TPMT_SIGNATURE* signature = NULL;
     if ((tss_r = tpm2_quote(esys_ctx, sig_key_handle, &pcr_selection,
-                 &qualifying_data, &attest_buf, &signature)) !=
+                 &qualifying_data, &sig_scheme, &attest_buf, &signature)) !=
             TSS2_RC_SUCCESS) {
         charra_log_error(
                 "[" LOG_NAME "] TPM2 quote unsuccessful. Error: %d", tss_r);

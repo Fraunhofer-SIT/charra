@@ -62,6 +62,8 @@ typedef struct {
         char ctx_path[1024];
         ESYS_TR tpm2_handle;
     } attestation_key;
+    TPM2_ALG_ID signature_scheme;
+    TPM2_ALG_ID hash_algorithm;
     char ima_log_path[1024];
     char tcg_boot_log_path[1024];
 } config_attester;
