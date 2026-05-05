@@ -27,12 +27,13 @@
 #include <string.h>
 
 #include "../../coap_util.h"
+#include "../../crypto_util.h"
 #include "../../io_util.h"
 #include "../../parser_util.h"
 #include "../file/config_attester_file_util.h"
 
 #define LOG_NAME "attester"
-#define ATTESTER_SHORT_OPTIONS "vl:c:pk:hr"
+#define ATTESTER_SHORT_OPTIONS "vl:c:pk:hrg:"
 
 /* string values */
 #define ATTESTER_FALSE_BIT_VALUE_STR "0"
@@ -49,6 +50,10 @@
 #define CLI_ATTESTER_PCR_LOG_LONG "pcr-log"
 #define CLI_ATTESTER_ATTESTATION_KEY_LONG "attestation-key"
 #define CLI_ATTESTER_CONFIG_LONG "config"
+
+/* TPM2-quote options (long) */
+#define CLI_ATTESTER_TPM2_QUOTE_SIGNATURE_SCHEME_LONG "scheme"
+#define CLI_ATTESTER_TPM2_QUOTE_HASH_ALGORITHM_LONG "hash-algorithm"
 
 /* rpk options (long) */
 #define CLI_ATTESTER_RPK_LONG "rpk"
@@ -72,16 +77,19 @@ typedef enum {
     CLI_ATTESTER_PCR_LOG = '2',
     CLI_ATTESTER_ATTESTATION_KEY = 'k',
     CLI_ATTESTER_CONFIG = 'c',
+    /* TPM2-quote options (short) */
+    CLI_ATTESTER_TPM2_QUOTE_SIGNATURE_SCHEME = '3',
+    CLI_ATTESTER_TPM2_QUOTE_HASH_ALGORITHM = 'g',
     /* rpk options (short) */
     CLI_ATTESTER_RPK = 'r',
-    CLI_ATTESTER_RPK_PRIVATE_KEY = '3',
-    CLI_ATTESTER_RPK_PUBLIC_KEY = '4',
-    CLI_ATTESTER_RPK_PEER_PUBLIC_KEY = '5',
-    CLI_ATTESTER_RPK_VERIFY_PEER = '6',
+    CLI_ATTESTER_RPK_PRIVATE_KEY = '4',
+    CLI_ATTESTER_RPK_PUBLIC_KEY = '5',
+    CLI_ATTESTER_RPK_PEER_PUBLIC_KEY = '6',
+    CLI_ATTESTER_RPK_VERIFY_PEER = '7',
     /* psk options (short) */
     CLI_ATTESTER_PSK = 'p',
-    CLI_ATTESTER_PSK_KEY = '7',
-    CLI_ATTESTER_PSK_HINT = '8',
+    CLI_ATTESTER_PSK_KEY = '8',
+    CLI_ATTESTER_PSK_HINT = '9',
 } cli_util_attester_args_e;
 
 static const struct option attester_options[] = {
@@ -96,6 +104,11 @@ static const struct option attester_options[] = {
         {CLI_ATTESTER_ATTESTATION_KEY_LONG, required_argument, 0,
                 CLI_ATTESTER_ATTESTATION_KEY},
         {CLI_ATTESTER_CONFIG_LONG, required_argument, 0, CLI_ATTESTER_CONFIG},
+        /* TPM2-quote options */
+        {CLI_ATTESTER_TPM2_QUOTE_SIGNATURE_SCHEME_LONG, required_argument, 0,
+                CLI_ATTESTER_TPM2_QUOTE_SIGNATURE_SCHEME},
+        {CLI_ATTESTER_TPM2_QUOTE_HASH_ALGORITHM_LONG, required_argument, 0,
+                CLI_ATTESTER_TPM2_QUOTE_HASH_ALGORITHM},
         /* rpk options */
         {CLI_ATTESTER_RPK_LONG, no_argument, 0, CLI_ATTESTER_RPK},
         {CLI_ATTESTER_RPK_PRIVATE_KEY_LONG, required_argument, 0,
@@ -212,6 +225,15 @@ void charra_cli_util_attester_print_help_message(void) {
     printf("     --%s=FORMAT:FILE:      Specifies the path to the PCR log "
            "file. Available formats are: ima, tcg-boot.\n",
             CLI_ATTESTER_PCR_LOG_LONG);
+
+    /* TPM2-quote options */
+    printf("     --%s=SCHEME:            Specifies the signature "
+           "scheme used for the TPM2 quote.\n",
+            CLI_ATTESTER_TPM2_QUOTE_SIGNATURE_SCHEME_LONG);
+    printf(" -%c, --%s=ALGORITHM: Specifies the hash "
+           "algorithm used for the TPM2 quote.\n",
+            CLI_ATTESTER_TPM2_QUOTE_HASH_ALGORITHM,
+            CLI_ATTESTER_TPM2_QUOTE_HASH_ALGORITHM_LONG);
 
     /* print DTLS-PSK grouped options */
     charra_print_dtls_psk_help_message();
@@ -474,6 +496,26 @@ static bool charra_cli_attester_psk_hint(char* arg) {
     return true;
 }
 
+static bool charra_cli_util_attester_scheme(char* arg) {
+    config->signature_scheme = charra_signature_scheme_from_str(arg);
+    if (config->signature_scheme == TPM2_ALG_NULL) {
+        charra_log_error(
+                "[%s] Unsupported signature scheme: '%s'", LOG_NAME, arg);
+        return false;
+    }
+    return true;
+}
+
+static bool charra_cli_util_attester_hash_algorithm(char* arg) {
+    config->hash_algorithm = charra_tpm_hash_algorithm_from_str(arg);
+    if (config->hash_algorithm == TPM2_ALG_NULL) {
+        charra_log_error(
+                "[%s] Unsupported hash algorithm: '%s'", LOG_NAME, arg);
+        return false;
+    }
+    return true;
+}
+
 static bool on_opt(char key, char* value) {
     if (config->lock_config) {
         // config is locked, arguments are ignored
@@ -500,6 +542,13 @@ static bool on_opt(char key, char* value) {
         break;
     case CLI_ATTESTER_CONFIG:
         // ignore config files in this iteration
+        break;
+    /* TPM2-quote options */
+    case CLI_ATTESTER_TPM2_QUOTE_SIGNATURE_SCHEME:
+        rc = charra_cli_util_attester_scheme(value);
+        break;
+    case CLI_ATTESTER_TPM2_QUOTE_HASH_ALGORITHM:
+        rc = charra_cli_util_attester_hash_algorithm(value);
         break;
     /* rpk options */
     case CLI_ATTESTER_RPK_PEER_PUBLIC_KEY:

@@ -25,6 +25,7 @@
 #include <tss2/tss2_tpm2_types.h>
 
 #include "../common/charra_error.h"
+#include "crypto_util.h"
 
 #ifndef CHARRA_UTIL_H
 #define CHARRA_UTIL_H
@@ -102,6 +103,25 @@ bool charra_verify_tpm2_quote_qualifying_data(
 bool charra_verify_tpm2_quote_pcrs(const TPM2_ALG_ID hash_algo_id,
         const uint8_t* const qualifying_data,
         const TPMS_ATTEST* const attest_struct);
+
+/**
+ * @brief Computes the PCR composite (hash digest) from the given PCR values.
+ *
+ * @param[in] hash_algorithm The hash algorithm to use for digest computation.
+ * @param[in] expected_pcr_values 3D array of PCR banks containing 2D arrays of
+ * PCR values.
+ * @param[in] expected_pcr_values_len An array containing the count of PCR
+ * values in each bank of expected_pcr_values.
+ * @param[in,out] pcr_composite_digest The computed PCR composite (hash
+ * digest).
+ * @return CHARRA_RC_SUCCESS on success, CHARRA_RC_ERROR on error.
+ */
+CHARRA_RC charra_compute_pcr_composite_digest_from_ptr_pcr_selection(
+        mbedtls_md_type_t hash_algorithm,
+        const uint8_t* const expected_pcr_values[TPM2_PCR_BANK_COUNT]
+                                                [TPM2_MAX_PCRS],
+        const uint32_t* const expected_pcr_values_len,
+        uint8_t* const pcr_composite_digest);
 
 /**
  * @brief Verifies whether the PCR composite (hash digest) matches the one in

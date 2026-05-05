@@ -478,8 +478,9 @@ CHARRA_RC parse_yaml_mapping(charra_yaml_parser_state_t* parser_state,
     return charra_rc;
 }
 
-CHARRA_RC parse_yaml_file(
-        const char* const path, yaml_field_handler field_handler, void* data) {
+CHARRA_RC parse_yaml_file(const char* const path,
+        yaml_field_handler field_handler,
+        yaml_document_end_handler_t document_end_handler, void* data) {
     CHARRA_RC charra_rc = CHARRA_RC_ERROR;
 
     charra_yaml_parser_state_t parser_state = {0};
@@ -509,6 +510,7 @@ CHARRA_RC parse_yaml_file(
 
     /* parse YAML file*/
     bool stream_end = false;
+    bool in_document = false;
     do {
         charra_rc = parse_yaml_token(&parser_state, &token);
         if (charra_rc != CHARRA_RC_SUCCESS) {
@@ -516,10 +518,30 @@ CHARRA_RC parse_yaml_file(
         }
         switch (token.type) {
         case YAML_STREAM_START_TOKEN:
+            break;
         case YAML_DOCUMENT_START_TOKEN:  // optional token
-        case YAML_DOCUMENT_END_TOKEN:    // optional token
+            if (in_document && document_end_handler != NULL) {
+                /* document ended implicitly */
+                charra_rc = document_end_handler(&parser_state, data);
+                if (charra_rc != CHARRA_RC_SUCCESS) {
+                    goto cleanup;
+                }
+            }
+            in_document = true;
+            break;
+        case YAML_DOCUMENT_END_TOKEN:  // optional token
+            if (document_end_handler != NULL) {
+                /* document ended explicitly */
+                charra_rc = document_end_handler(&parser_state, data);
+                if (charra_rc != CHARRA_RC_SUCCESS) {
+                    goto cleanup;
+                }
+            }
+            in_document = false;
             break;
         case YAML_BLOCK_MAPPING_START_TOKEN:
+            /* document started implicitly */
+            in_document = true;
             charra_rc = parse_yaml_inner_mapping(
                     &parser_state, field_handler, true, data);
             if (charra_rc != CHARRA_RC_SUCCESS) {
@@ -527,6 +549,8 @@ CHARRA_RC parse_yaml_file(
             }
             break;
         case YAML_FLOW_MAPPING_START_TOKEN:
+            /* document started implicitly */
+            in_document = true;
             charra_rc = parse_yaml_inner_mapping(
                     &parser_state, field_handler, false, data);
             if (charra_rc != CHARRA_RC_SUCCESS) {
@@ -534,6 +558,13 @@ CHARRA_RC parse_yaml_file(
             }
             break;
         case YAML_STREAM_END_TOKEN:
+            if (in_document && document_end_handler != NULL) {
+                /* document ended implicitly */
+                charra_rc = document_end_handler(&parser_state, data);
+                if (charra_rc != CHARRA_RC_SUCCESS) {
+                    goto cleanup;
+                }
+            }
             stream_end = true;
             break;
         /* all other tokens should not be parsed in this stage */

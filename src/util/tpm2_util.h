@@ -106,6 +106,21 @@ TSS2_RC tpm2_get_random(
         ESYS_CONTEXT* ctx, const uint32_t len, TPM2B_DIGEST** random_bytes);
 
 /**
+ * @brief Determines the signature scheme to use for a TPM quote operation.
+ *
+ * @param ctx[in,out] The ESAPI context.
+ * @param sign_key_handle[in] The TPM2 handle of the signature key.
+ * @param hash_algorithm[in] The hash algorithm to use.
+ * @param sig_scheme_id[in] The desired signature scheme ID. If this is
+ * TPM2_ALG_NULL, the default signature scheme for the key type will be used.
+ * @param sig_scheme[out] The determined signature scheme.
+ * @return TSS2_RC The TSS return code.
+ */
+TSS2_RC tpm2_determine_signature_scheme(ESYS_CONTEXT* ctx,
+        const ESYS_TR sign_key_handle, const TPM2_ALG_ID hash_algorithm,
+        const TPM2_ALG_ID sig_scheme_id, TPMT_SIG_SCHEME* sig_scheme);
+
+/**
  * @brief Executes a TPM quote operation.
  *
  * @param ctx[in,out] The ESAPI context.
@@ -113,13 +128,15 @@ TSS2_RC tpm2_get_random(
  * @param pcr_selection[in] The PCR selection
  * @param qualifying_data[in] The qualifying data, such as a nonce for
  * freshness.
+ * @param sig_scheme[in] The signature scheme to use for the quote.
  * @param attest[out] The attestation data structure.
  * @param signature[out] The TPM2 signature over \a attest->attestationData.
  * @return TSS2_RC The TSS return code.
  */
 TSS2_RC tpm2_quote(ESYS_CONTEXT* ctx, const ESYS_TR sign_key_handle,
         const TPML_PCR_SELECTION* pcr_selection,
-        const TPM2B_DATA* qualifyingData, TPM2B_ATTEST** attest,
+        const TPM2B_DATA* qualifying_data,
+        const TPMT_SIG_SCHEME* const sig_scheme, TPM2B_ATTEST** attest,
         TPMT_SIGNATURE** signature);
 
 #endif /* TPM2_UTIL_H */

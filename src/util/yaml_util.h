@@ -34,6 +34,17 @@ typedef struct {
 } charra_yaml_parser_state_t;
 
 /**
+ * @brief A function pointer type for handling the end of a YAML document. If
+ * the return value is not CHARRA_RC_SUCCESS, the parser will stop parsing.
+ *
+ * @param parser_state a pointer to the parser state
+ * @param data a pointer to the data structure
+ * @returns CHARRA_RC_SUCCESS if the parser should continue parsing
+ */
+typedef CHARRA_RC (*yaml_document_end_handler_t)(
+        const charra_yaml_parser_state_t* const parser_state, void* data);
+
+/**
  * @brief A function pointer type for handling YAML fields. This function has to
  * parse all fields of a mapping, otherwise the parser may fail.
  *
@@ -151,11 +162,14 @@ CHARRA_RC parse_yaml_mapping(charra_yaml_parser_state_t* parser_state,
  *
  * @param path the path to the YAML file
  * @param field_handler the field handler function (has to parse each field
- * completely)
+ * completely or else will lead to undefined behavior)
+ * @param document_end_handler the document end handler function called after
+ * the end of each YAML document in this file (can be NULL)
  * @param data a pointer to the data structure
  * @returns CHARRA_RC_SUCCESS on success, CHARRA_RC_ERROR on errors.
  */
-CHARRA_RC parse_yaml_file(
-        const char* const path, yaml_field_handler field_handler, void* data);
+CHARRA_RC parse_yaml_file(const char* const path,
+        yaml_field_handler field_handler,
+        yaml_document_end_handler_t document_end_handler, void* data);
 
 #endif  // YAML_UTIL_H

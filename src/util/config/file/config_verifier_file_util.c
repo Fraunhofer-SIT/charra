@@ -341,10 +341,10 @@ static CHARRA_RC verifier_tpm_pcr_selection_field_handler(
     CHARRA_RC charra_rc = CHARRA_RC_SUCCESS;
     config_verifier* config = (config_verifier*)data;
 
-    config_verifier_pcr_bank_index pcr_bank_index = VERIFIER_PCR_BANK_UNKNOWN;
+    charra_tpm_pcr_bank_index pcr_bank_index = CHARRA_TPM_PCR_BANK_UNKNOWN;
 
-    charra_config_verifier_pcr_bank_index_from_str(key, &pcr_bank_index);
-    if (pcr_bank_index == VERIFIER_PCR_BANK_UNKNOWN) {
+    pcr_bank_index = charra_tpm_pcr_bank_index_from_str(key);
+    if (pcr_bank_index == CHARRA_TPM_PCR_BANK_UNKNOWN) {
         charra_rc = CHARRA_RC_ERROR;
         CHARRA_YAML_PARSER_ERROR_LOG_F(
                 parser_state->parser, "unknown field '%s'", key);
@@ -440,7 +440,7 @@ static CHARRA_RC verifier_attestation_field_handler(
         if (config->signature_hash_algorithm.mbedtls_hash_algorithm ==
                         MBEDTLS_MD_NONE ||
                 config->signature_hash_algorithm.tpm2_hash_algorithm ==
-                        TPM2_ALG_ERROR) {
+                        TPM2_ALG_NULL) {
             charra_rc = CHARRA_RC_ERROR;
             CHARRA_YAML_PARSER_ERROR_LOG_F(parser_state->parser,
                     "unknown hash algorithm '%s'", string_value);
@@ -545,5 +545,5 @@ static CHARRA_RC verifier_field_handler(
 
 CHARRA_RC load_verifier_yaml_config_file(
         const char* const path, config_verifier* const config) {
-    return parse_yaml_file(path, verifier_field_handler, config);
+    return parse_yaml_file(path, verifier_field_handler, NULL, config);
 }

@@ -46,6 +46,14 @@
 
     Specifies the path to the PCR log file. Available formats are: ima, tcg-boot.
 
+  * **\--scheme=SCHEME**:
+
+    Specifies the signature scheme used for the TPM2 quote.
+
+  * **-g**, **\--hash-algorithm=ALGORITHM**
+
+    Specifies the hash algorithm used for the TPM2 quote.
+
 # DTLS-PSK Options:
 
 * **-p**, **\--psk**:
@@ -139,17 +147,23 @@ Below is a description of the configuration structure and its available fields:
 | verify-peer-public-key                | Boolean      | Whether to verify the verifier's public key against a known reference |
 | peer-public-key-path                  | String       | Path to the verifier’s public key (DER format)                        |
 
+### charra-attester.attestation
+
+| Field                                                    | Type            | Description                                                        |
+| ---------------------------------------------------      | --------------- | ------------------------------------------------------------------ |
+| tpm-quote-signature-scheme                               | String          | Signature scheme to use for TPM quote (e.g. rsapss).               |
+| tpm-quote-signature-hash-algorithm                       | String          | Hash algorithm to use for TPM quote signature (e.g., sha256).      |
 
 ### charra-attester.attestation.key
 
-| Field       | Type   | Description                                                              |
-| ----------- | ------ | ------------------------------------------------------------------------ |
-| format      | String | Type of key reference: context or handle                                 |
+| Field       | Type   | Description                                                                    |
+| ----------- | ------ | ------------------------------------------------------------------------------ |
+| format      | String | Type of key reference: context or handle                                       |
 | path        | String | Path to the key context file or a TPM handle used for TPM attestation key (AK) |
 
 ### charra-attester.attestation.pcr-log
 
-| Field    | Type   | Description                                                                |
+| Field    | Type   | Description                 |
 | -------- | ------ | --------------------------- |
 | ima      | String | Path to IMA logs            |
 | tcg-boot | String | Path to TCG boot log        |

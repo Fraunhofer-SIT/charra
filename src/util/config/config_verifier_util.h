@@ -30,12 +30,8 @@
 
 #include "../../common/charra_log.h"
 #include "../../core/charra_tap/charra_tap_dto.h"
+#include "../crypto_util.h"
 #include "cli/cli_options.h"
-#include "config_attester_util.h"
-
-#define TPM2_PCR_BANK_COUNT 4  // sha1, sha256, sha384, sha512
-
-typedef uint8_t verifier_pcr_banks[TPM2_PCR_BANK_COUNT][TPM2_MAX_PCRS];
 
 typedef struct {
     mbedtls_md_type_t mbedtls_hash_algorithm;
@@ -46,14 +42,6 @@ typedef enum {
     VERIFIER_REFERENCE_PCRP_FILE_FORMAT_UNKNOWN = 0,
     VERIFIER_REFERENCE_PCRP_FILE_FORMAT_YAML = 'y',
 } config_verifier_reference_pcr_file_format_e;
-
-typedef enum {
-    VERIFIER_PCR_BANK_SHA1 = 0,
-    VERIFIER_PCR_BANK_SHA256 = 1,
-    VERIFIER_PCR_BANK_SHA384 = 2,
-    VERIFIER_PCR_BANK_SHA512 = 3,
-    VERIFIER_PCR_BANK_UNKNOWN = -1,
-} config_verifier_pcr_bank_index;
 
 /**
  * A structure holding all config parameters.
@@ -82,7 +70,7 @@ typedef struct {
     config_verifier_reference_pcr_file_format_e reference_pcr_file_format;
     char reference_pcr_file_path[1024];
     uint8_t tpm_pcr_selection_len[TPM2_PCR_BANK_COUNT];
-    verifier_pcr_banks tpm_pcr_selection;
+    charra_tpm_pcr_selection tpm_pcr_selection;
     uint8_t pcr_log_len;
     pcr_log_dto pcr_logs[SUPPORTED_PCR_LOGS_COUNT];
 } config_verifier;
@@ -101,15 +89,6 @@ void trace_log_verifier_config(const config_verifier* const config);
  */
 cli_option_code load_verifier_config(
         int argc, char* argv[], config_verifier* const config);
-
-/**
- *  @brief parses the string as a PCR bank index.
- *
- * @param pcr_bank the string holding the PCR bank.
- * @param pcr_bank_index the PCR bank index to be set.
- */
-void charra_config_verifier_pcr_bank_index_from_str(const char* const pcr_bank,
-        config_verifier_pcr_bank_index* const pcr_bank_index);
 
 /**
  *  @brief parses the string as a hash algorithm.

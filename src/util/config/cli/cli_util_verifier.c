@@ -682,7 +682,7 @@ static bool charra_cli_verifier_parse_pcr_selection(char* pcr_selections) {
     char* next_token = pcr_selections;
     char* bank_name = NULL;
     char* pcr_list = NULL;
-    int bank = -1;
+    charra_tpm_pcr_bank_index bank = -1;
     while ((bank_token = charra_cli_verifier_strtok(NULL, "+", &next_token)) !=
             NULL) {
         bank_name = charra_cli_verifier_strtok(bank_token, ":", &pcr_list);
@@ -690,8 +690,8 @@ static bool charra_cli_verifier_parse_pcr_selection(char* pcr_selections) {
             charra_log_error("[%s] No bank defined '%s'", LOG_NAME);
             return false;
         }
-        charra_config_verifier_pcr_bank_index_from_str(bank_name, &bank);
-        if (bank == VERIFIER_PCR_BANK_UNKNOWN) {
+        bank = charra_tpm_pcr_bank_index_from_str(bank_name);
+        if (bank == CHARRA_TPM_PCR_BANK_UNKNOWN) {
             charra_log_error("[%s] Invalid PCR bank '%s'", LOG_NAME, bank_name);
             return false;
         }
@@ -704,7 +704,7 @@ static bool charra_cli_verifier_parse_pcr_selection(char* pcr_selections) {
 }
 
 static bool charra_cli_verifier_pcr_selection(char* arg) {
-    uint8_t(*tpm_pcr_selection)[TPM2_MAX_PCRS] = config->tpm_pcr_selection;
+    uint8_t (*tpm_pcr_selection)[TPM2_MAX_PCRS] = config->tpm_pcr_selection;
     uint8_t* tpm_pcr_selection_len = config->tpm_pcr_selection_len;
     for (uint32_t i = 0; i < TPM2_PCR_BANK_COUNT; i++) {
         for (uint32_t j = 0; j < TPM2_MAX_PCRS; j++) {
@@ -728,7 +728,7 @@ static bool charra_cli_verifier_hash_algorithm(const char* const arg) {
     if (config->signature_hash_algorithm.mbedtls_hash_algorithm ==
                     MBEDTLS_MD_NONE ||
             config->signature_hash_algorithm.tpm2_hash_algorithm ==
-                    TPM2_ALG_ERROR) {
+                    TPM2_ALG_NULL) {
         charra_log_error(
                 "[%s] Unsupported hash algorithm: '%s'", LOG_NAME, arg);
         return false;
