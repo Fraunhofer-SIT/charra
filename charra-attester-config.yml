@@ -1,0 +1,25 @@
+charra-attester:
+    lock-config: false
+    listen-ip: "0.0.0.0"
+    listen-port: 5683
+    log-level: INFO # TRACE, DEBUG, INFO, WARN, ERROR, FATAL
+    coap:
+        log-level: INFO # EMERG, ALERT, CRIT, ERR, WARNING, NOTICE, INFO, DEBUG, CIPHERS
+        udp:
+            dtls-psk:
+                enable: false
+                hint: "CHARRA Attester"
+                key: "CHARRA DTLS Key"
+            dtls-rpk:
+                enable: false
+                private-key-path: "./keys/attester.der"
+                public-key-path: "./keys/attester.pub.der"
+                verify-peer-public-key: true
+                peer-public-key-path: "./keys/verifier.pub.der"
+    attestation:
+        key:
+            format: context # context, handle
+            path: "./tpm_keys/rsa_ak.ctx"
+        pcr-log:
+            ima: "./logs/ima/binary_runtime_measurements"
+            tcg-boot: "./logs/tcg-boot/binary_bios_measurements"

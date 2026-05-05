@@ -19,16 +19,18 @@
  * BSD-3-Clause).
  */
 
+#include "parser_util.h"
+
 #include <errno.h>
+#include <stdint.h>
+#include <string.h>
+
+#include <tss2/tss2_tpm2_types.h>
 
 #include "../common/charra_error.h"
 #include "../common/charra_log.h"
 #include "../common/charra_macro.h"
 #include "../util/io_util.h"
-#include "parser_util.h"
-
-#include <string.h>
-#include <tss2/tss2_tpm2_types.h>
 
 /* a byte is represented as 2 characters in a hex string + 2 bytes for the
  * characters "0x" */
@@ -68,22 +70,28 @@ CHARRA_RC parse_pcr_value(char* start, size_t length, uint8_t* pcr_value) {
     return CHARRA_RC_SUCCESS;
 }
 
-int parse_pcr_index(char* index_start) {
-    errno = 0;
-    char* end = NULL;
-    int pcr_index = strtoul(index_start, &end, 10);  // parse digits as index
-    if (end == index_start || *end != '\0' || errno != 0 ||
-            pcr_index >= TPM2_MAX_PCRS) {
-        return -1;
+CHARRA_RC parse_pcr_index(const char* const index_start, uint8_t* const index) {
+    CHARRA_RC charra_rc = CHARRA_RC_SUCCESS;
+    uint64_t long_value = 0;
+
+    charra_rc = parse_ulong(index_start, 10, &long_value);
+    if (charra_rc != CHARRA_RC_SUCCESS) {
+        return charra_rc;
     }
-    return pcr_index;
+    if (long_value >= TPM2_MAX_PCRS) {
+        return CHARRA_RC_ERROR;
+    }
+    *index = (uint8_t)long_value;
+    return charra_rc;
 }
 
 static charra_tap_pcr_logs_t parse_pcr_log_identifier(
         const char* const identifier) {
-    if (strcmp("ima", identifier) == 0) {
+    if (strncmp(CHARRA_TAP_PCR_LOG_IMA_STR, identifier,
+                sizeof(CHARRA_TAP_PCR_LOG_IMA_STR)) == 0) {
         return CHARRA_TAP_PCR_LOG_IMA;
-    } else if (strcmp("tcg-boot", identifier) == 0) {
+    } else if (strncmp(CHARRA_TAP_PCR_LOG_TCG_BOOT_STR, identifier,
+                       sizeof(CHARRA_TAP_PCR_LOG_TCG_BOOT_STR)) == 0) {
         return CHARRA_TAP_PCR_LOG_TCG_BOOT;
     } else {
         return CHARRA_TAP_PCR_LOG_ERROR;
@@ -169,7 +177,8 @@ CHARRA_RC parse_pcr_log_request(const char* const log_name,
         const char* const ima_log_path, const char* const tcg_boot_log_path,
         const pcr_log_dto* const request, pcr_log_response_dto* response) {
     /* TODO: handle memory allocations */
-    response->identifier = request->identifier;
+    memcpy(response->identifier, request->identifier,
+            CHARRA_TAP_PCR_LOG_IDENTIFIER_MAXLEN);
     switch (parse_pcr_log_identifier(request->identifier)) {
     case CHARRA_TAP_PCR_LOG_IMA:
         return parse_pcr_ima_log(log_name, ima_log_path, request, response);
@@ -185,5 +194,55 @@ CHARRA_RC parse_pcr_log_request(const char* const log_name,
         response->content = NULL;
         break;
     }
+    return CHARRA_RC_SUCCESS;
+}
+
+CHARRA_RC parse_long(const char* const string, int base, int64_t* const value) {
+    if (string == NULL || value == NULL) {
+        return CHARRA_RC_BAD_ARGUMENT;
+    }
+
+    errno = 0;
+    const char* value_start_index = string;
+    int64_t tmp_value = 0;
+    char* end = NULL;
+
+    /* skip leading spaces */
+    while (*value_start_index == ' ') {
+        value_start_index++;
+    }
+
+    tmp_value = strtoll(value_start_index, &end, base);
+    if (end == value_start_index || *end != '\0' || errno != 0) {
+        return CHARRA_RC_ERROR;
+    }
+
+    *value = tmp_value;
+    return CHARRA_RC_SUCCESS;
+}
+
+CHARRA_RC parse_ulong(
+        const char* const string, int base, uint64_t* const value) {
+    if (string == NULL || value == NULL) {
+        return CHARRA_RC_BAD_ARGUMENT;
+    }
+
+    errno = 0;
+    const char* value_start_index = string;
+    uint64_t tmp_value = 0;
+    char* end = NULL;
+
+    /* skip leading spaces */
+    while (*value_start_index == ' ') {
+        value_start_index++;
+    }
+
+    tmp_value = strtoull(value_start_index, &end, base);
+    if (end == value_start_index || *end != '\0' || errno != 0 ||
+            *value_start_index == '-') {
+        return CHARRA_RC_ERROR;
+    }
+
+    *value = tmp_value;
     return CHARRA_RC_SUCCESS;
 }

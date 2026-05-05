@@ -39,9 +39,8 @@
 #include "core/charra_key_mgr.h"
 #include "core/charra_tap/charra_tap_cbor.h"
 #include "core/charra_tap/charra_tap_dto.h"
-#include "util/cli/cli_util_attester.h"
-#include "util/cli/cli_util_common.h"
 #include "util/coap_util.h"
+#include "util/config/config_attester_util.h"
 #include "util/io_util.h"
 #include "util/parser_util.h"
 #include "util/tpm2_util.h"
@@ -55,26 +54,12 @@ static bool quit = false;
 
 /* logging */
 #define LOG_NAME "attester"
-coap_log_t coap_log_level = LOG_INFO;
 // #define LOG_LEVEL_CBOR LOG_DEBUG
-charra_log_t charra_log_level = CHARRA_LOG_INFO;
 
 /* config */
-static cli_config cli_attester_config = {0};
-static const char LISTEN_ADDRESS[] = "0.0.0.0";
-static unsigned int port = COAP_DEFAULT_PORT;  // default port 5683
-#define CBOR_ENCODER_BUFFER_LENGTH 20480       // 20 KiB should be sufficient
-bool use_dtls_psk = false;
-char* dtls_psk_key = "Charra DTLS Key";
-char* dtls_psk_hint = "Charra Attester";
+static config_attester config = {0};
+#define CBOR_ENCODER_BUFFER_LENGTH 20480  // 20 KiB should be sufficient
 // TODO(any): Allocate memory for CBOR buffer with malloc() as logs can be huge.
-
-// for DTLS-RPK
-bool use_dtls_rpk = false;
-char* dtls_rpk_private_key_path = "keys/attester.der";
-char* dtls_rpk_public_key_path = "keys/attester.pub.der";
-char* dtls_rpk_peer_public_key_path = "keys/verifier.pub.der";
-bool dtls_rpk_verify_peer_public_key = true;
 
 /**
  * @brief SIGINT handler: set quit to 1 for graceful termination.
@@ -98,90 +83,41 @@ int main(int argc, char** argv) {
     /* handle SIGINT */
     signal(SIGINT, handle_sigint);
 
-    /* check environment variables */
-    charra_log_level_from_str(
-            (const char*)getenv("LOG_LEVEL_CHARRA"), &charra_log_level);
-    charra_coap_log_level_from_str(
-            (const char*)getenv("LOG_LEVEL_COAP"), &coap_log_level);
+    /* set log level before parsing CLI to be able to print errors. */
+    charra_log_set_level(CHARRA_LOG_INFO);
 
-    /* initialize structures to pass to the CLI parser */
-    /* clang-format off */
-    cli_attester_config = (cli_config){
-        .caller = ATTESTER,
-        .common_config = {
-            .charra_log_level = &charra_log_level,
-            .coap_log_level = &coap_log_level,
-            .port = &port,
-            .use_dtls_psk = &use_dtls_psk,
-            .dtls_psk_key = &dtls_psk_key,
-            .use_dtls_rpk = &use_dtls_rpk,
-            .dtls_rpk_private_key_path =
-                    &dtls_rpk_private_key_path,
-            .dtls_rpk_public_key_path =
-                    &dtls_rpk_public_key_path,
-            .dtls_rpk_peer_public_key_path =
-                    &dtls_rpk_peer_public_key_path,
-            .dtls_rpk_verify_peer_public_key =
-                    &dtls_rpk_verify_peer_public_key,
-        },
-        .specific_config.attester_config = {
-            .dtls_psk_hint = &dtls_psk_hint,
-            .attestation_key_format = CLI_UTIL_ATTESTATION_KEY_FORMAT_FILE,
-            .attestation_key.ctx_path = NULL,
-            .ima_log_path = NULL,
-            .tcg_boot_log_path = NULL,
-        },
-    };
-    /* clang-format on */
-
-    /* parse CLI arguments */
-    if ((result = charra_parse_command_line_attester_arguments(
-                 argc, argv, &cli_attester_config)) != 0) {
+    /* load config from env-vars, files and cli */
+    cli_option_code option_code = load_attester_config(argc, argv, &config);
+    if (option_code != cli_option_code_continue) {
         // 1 means help message is displayed, -1 means error
-        return (result == 1) ? EXIT_SUCCESS : EXIT_FAILURE;
+        return (option_code == cli_option_code_stop) ? EXIT_SUCCESS
+                                                     : EXIT_FAILURE;
     }
 
     /* set CHARRA and libcoap log levels */
-    charra_log_set_level(charra_log_level);
-    coap_set_log_level(coap_log_level);
+    charra_log_set_level(config.charra_log_level);
+    coap_set_log_level(config.coap_log_level);
 
-    charra_log_debug("[" LOG_NAME "] Attester Configuration:");
-    charra_log_debug("[" LOG_NAME "]     Used local port: %d", port);
-    charra_log_debug("[" LOG_NAME "]     DTLS-PSK enabled: %s",
-            (use_dtls_psk == true) ? "true" : "false");
-    if (use_dtls_psk) {
-        charra_log_debug(
-                "[" LOG_NAME "]         Pre-shared key: '%s'", dtls_psk_key);
-        charra_log_debug("[" LOG_NAME "]         Hint: '%s'", dtls_psk_hint);
-    }
-    charra_log_debug("[" LOG_NAME "]     DTLS-RPK enabled: %s",
-            (use_dtls_rpk == true) ? "true" : "false");
-    if (use_dtls_rpk) {
-        charra_log_debug("[" LOG_NAME "]         Private key path: '%s'",
-                dtls_rpk_private_key_path);
-        charra_log_debug("[" LOG_NAME "]         Public key path: '%s'",
-                dtls_rpk_public_key_path);
-        charra_log_debug("[" LOG_NAME "]         Peers' public key path: '%s'",
-                dtls_rpk_peer_public_key_path);
-    }
+    trace_log_attester_config(&config);
 
     /* set varaibles here such that they are valid in case of an 'goto error' */
     coap_context_t* coap_context = NULL;
     coap_endpoint_t* coap_endpoint = NULL;
 
-    if (use_dtls_psk && use_dtls_rpk) {
+    if (config.use_dtls_psk && config.use_dtls_rpk) {
         charra_log_error(
                 "[" LOG_NAME "] Configuration enables both DTSL with PSK "
                 "and DTSL with PKI. Aborting!");
         goto error;
     }
 
-    if (use_dtls_psk || use_dtls_rpk) {
+    if (config.use_dtls_psk || config.use_dtls_rpk) {
         // print TLS version when in debug mode
         coap_show_tls_version(LOG_DEBUG);
     }
 
-    if ((use_dtls_psk || use_dtls_psk) && !coap_dtls_is_supported()) {
+    if ((config.use_dtls_psk || config.use_dtls_psk) &&
+            !coap_dtls_is_supported()) {
         charra_log_error("[" LOG_NAME "] CoAP does not support DTLS but the "
                          "configuration enables DTLS. Aborting!");
         goto error;
@@ -193,30 +129,33 @@ int main(int argc, char** argv) {
         goto error;
     }
 
-    if (use_dtls_psk) {
+    if (config.use_dtls_psk) {
         charra_log_info(
                 "[" LOG_NAME "] Creating CoAP server endpoint using DTLS-PSK.");
-        if (!coap_context_set_psk(coap_context, dtls_psk_hint,
-                    (uint8_t*)dtls_psk_key, strlen(dtls_psk_key))) {
+        if (!coap_context_set_psk(coap_context, config.dtls_psk_hint,
+                    (uint8_t*)config.dtls_psk_key,
+                    strlen(config.dtls_psk_key))) {
             charra_log_error("[" LOG_NAME
                              "] Error while configuring CoAP to use DTLS-PSK.");
             goto error;
         }
 
         if ((coap_endpoint = charra_coap_new_endpoint(coap_context,
-                     LISTEN_ADDRESS, port, COAP_PROTO_DTLS)) == NULL) {
+                     config.listen_ip, config.port, COAP_PROTO_DTLS)) == NULL) {
             charra_log_error("[" LOG_NAME "] Cannot create CoAP server "
                              "endpoint based on DTLS-PSK.\n");
             goto error;
         }
-    } else if (use_dtls_rpk) {
+    } else if (config.use_dtls_rpk) {
         charra_log_info(
                 "[" LOG_NAME "] Creating CoAP server endpoint using DTLS-RPK.");
         coap_dtls_pki_t dtls_pki = {0};
 
         CHARRA_RC rc = charra_coap_setup_dtls_pki_for_rpk(&dtls_pki,
-                dtls_rpk_private_key_path, dtls_rpk_public_key_path,
-                dtls_rpk_peer_public_key_path, dtls_rpk_verify_peer_public_key);
+                config.dtls_rpk_private_key_path,
+                config.dtls_rpk_public_key_path,
+                config.dtls_rpk_peer_public_key_path,
+                config.dtls_rpk_verify_peer_public_key);
         if (rc != CHARRA_RC_SUCCESS) {
             charra_log_error("[" LOG_NAME
                              "] Error while setting up DTLS-RPK structure.");
@@ -230,7 +169,7 @@ int main(int argc, char** argv) {
         }
 
         if ((coap_endpoint = charra_coap_new_endpoint(coap_context,
-                     LISTEN_ADDRESS, port, COAP_PROTO_DTLS)) == NULL) {
+                     config.listen_ip, config.port, COAP_PROTO_DTLS)) == NULL) {
             charra_log_error("[" LOG_NAME "] Cannot create CoAP server "
                              "endpoint based on DTLS-RPK.\n");
             goto error;
@@ -239,7 +178,7 @@ int main(int argc, char** argv) {
         charra_log_info(
                 "[" LOG_NAME "] Creating CoAP server endpoint using UDP.");
         if ((coap_endpoint = charra_coap_new_endpoint(coap_context,
-                     LISTEN_ADDRESS, port, COAP_PROTO_UDP)) == NULL) {
+                     config.listen_ip, config.port, COAP_PROTO_UDP)) == NULL) {
             charra_log_error(
                     "[" LOG_NAME
                     "] Cannot create CoAP server endpoint based on UDP.\n");
@@ -369,8 +308,7 @@ static void coap_attest_handler(struct coap_resource_t* resource,
 
     /* load TPM key */
     charra_log_info("[" LOG_NAME "] Loading TPM (attestation) key.");
-    if ((charra_r = charra_load_tpm2_key(esys_ctx, &sig_key_handle,
-                 &cli_attester_config.specific_config.attester_config)) !=
+    if ((charra_r = charra_load_tpm2_key(esys_ctx, &sig_key_handle, &config)) !=
             CHARRA_RC_SUCCESS) {
         charra_log_error(
                 "[" LOG_NAME "] Could not load TPM (attestation) key.");
@@ -398,12 +336,9 @@ static void coap_attest_handler(struct coap_resource_t* resource,
 
     /* parse log files if requested */
     for (uint32_t i = 0; i < req.pcr_log_len; i++) {
-        parse_pcr_log_request(LOG_NAME,
-                cli_attester_config.specific_config.attester_config
-                        .ima_log_path,
-                cli_attester_config.specific_config.attester_config
-                        .tcg_boot_log_path,
-                req.pcr_logs + i, pcr_log_responses + i);
+        parse_pcr_log_request(LOG_NAME, config.ima_log_path,
+                config.tcg_boot_log_path, req.pcr_logs + i,
+                pcr_log_responses + i);
     }
 
     /* prepare response */
@@ -465,7 +400,6 @@ error:
     charra_free_if_not_null(signature);
     charra_free_if_not_null(attest_buf);
     for (uint32_t i = 0; i < req.pcr_log_len; i++) {
-        charra_free_if_not_null(pcr_log_responses[i].identifier);
         charra_free_if_not_null(pcr_log_responses[i].content);
     }
     charra_free_and_null(req.pcr_logs);
@@ -475,9 +409,8 @@ error:
     /* flush handles */
     if (sig_key_handle != ESYS_TR_NONE) {
         TSS2_RC r = TSS2_RC_SUCCESS;
-        if (cli_attester_config.specific_config.attester_config
-                        .attestation_key_format ==
-                CLI_UTIL_ATTESTATION_KEY_FORMAT_HANDLE) {
+        if (config.attestation_key_format ==
+                ATTESTER_ATTESTATION_KEY_FORMAT_HANDLE) {
             /* close persistent key */
             r = Esys_TR_Close(esys_ctx, &sig_key_handle);
         } else {

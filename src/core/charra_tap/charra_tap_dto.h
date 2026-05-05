@@ -29,6 +29,9 @@
 #define SIG_KEY_ID_MAXLEN 256
 #define SUPPORTED_PCR_LOGS_COUNT 2
 #define CHARRA_TAP_SPEC_VERSION 0x00000000020200
+#define CHARRA_TAP_PCR_LOG_IDENTIFIER_MAXLEN 16
+#define CHARRA_TAP_PCR_LOG_IMA_STR "ima"
+#define CHARRA_TAP_PCR_LOG_TCG_BOOT_STR "tcg-boot"
 
 typedef enum {
     CHARRA_TAP_PCR_LOG_ERROR = 0,
@@ -59,7 +62,7 @@ typedef struct {
 } pcr_selection_dto;
 
 typedef struct {
-    char* identifier;
+    char identifier[CHARRA_TAP_PCR_LOG_IDENTIFIER_MAXLEN];
     uint64_t start;
     uint64_t count;
 } pcr_log_dto;
@@ -81,7 +84,7 @@ typedef struct {
 } charra_tap_msg_attestation_request_dto;
 
 typedef struct {
-    char* identifier;
+    char identifier[CHARRA_TAP_PCR_LOG_IDENTIFIER_MAXLEN];
     uint64_t start;
     uint64_t count;
     uint64_t content_len;

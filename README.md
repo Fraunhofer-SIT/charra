@@ -38,7 +38,7 @@ Inside the container, change to the `~/charra/` folder, build it, and run it:
     cd ~/charra/
     make -j
     ./generate-ak.sh
-    (bin/attester --attestation-key context:tpm_keys/rsa_ak.ctx &); sleep .2 ; bin/verifier -f yaml:reference-pcrs.yml --attestation-public-key tpm_keys/rsa_ak.pub ; sleep 1 ; pkill -SIGINT attester
+    (bin/attester --config charra-attester-config.yml &); sleep .2 ; bin/verifier --config charra-verifier-config.yml ; sleep 1 ; pkill -SIGINT attester
 
 ## How it Works: Protocol Flow
 
