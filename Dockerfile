@@ -73,7 +73,7 @@ RUN apt-get update \
 ## --- install dependencies ----------------------------------------------------
 ## -----------------------------------------------------------------------------
 
-ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/local/lib"
+ENV LD_LIBRARY_PATH="/usr/local/lib"
 
 ## TPM2 TSS
 RUN git clone --depth=1 -b "${tpm2tss_version}" \
@@ -284,7 +284,7 @@ RUN ln -s '/usr/local/bin/docker-entrypoint.sh' /
 
 ## set environment variables
 USER "${uid}:${gid}"
-ENV HOME /home/"${user}"
+ENV HOME=/home/"${user}"
 WORKDIR /home/"${user}"
 
 ## -----------------------------------------------------------------------------
