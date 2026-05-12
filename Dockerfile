@@ -37,10 +37,10 @@ ARG gid=1000
 ## software versions (typically Git branches or tags)
 ARG tpm2tss_version='4.1.3'   # https://github.com/tpm2-software/tpm2-tss
 ARG tpm2tools_version='5.7'   # https://github.com/tpm2-software/tpm2-tools
-ARG libcoap_version='v4.3.5'  # https://github.com/obgm/libcoap
-ARG mbedtls_version='v3.6.1'  # https://github.com/ARMmbed/mbedtls
-ARG qcbor_version='v1.4.1'      # https://github.com/laurencelundblade/QCBOR
-ARG tcose_version='v1.1.2'    # https://github.com/laurencelundblade/t_cose
+ARG libcoap_version='release-4.3.5-patches'  # https://github.com/obgm/libcoap
+ARG mbedtls_version='v4.1.0'  # https://github.com/ARMmbed/mbedtls
+ARG qcbor_version='v1.6.1'      # https://github.com/laurencelundblade/QCBOR
+ARG tcose_version='v1.2.0'    # https://github.com/laurencelundblade/t_cose
 ARG pytss_version='2.3.0'     # https://github.com/tpm2-software/tpm2-pytss
 
 
@@ -121,12 +121,13 @@ RUN apt-get update \
     && apt-get install --no-install-recommends -y \
         python3-jinja2 \
         python3-jsonschema \
+        cmake \
     && rm -rf /var/lib/apt/lists/*
 RUN git clone --recursive -b "${mbedtls_version}" \
         'https://github.com/ARMmbed/mbedtls.git' /tmp/mbedtls
 WORKDIR /tmp/mbedtls
-RUN make -j lib SHARED=true \
-    && make install
+RUN cmake -DUSE_SHARED_MBEDTLS_LIBRARY=On -DUSE_STATIC_MBEDTLS_LIBRARY=OFF . \
+    && cmake --build .
 WORKDIR /
 RUN rm -rfv /tmp/mbedtls
 
