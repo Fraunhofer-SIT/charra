@@ -133,107 +133,96 @@ static config_attester* config = NULL;
 
 static void charra_print_dtls_psk_help_message(void) {
     printf("DTLS-PSK Options:\n");
-    printf(" -%c, --%s:                      Enable DTLS protocol "
-           "with PSK. By default the key '%s' and hint '%s' are "
-           "used.\n",
-            CLI_ATTESTER_PSK, CLI_ATTESTER_PSK_LONG, config->dtls_psk_key,
-            config->dtls_psk_hint);
-    printf("     --%s=KEY:              Use KEY as pre-shared "
-           "key for DTLS. Implicitly enables DTLS-PSK.\n",
-            CLI_ATTESTER_PSK_KEY_LONG);
-    printf("     --%s=HINT:            Use HINT as hint for "
-           "DTLS. Implicitly enables DTLS-PSK.\n",
-            CLI_ATTESTER_PSK_HINT_LONG);
+    print_option(CLI_ATTESTER_PSK, CLI_ATTESTER_PSK_LONG, NULL,
+            "Enable DTLS protocol with PSK. By default, the key '%s' and hint "
+            "'%s' are used.",
+            config->dtls_psk_key, config->dtls_psk_hint);
+    print_option(CLI_UTIL_NO_SHORT_OPT, CLI_ATTESTER_PSK_KEY_LONG, "KEY",
+            "Use KEY as pre-shared key for DTLS. Implicitly enables DTLS-PSK.");
+    print_option(CLI_UTIL_NO_SHORT_OPT, CLI_ATTESTER_PSK_HINT_LONG, "HINT",
+            "Use HINT as hint for DTLS. Implicitly enables DTLS-PSK.");
 }
 
 static void charra_print_dtls_rpk_help_message(void) {
     printf("DTLS-RPK Options:\n");
-    printf("                                 Charra includes default "
-           "'keys' in the keys folder, but these are only intended for "
-           "testing. They MUST be changed in actual production "
-           "environments!\n");
-    printf(" -%c, --%s:                      Enable DTLS-RPK (raw "
-           "public keys) protocol. The protocol is intended for "
-           "scenarios in which public keys of either attester or "
-           "verifier or both of them are pre-shared.\n",
-            CLI_ATTESTER_RPK, CLI_ATTESTER_RPK_LONG);
-    printf("     --%s=PATH:     Specify the path of the "
-           "private key used for RPK. Currently only supports DER "
-           "(ASN.1) format.\n",
-            CLI_ATTESTER_RPK_PRIVATE_KEY_LONG);
-    printf("                                 By default '%s' is used. "
-           "Implicitly enables DTLS-RPK.\n",
+    print_option(CLI_UTIL_NO_SHORT_OPT, NULL, NULL,
+            "CHARRA includes default keys in the 'keys' folder, but these are "
+            "only intended for testing. They MUST be changed in actual "
+            "production environments!");
+    print_option(CLI_ATTESTER_RPK, CLI_ATTESTER_RPK_LONG, NULL,
+            "Enable DTLS-RPK (raw public keys) protocol. The protocol is "
+            "intended for scenarios in which public keys of either attester or "
+            "verifier or both of them are pre-shared.");
+    print_option(CLI_UTIL_NO_SHORT_OPT, CLI_ATTESTER_RPK_PRIVATE_KEY_LONG,
+            "PATH",
+            "Specify the path of the private key used for RPK. Currently, only "
+            "supports DER (ASN.1) format.\nBy default, '%s' is used. "
+            "Implicitly enables DTLS-RPK.",
             config->dtls_rpk_private_key_path);
-    printf("     --%s=PATH:      Specify the path of the "
-           "public key used for RPK. Currently only supports DER "
-           "(ASN.1) format.\n",
-            CLI_ATTESTER_RPK_PUBLIC_KEY_LONG);
-    printf("                                 By default '%s' is used. "
-           "Implicitly enables DTLS-RPK.\n",
+    print_option(CLI_UTIL_NO_SHORT_OPT, CLI_ATTESTER_RPK_PUBLIC_KEY_LONG,
+            "PATH",
+            "Specify the path of the public key used for RPK. Currently, only "
+            "supports DER (ASN.1) format.\nBy default, '%s' is used. "
+            "Implicitly enables DTLS-RPK.",
             config->dtls_rpk_public_key_path);
-    printf("     --%s=PATH: Specify the path of the "
-           "reference public key of the peer, used for RPK. Currently "
-           "only supports DER (ASN.1) format.\n",
-            CLI_ATTESTER_RPK_PEER_PUBLIC_KEY_LONG);
-    printf("                                 By default '%s' is used. "
-           "Implicitly enables DTLS-RPK.\n",
+    print_option(CLI_UTIL_NO_SHORT_OPT, CLI_ATTESTER_RPK_PEER_PUBLIC_KEY_LONG,
+            "PATH",
+            "Specify the path of the reference public key of the peer, used "
+            "for RPK. Currently, only supports DER (ASN.1) format.\nBy "
+            "default, '%s' is used. Implicitly enables DTLS-RPK.",
             config->dtls_rpk_peer_public_key_path);
-    printf("     --%s=[0,1]:    Specify whether the peers "
-           "public key shall be checked against the reference public "
-           "key. 0 means no check, 1 means check. By default the check "
-           "is performed.\n",
-            CLI_ATTESTER_RPK_VERIFY_PEER_LONG);
-    printf("                                 WARNING: Disabling the "
-           "verification means that connections from any peer will be "
-           "accepted. This is primarily intended for the verifier, "
-           "which may not have\n");
-    printf("                                 the public keys of all "
-           "attesters and does an identity check with the attestation "
-           "response. Implicitly enables DTLS-RPK.\n");
-    printf("\nTo specify TCTI commands for the TPM, set the "
-           "'CHARRA_TCTI' environment variable accordingly.\n");
+    print_option(CLI_UTIL_NO_SHORT_OPT, CLI_ATTESTER_RPK_VERIFY_PEER_LONG,
+            "[0,1]",
+            "Specify whether the peer's public key shall be checked against "
+            "the reference public key. 0 means no check, 1 means check. By "
+            "default, the check is performed.");
+    print_option(CLI_UTIL_NO_SHORT_OPT, NULL, NULL,
+            "WARNING: Disabling the verification means that connections from "
+            "any peer will be accepted. This is primarily intended for the "
+            "verifier, which may not have the public keys of all attesters and "
+            "does an identity check with the attestation response. Implicitly "
+            "enables DTLS-RPK.");
+    printf("\nTo configure TCTI for the TPM, set the 'CHARRA_TCTI' environment "
+           "variable accordingly.\n");
 }
 
 void charra_cli_util_attester_print_help_message(void) {
     /* print help messages of common arguments */
     printf("Usage: %s [<options>]\n", LOG_NAME);
     printf("Where <options> are:\n");
-    printf(" -%c, --%s:                     Print this help "
-           "message.\n",
-            CLI_ATTESTER_HELP, CLI_ATTESTER_HELP_LONG);
-    printf(" -%c, --%s=PATH:              Load attester config from a file.\n",
-            CLI_ATTESTER_CONFIG, CLI_ATTESTER_CONFIG_LONG);
-    printf(" -%c, --%s:                  Set CHARRA and CoAP "
-           "log-level to DEBUG.\n",
-            CLI_ATTESTER_VERBOSE, CLI_ATTESTER_VERBOSE_LONG);
-    printf(" -%c, --%s=LEVEL:          Set CHARRA log-level to "
-           "LEVEL. Available are: TRACE, DEBUG, INFO, WARN, ERROR, "
-           "FATAL. Default is INFO.\n",
-            CLI_ATTESTER_LOG_LEVEL, CLI_ATTESTER_LOG_LEVEL_LONG);
-    printf("     --%s=LEVEL:     Set CoAP log-level to "
-           "LEVEL. Available are: DEBUG, INFO, NOTICE, WARNING, ERR, "
-           "CRIT, ALERT, EMERG, CIPHERS. Default is INFO.\n",
-            CLI_ATTESTER_COAP_LOG_LEVEL_LONG);
+    print_option(CLI_ATTESTER_HELP, CLI_ATTESTER_HELP_LONG, NULL,
+            "Print this help message.");
+    print_option(CLI_ATTESTER_CONFIG, CLI_ATTESTER_CONFIG_LONG, "PATH",
+            "Load attester config from a file.");
+    print_option(CLI_ATTESTER_VERBOSE, CLI_ATTESTER_VERBOSE_LONG, NULL,
+            "Set CHARRA and CoAP log-level to DEBUG.");
+    print_option(CLI_ATTESTER_LOG_LEVEL, CLI_ATTESTER_LOG_LEVEL_LONG, "LEVEL",
+            "Set CHARRA log-level to LEVEL. Available are: TRACE, DEBUG, INFO, "
+            "WARN, ERROR, FATAL. Default is INFO.");
+    print_option(CLI_UTIL_NO_SHORT_OPT, CLI_ATTESTER_COAP_LOG_LEVEL_LONG,
+            "LEVEL",
+            "Set CoAP log-level to LEVEL. Available are: DEBUG, INFO, NOTICE, "
+            "WARNING, ERR, CRIT, ALERT, EMERG, CIPHERS. Default is INFO.");
 
     /* print specific attester options */
-    printf(" -%c, --%s=FORMAT:VALUE:     Specifies the path to "
-           "the attestation key. Available are: context, handle.\n",
-            CLI_ATTESTER_ATTESTATION_KEY, CLI_ATTESTER_ATTESTATION_KEY_LONG);
-    printf("     --%s=PORT:                Open PORT instead of "
-           "port %u.\n",
-            CLI_ATTESTER_PORT_LONG, config->port);
-    printf("     --%s=FORMAT:FILE:      Specifies the path to the PCR log "
-           "file. Available formats are: ima, tcg-boot.\n",
-            CLI_ATTESTER_PCR_LOG_LONG);
+    print_option(CLI_ATTESTER_ATTESTATION_KEY,
+            CLI_ATTESTER_ATTESTATION_KEY_LONG, "FORMAT:VALUE",
+            "Specifies the path to the attestation key. Available are: "
+            "context, handle.");
+    print_option(CLI_UTIL_NO_SHORT_OPT, CLI_ATTESTER_PORT_LONG, "PORT",
+            "Open PORT instead of port %u.", config->port);
+    print_option(CLI_UTIL_NO_SHORT_OPT, CLI_ATTESTER_PCR_LOG_LONG,
+            "FORMAT:FILE",
+            "Specifies the path to the PCR log file. Available formats are: "
+            "ima, tcg-boot.");
 
     /* TPM2-quote options */
-    printf("     --%s=SCHEME:            Specifies the signature "
-           "scheme used for the TPM2 quote.\n",
-            CLI_ATTESTER_TPM2_QUOTE_SIGNATURE_SCHEME_LONG);
-    printf(" -%c, --%s=ALGORITHM: Specifies the hash "
-           "algorithm used for the TPM2 quote.\n",
-            CLI_ATTESTER_TPM2_QUOTE_HASH_ALGORITHM,
-            CLI_ATTESTER_TPM2_QUOTE_HASH_ALGORITHM_LONG);
+    print_option(CLI_UTIL_NO_SHORT_OPT,
+            CLI_ATTESTER_TPM2_QUOTE_SIGNATURE_SCHEME_LONG, "SCHEME",
+            "Specifies the signature scheme used for the TPM2 quote.");
+    print_option(CLI_ATTESTER_TPM2_QUOTE_HASH_ALGORITHM,
+            CLI_ATTESTER_TPM2_QUOTE_HASH_ALGORITHM_LONG, "ALGORITHM",
+            "Specifies the hash algorithm used for the TPM2 quote.");
 
     /* print DTLS-PSK grouped options */
     charra_print_dtls_psk_help_message();

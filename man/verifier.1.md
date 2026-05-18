@@ -70,7 +70,7 @@
 
 * **-p**, **\--psk**:
 
-    Enable DTLS protocol with PSK. By default the key 'Charra DTLS Key' and identity 'Charra Verifier' are used.
+    Enable DTLS protocol with PSK. By default, the key 'CHARRA DTLS Key' and identity 'CHARRA Verifier' are used.
 
 * **\--psk-key=KEY**:
 
@@ -82,7 +82,7 @@
 
 # DTLS-RPK Options:
 
-Charra includes default 'keys' in the keys folder, but these are only intended for testing. They MUST be changed in actual production environments!
+CHARRA includes default keys in the 'keys' folder, but these are only intended for testing. They MUST be changed in actual production environments!
 
 *  **-r**, **\--rpk**:
 
@@ -90,39 +90,36 @@ Charra includes default 'keys' in the keys folder, but these are only intended f
 
 *  **\--rpk-private-key=PATH**:
 
-    Specify the path of the private key used for RPK. Currently only supports DER (ASN.1) format.
+    Specify the path of the private key used for RPK. Currently, only supports DER (ASN.1) format.
 
-    By default 'keys/verifier.der' is used. Implicitly enables DTLS-RPK.
+    By default, 'keys/verifier.der' is used. Implicitly enables DTLS-RPK.
 
 *  **\--rpk-public-key=PATH**:
 
-    Specify the path of the public key used for RPK. Currently only supports DER (ASN.1) format.
+    Specify the path of the public key used for RPK. Currently, only supports DER (ASN.1) format.
 
-    By default 'keys/verifier.pub.der' is used. Implicitly enables DTLS-RPK.
+    By default, 'keys/verifier.pub.der' is used. Implicitly enables DTLS-RPK.
 
 *  **\--rpk-peer-public-key=PATH**:
 
-    Specify the path of the reference public key of the peer, used for RPK. Currently only supports DER (ASN.1) format.
+    Specify the path of the reference public key of the peer, used for RPK. Currently, only supports DER (ASN.1) format.
 
-    By default 'keys/attester.pub.der' is used. Implicitly enables DTLS-RPK.
+    By default, 'keys/attester.pub.der' is used. Implicitly enables DTLS-RPK.
 
 *  **\--rpk-verify-peer=[0,1]**:
 
-    Specify whether the peers public key shall be checked against the reference public key. 0 means no check, 1 means check. By default the check is performed.
+    Specify whether the peer's public key shall be checked against the reference public key. 0 means no check, 1 means check. By default, the check is performed.
 
     WARNING: Disabling the verification means that connections from any peer will be accepted. This is primarily intended for the verifier, which may not have
     the public keys of all attesters and does an identity check with the attestation response. Implicitly enables DTLS-RPK.
 
-# TCTI commands
+# TCTI
 
-To specify TCTI commands for the TPM, set the 'CHARRA_TCTI' environment variable accordingly.
+To configure TCTI for the TPM, set the 'CHARRA_TCTI' environment variable accordingly.
 
 # CONFIGURATION FILES
 CHARRA's verifier can be configured using a YAML configuration file. If no configuration file is explicitly provided via --config, the verifier attempts to load **/etc/charra/verifier-config.yaml**
 if present. Other specified config files and command-line arguments override values from a config file unless **lock-config** is set to **true**.
-
-Configuration Structure Overview
-The root field in the YAML file must be charra-verifier. Below is a description of the key configuration fields and their purpose.
 
 ## Configuration Structure
 
@@ -169,7 +166,7 @@ Below is a description of the configuration structure and its available fields:
 | response-timeout                                         | Integer         | Max time (in seconds) to wait for an attestation response.         |
 | use-tpm-for-random-nonce-generation                      | Boolean         | Use TPM to generate nonce; otherwise use software RNG.             |
 | tpm-sig-key-id                                           | String          | Identifier for the TPM signing key.                                |
-| tpm-quote-signature-hash-algorithm                       | String          | Hash algorithm used for TPM quote signature (e.g., sha256).        |
+| tpm-quote-signature-hash-algorithm                       | String          | Hash algorithm used for TPM quote signature (e.g. sha256).        |
 | public-key-path                                          | String          | Path to the attester’s public portion of the Attestation Key (AK). |
 
 ### charra-verifier.attestation.reference-pcr-file

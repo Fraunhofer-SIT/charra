@@ -46,6 +46,21 @@ typedef enum cli_option_code {
     cli_option_code_error = -1,
 } cli_option_code;
 
+#define CLI_UTIL_NO_SHORT_OPT '\0'
+
+/**
+ * @brief Prints a formatted command-line option and its wrapped description.
+ *
+ * @param short_opt Short option (CLI_UTIL_NO_SHORT_OPT if does not exists)
+ * @param long_opt Long option. If NULL, only the description is printed.
+ * @param arg Optional argument placeholder appended as '=ARG'. Pass NULL if the
+ * option takes no argument.
+ * @param description_fmt printf-style format string describing the option.
+ * @param ... Optional arguments referenced by description_fmt.
+ */
+void print_option(char short_opt, const char* long_opt, const char* arg,
+        const char* description_fmt, ...);
+
 /**
  * @brief Allocates and initializes a new cli_options structure.
  *
