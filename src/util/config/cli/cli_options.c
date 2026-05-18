@@ -29,10 +29,156 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
 
 #include "../../../common/charra_log.h"
 
 #define CLI_UTIL_HELP 'h'
+
+#define HELP_COL_WIDTH 40
+#define LINE_WIDTH 80
+
+static int get_terminal_width(void) {
+    struct winsize w;
+
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == -1) {
+        return LINE_WIDTH;  // set default value
+    }
+
+    if (w.ws_col <= HELP_COL_WIDTH) {
+        return LINE_WIDTH;  // prevent one letter per line
+    }
+
+    return w.ws_col;
+}
+
+static void newline_with_indent(int indent, int* col) {
+    putchar('\n');
+    printf("%*s", indent, "");
+    *col = indent;
+}
+
+static int word_length(const char* text) {
+    int len = 0;
+
+    while (text[len] && text[len] != ' ' && text[len] != '\t' &&
+            text[len] != '\n') {
+        len++;
+    }
+
+    return len;
+}
+
+static void print_split_word(
+        const char* word, int len, int line_width, int indent, int* col) {
+    for (int i = 0; i < len; i++) {
+
+        if (*col >= line_width) {
+            newline_with_indent(indent, col);
+        }
+
+        putchar(word[i]);
+        (*col)++;
+    }
+}
+
+static void print_word(
+        const char* word, int len, int line_width, int indent, int* col) {
+    int max_word_len = line_width - indent;
+
+    if (len <= max_word_len) {
+
+        if (*col > indent && *col + len > line_width) {
+            newline_with_indent(indent, col);
+        }
+
+        fwrite(word, 1, len, stdout);
+        *col += len;
+    }
+    // Word too long to fit in one line
+    else {
+        print_split_word(word, len, line_width, indent, col);
+    }
+}
+
+static void print_wrapped_text(const char* text, int indent, int line_width) {
+    int col = indent;
+
+    while (*text) {
+
+        switch (*text) {
+
+        case '\n':
+            newline_with_indent(indent, &col);
+            text++;
+            break;
+
+        case ' ':
+        case '\t':
+            if (col >= line_width) {
+                newline_with_indent(indent, &col);
+            } else {
+                putchar(*text);
+                col++;
+            }
+            text++;
+            break;
+
+        default: {
+            int len = word_length(text);
+
+            print_word(text, len, line_width, indent, &col);
+
+            text += len;
+            break;
+        }
+        }
+    }
+
+    putchar('\n');
+}
+
+void print_option(char short_opt, const char* long_opt, const char* arg,
+        const char* description_fmt, ...) {
+    char option_buf[256] = {0};
+    char description_buf[2048] = {0};
+    int option_len = 0;
+
+    if (long_opt == NULL) {
+        goto print_description;
+    }
+
+    if (short_opt != CLI_UTIL_NO_SHORT_OPT) {
+        snprintf(option_buf, sizeof(option_buf), " -%c, --%s%s%s:", short_opt,
+                long_opt, arg ? "=" : "", arg ? arg : "");
+    } else {
+        snprintf(option_buf, sizeof(option_buf), "     --%s%s%s:", long_opt,
+                arg ? "=" : "", arg ? arg : "");
+    }
+
+    printf("%s", option_buf);
+
+print_description:
+
+    option_len = (int)strlen(option_buf);
+
+    if (option_len < HELP_COL_WIDTH) {
+        printf("%*s", HELP_COL_WIDTH - option_len, "");
+    } else {
+        printf("\n%*s", HELP_COL_WIDTH, "");
+    }
+
+    va_list args;
+
+    va_start(args, description_fmt);
+
+    vsnprintf(description_buf, sizeof(description_buf), description_fmt, args);
+
+    va_end(args);
+
+    print_wrapped_text(description_buf, HELP_COL_WIDTH, get_terminal_width());
+}
 
 /* strdup is no c99 function */
 static char* string_clone(const char* const str) {

@@ -58,7 +58,7 @@
 
 * **-p**, **\--psk**:
 
-    Enable DTLS protocol with PSK. By default the key 'Charra DTLS Key' and hint 'Charra Attester' are used.
+    Enable DTLS protocol with PSK. By default, the key 'CHARRA DTLS Key' and hint 'CHARRA Attester' are used.
 
 * **\--psk-key=KEY**:
 
@@ -70,7 +70,7 @@
 
 # DTLS-RPK Options:
 
-Charra includes default 'keys' in the keys folder, but these are only intended for testing. They MUST be changed in actual production environments!
+CHARRA includes default keys in the 'keys' folder, but these are only intended for testing. They MUST be changed in actual production environments!
 
 *  **-r**, **\--rpk**:
 
@@ -78,32 +78,32 @@ Charra includes default 'keys' in the keys folder, but these are only intended f
 
 *  **\--rpk-private-key=PATH**:
 
-    Specify the path of the private key used for RPK. Currently only supports DER (ASN.1) format.
+    Specify the path of the private key used for RPK. Currently, only supports DER (ASN.1) format.
 
-    By default 'keys/attester.der' is used. Implicitly enables DTLS-RPK.
+    By default, 'keys/attester.der' is used. Implicitly enables DTLS-RPK.
 
 *  **\--rpk-public-key=PATH**:
 
-    Specify the path of the public key used for RPK. Currently only supports DER (ASN.1) format.
+    Specify the path of the public key used for RPK. Currently, only supports DER (ASN.1) format.
 
-    By default 'keys/attester.pub.der' is used. Implicitly enables DTLS-RPK.
+    By default, 'keys/attester.pub.der' is used. Implicitly enables DTLS-RPK.
 
 *  **\--rpk-peer-public-key=PATH**:
 
-    Specify the path of the reference public key of the peer, used for RPK. Currently only supports DER (ASN.1) format.
+    Specify the path of the reference public key of the peer, used for RPK. Currently, only supports DER (ASN.1) format.
 
-    By default 'keys/verifier.pub.der' is used. Implicitly enables DTLS-RPK.
+    By default, 'keys/verifier.pub.der' is used. Implicitly enables DTLS-RPK.
 
 *  **\--rpk-verify-peer=[0,1]**:
 
-    Specify whether the peers public key shall be checked against the reference public key. 0 means no check, 1 means check. By default the check is performed.
+    Specify whether the peer's public key shall be checked against the reference public key. 0 means no check, 1 means check. By default, the check is performed.
 
     WARNING: Disabling the verification means that connections from any peer will be accepted. This is primarily intended for the verifier, which may not have
     the public keys of all attesters and does an identity check with the attestation response. Implicitly enables DTLS-RPK.
 
-# TCTI commands
+# TCTI
 
-To specify TCTI commands for the TPM, set the 'CHARRA_TCTI' environment variable accordingly.
+To configure TCTI for the TPM, set the 'CHARRA_TCTI' environment variable accordingly.
 
 # CONFIGURATION FILES
 
@@ -152,7 +152,7 @@ Below is a description of the configuration structure and its available fields:
 | Field                                                    | Type            | Description                                                        |
 | ---------------------------------------------------      | --------------- | ------------------------------------------------------------------ |
 | tpm-quote-signature-scheme                               | String          | Signature scheme to use for TPM quote (e.g. rsapss).               |
-| tpm-quote-signature-hash-algorithm                       | String          | Hash algorithm to use for TPM quote signature (e.g., sha256).      |
+| tpm-quote-signature-hash-algorithm                       | String          | Hash algorithm to use for TPM quote signature (e.g. sha256).       |
 
 ### charra-attester.attestation.key
 

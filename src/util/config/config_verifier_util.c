@@ -61,7 +61,7 @@ static const uint8_t
                 {0},
                 /* sha512 */
                 {0}};
-static const uint32_t
+static const uint8_t
         VERIFIER_DEFAULT_TPM_PCR_SELECTION_LEN[TPM2_PCR_BANK_COUNT] = {
                 0,   // sha1
                 9,   // sha256
@@ -79,8 +79,8 @@ static const uint32_t
 
 // for DTLS-PSK
 #define VERIFIER_DEFAULT_USE_DTLS_PSK false
-#define VERIFIER_DEFAULT_DTLS_PSK_KEY "Charra DTLS Key"
-#define VERIFIER_DEFAULT_DTLS_PSK_IDENTITY "Charra Verifier"
+#define VERIFIER_DEFAULT_DTLS_PSK_KEY "CHARRA DTLS Key"
+#define VERIFIER_DEFAULT_DTLS_PSK_IDENTITY "CHARRA Verifier"
 
 // for DTLS-RPK
 #define VERIFIER_DEFAULT_USE_DTLS_RPK false

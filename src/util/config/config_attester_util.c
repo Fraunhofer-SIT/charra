@@ -48,8 +48,8 @@ static charra_log_t charra_log_level = CHARRA_LOG_INFO;
 
 // for DTLS-PSK
 #define ATTESTER_DEFAULT_USE_DTLS_PSK false
-#define ATTESTER_DEFAULT_DTLS_PSK_KEY "Charra DTLS Key"
-#define ATTESTER_DEFAULT_DTLS_PSK_HINT "Charra Attester"
+#define ATTESTER_DEFAULT_DTLS_PSK_KEY "CHARRA DTLS Key"
+#define ATTESTER_DEFAULT_DTLS_PSK_HINT "CHARRA Attester"
 
 // for DTLS-RPK
 #define ATTESTER_DEFAULT_USE_DTLS_RPK false

@@ -144,133 +144,110 @@ static config_verifier* config = NULL;
 
 static void charra_print_dtls_psk_help_message(void) {
     printf("DTLS-PSK Options:\n");
-    printf(" -%c, --%s:                      Enable DTLS protocol "
-           "with PSK. By default the key '%s' and identity '%s' "
-           "are used.\n",
-            CLI_VERIFIER_PSK, CLI_VERIFIER_PSK_LONG, config->dtls_psk_key,
-            config->dtls_psk_identity);
-    printf("     --%s=KEY:              Use KEY as pre-shared "
-           "key for DTLS-PSK. Implicitly enables DTLS-PSK.\n",
-            CLI_VERIFIER_PSK_KEY_LONG);
-    printf("     --%s=IDENTITY:    Use IDENTITY as "
-           "identity for DTLS. Implicitly enables DTLS-PSK.\n",
-            CLI_VERIFIER_PSK_IDENTITY_LONG);
+    print_option(CLI_VERIFIER_PSK, CLI_VERIFIER_PSK_LONG, NULL,
+            "Enable DTLS protocol with PSK. By default, the key '%s' and "
+            "identity '%s' are used.",
+            config->dtls_psk_key, config->dtls_psk_identity);
+    print_option(CLI_UTIL_NO_SHORT_OPT, CLI_VERIFIER_PSK_KEY_LONG, "KEY",
+            "Use KEY as pre-shared key for DTLS-PSK. Implicitly enables "
+            "DTLS-PSK.");
+    print_option(CLI_UTIL_NO_SHORT_OPT, CLI_VERIFIER_PSK_IDENTITY_LONG,
+            "IDENTITY",
+            "Use IDENTITY as identity for DTLS. Implicitly enables DTLS-PSK.");
 }
 
 static void charra_print_dtls_rpk_help_message(void) {
     printf("DTLS-RPK Options:\n");
-    printf("                                 Charra includes default "
-           "'keys' in the keys folder, but these are only intended for "
-           "testing. They MUST be changed in actual production "
-           "environments!\n");
-    printf(" -%c, --%s:                      Enable DTLS-RPK (raw "
-           "public keys) protocol. The protocol is intended for "
-           "scenarios in which public keys of either attester or "
-           "verifier or both of them are pre-shared.\n",
-            CLI_VERIFIER_RPK, CLI_VERIFIER_RPK_LONG);
-    printf("     --%s=PATH:     Specify the path of the "
-           "private key used for RPK. Currently only supports DER "
-           "(ASN.1) format.\n",
-            CLI_VERIFIER_RPK_PRIVATE_KEY_LONG);
-    printf("                                 By default '%s' is used. "
-           "Implicitly enables DTLS-RPK.\n",
+    print_option(CLI_UTIL_NO_SHORT_OPT, NULL, NULL,
+            "CHARRA includes default keys in the 'keys' folder, but these are "
+            "only intended for testing. They MUST be changed in actual "
+            "production environments!");
+    print_option(CLI_VERIFIER_RPK, CLI_VERIFIER_RPK_LONG, NULL,
+            "Enable DTLS-RPK (raw public keys) protocol. The protocol is "
+            "intended for scenarios in which public keys of either attester or "
+            "verifier or both of them are pre-shared.");
+    print_option(CLI_UTIL_NO_SHORT_OPT, CLI_VERIFIER_RPK_PRIVATE_KEY_LONG,
+            "PATH",
+            "Specify the path of the private key used for RPK. Currently, only "
+            "supports DER (ASN.1) format.\nBy default, '%s' is used. "
+            "Implicitly enables DTLS-RPK.",
             config->dtls_rpk_private_key_path);
-    printf("     --%s=PATH:      Specify the path of the "
-           "public key used for RPK. Currently only supports DER "
-           "(ASN.1) format.\n",
-            CLI_VERIFIER_RPK_PUBLIC_KEY_LONG);
-    printf("                                 By default '%s' is used. "
-           "Implicitly enables DTLS-RPK.\n",
+    print_option(CLI_UTIL_NO_SHORT_OPT, CLI_VERIFIER_RPK_PUBLIC_KEY_LONG,
+            "PATH",
+            "Specify the path of the public key used for RPK. Currently, only "
+            "supports DER (ASN.1) format.\nBy default, '%s' is used. "
+            "Implicitly enables DTLS-RPK.",
             config->dtls_rpk_public_key_path);
-    printf("     --%s=PATH: Specify the path of the "
-           "reference public key of the peer, used for RPK. Currently "
-           "only supports DER (ASN.1) format.\n",
-            CLI_VERIFIER_RPK_PEER_PUBLIC_KEY_LONG);
-    printf("                                 By default '%s' is used. "
-           "Implicitly enables DTLS-RPK.\n",
+    print_option(CLI_UTIL_NO_SHORT_OPT, CLI_VERIFIER_RPK_PEER_PUBLIC_KEY_LONG,
+            "PATH",
+            "Specify the path of the reference public key of the peer, used "
+            "for RPK. Currently, only supports DER (ASN.1) format.\nBy "
+            "default, '%s' is used. Implicitly enables DTLS-RPK.",
             config->dtls_rpk_peer_public_key_path);
-    printf("     --%s=[0,1]:    Specify whether the peers "
-           "public key shall be checked against the reference public "
-           "key. 0 means no check, 1 means check. By default the check "
-           "is performed.\n",
-            CLI_VERIFIER_RPK_VERIFY_PEER_LONG);
-    printf("                                 WARNING: Disabling the "
-           "verification means that connections from any peer will be "
-           "accepted. This is primarily intended for the verifier, "
-           "which may not have\n");
-    printf("                                 the public keys of all "
-           "attesters and does an identity check with the attestation "
-           "response. Implicitly enables DTLS-RPK.\n");
-    printf("\nTo specify TCTI commands for the TPM, set the "
-           "'CHARRA_TCTI' environment variable accordingly.\n");
+    print_option(CLI_UTIL_NO_SHORT_OPT, CLI_VERIFIER_RPK_VERIFY_PEER_LONG,
+            "[0,1]",
+            "Specify whether the peer's public key shall be checked against "
+            "the reference public key. 0 means no check, 1 means check. By "
+            "default, the check is performed.");
+    print_option(CLI_UTIL_NO_SHORT_OPT, NULL, NULL,
+            "WARNING: Disabling the verification means that connections from "
+            "any peer will be accepted. This is primarily intended for the "
+            "verifier, which may not have the public keys of all attesters and "
+            "does an identity check with the attestation response. Implicitly "
+            "enables DTLS-RPK.");
+    printf("\nTo configure TCTI for the TPM, set the 'CHARRA_TCTI' environment "
+           "variable accordingly.\n");
 }
 
 void charra_cli_util_verifier_print_help_message(void) {
     /* print help messages of common arguments */
     printf("Usage: %s [<options>]\n", LOG_NAME);
     printf("Where <options> are:\n");
-    printf(" -%c, --%s:                     Print this help "
-           "message.\n",
-            CLI_VERIFIER_HELP, CLI_VERIFIER_HELP_LONG);
-    printf(" -%c, --%s=PATH:              Load verifier config from a file.\n",
-            CLI_VERIFIER_CONFIG, CLI_VERIFIER_CONFIG_LONG);
-    printf(" -%c, --%s:                  Set CHARRA and CoAP "
-           "log-level to DEBUG.\n",
-            CLI_VERIFIER_VERBOSE, CLI_VERIFIER_VERBOSE_LONG);
-    printf(" -%c, --%s=LEVEL:          Set CHARRA log-level to "
-           "LEVEL. Available are: TRACE, DEBUG, INFO, WARN, ERROR, "
-           "FATAL. Default is INFO.\n",
-            CLI_VERIFIER_LOG_LEVEL, CLI_VERIFIER_LOG_LEVEL_LONG);
-    printf("     --%s=LEVEL:     Set CoAP log-level to "
-           "LEVEL. Available are: DEBUG, INFO, NOTICE, WARNING, ERR, "
-           "CRIT, ALERT, EMERG, CIPHERS. Default is INFO.\n",
-            CLI_VERIFIER_COAP_LOG_LEVEL_LONG);
+    print_option(CLI_VERIFIER_HELP, CLI_VERIFIER_HELP_LONG, NULL,
+            "Print this help message.");
+    print_option(CLI_VERIFIER_CONFIG, CLI_VERIFIER_CONFIG_LONG, "PATH",
+            "Load verifier config from a file.");
+    print_option(CLI_VERIFIER_VERBOSE, CLI_VERIFIER_VERBOSE_LONG, NULL,
+            "Set CHARRA and CoAP log-level to DEBUG.");
+    print_option(CLI_VERIFIER_LOG_LEVEL, CLI_VERIFIER_LOG_LEVEL_LONG, "LEVEL",
+            "Set CHARRA log-level to LEVEL. Available are: TRACE, DEBUG, INFO, "
+            "WARN, ERROR, FATAL. Default is INFO.");
+    print_option(CLI_UTIL_NO_SHORT_OPT, CLI_VERIFIER_COAP_LOG_LEVEL_LONG,
+            "LEVEL",
+            "Set CoAP log-level to LEVEL. Available are: DEBUG, INFO, NOTICE, "
+            "WARNING, ERR, CRIT, ALERT, EMERG, CIPHERS. Default is INFO.");
 
-    printf(" -%c, --%s=IP:                    Connect to IP instead "
-           "of doing the attestation on localhost.\n",
-            CLI_VERIFIER_IP, CLI_VERIFIER_IP_LONG);
-    printf("     --%s=PORT:                Connect to PORT "
-           "instead of default port %u.\n",
-            CLI_VERIFIER_PORT_LONG, config->dst_port);
-    printf(" -%c, --%s=SECONDS:          Wait up to SECONDS "
-           "for the attestation answer. Default is %d seconds.\n",
-            CLI_VERIFIER_TIMEOUT, CLI_VERIFIER_TIMEOUT_LONG,
+    print_option(CLI_VERIFIER_IP, CLI_VERIFIER_IP_LONG, "IP",
+            "Connect to IP instead of doing the attestation on localhost.");
+    print_option(CLI_UTIL_NO_SHORT_OPT, CLI_VERIFIER_PORT_LONG, "PORT",
+            "Connect to PORT instead of default port %u.", config->dst_port);
+    print_option(CLI_VERIFIER_TIMEOUT, CLI_VERIFIER_TIMEOUT_LONG, "SECONDS",
+            "Wait up to SECONDS for the attestation answer. Default is %d "
+            "seconds.",
             config->attestation_response_timeout);
-    printf(" -%c, --%s=PATH:      Specifies the path to "
-           "the public portion of the attestation key.\n",
-            CLI_VERIFIER_ATTESTATION_PUBLIC_KEY,
-            CLI_VERIFIER_ATTESTATION_PUBLIC_KEY_LONG);
-    printf(" -%c, --%s=FORMAT:PATH:     Read reference PCRs "
-           "from PATH in a specified FORMAT. Available is: "
-           "yaml.\n",
-            CLI_VERIFIER_PCR_FILE, CLI_VERIFIER_PCR_FILE_LONG);
-    printf(" -%c, --%s=X1[+X2...]: Specifies which PCRs "
-           "to check on the attester. Each X refers to a PCR bank that "
-           "begins with the algorithm, followed by a ':' and a comma-separated "
-           "list of PCRs. \n"
-           "                                 Each PCR bank is separated "
-           "by a '+'. ",
-            CLI_VERIFIER_PCR_SELECTION, CLI_VERIFIER_PCR_SELECTION_LONG);
-    printf("By default these PCRs are checked: sha256:");
-    const uint32_t tpm_pcr_selection_len = config->tpm_pcr_selection_len[1];
-    for (uint8_t i = 0; i < tpm_pcr_selection_len; i++) {
-        printf("%d", config->tpm_pcr_selection[1][i]);
-        if (i != config->tpm_pcr_selection_len[1] - 1) {
-            printf(",");
-        }
-    }
+    print_option(CLI_VERIFIER_ATTESTATION_PUBLIC_KEY,
+            CLI_VERIFIER_ATTESTATION_PUBLIC_KEY_LONG, "PATH",
+            "Specifies the path to the public portion of the attestation key.");
+    print_option(CLI_VERIFIER_PCR_FILE, CLI_VERIFIER_PCR_FILE_LONG,
+            "FORMAT:PATH",
+            "Read reference PCRs from PATH in a specified FORMAT. Available "
+            "is: yaml.");
+    print_option(CLI_VERIFIER_PCR_SELECTION, CLI_VERIFIER_PCR_SELECTION_LONG,
+            "X1[+X2...]",
+            "Specifies which PCRs to check on the attester. Each X refers to a "
+            "PCR bank that begins with the algorithm, followed by a ':' and a "
+            "comma-separated list of PCRs. \nEach PCR bank is separated "
+            "by a '+'.\nBy default, these PCRs are checked: sha256: 0, 1, 2, "
+            "3, 4, 5, 6, 7, 10");
 
-    printf("\n");
-    printf("     --%s=FORMAT:START,COUNT: Specifies the desired PCR log "
-           "format with a starting index and the number of logs. If 'START' is "
-           "0, an empty log is requested. If 'COUNT' is 0, all logs beginning "
-           "with 'START' are requested.\n"
-           "                                 Available formats are: ima, "
-           "tcg-boot.\n",
-            CLI_VERIFIER_PCR_LOG_LONG);
-    printf(" -%c, --%s=ALGORITHM: The hash algorithm used to digest "
-           "the tpm quote.\n",
-            CLI_VERIFIER_HASH_ALGORITHM, CLI_VERIFIER_HASH_ALGORITHM_LONG);
+    print_option(CLI_UTIL_NO_SHORT_OPT, CLI_VERIFIER_PCR_LOG_LONG,
+            "FORMAT:START,COUNT",
+            "Specifies the desired PCR log format with a starting index and "
+            "the number of logs. If 'START' is 0, an empty log is requested. "
+            "If 'COUNT' is 0, all logs beginning with 'START' are "
+            "requested.\nAvailable formats are: ima, tcg-boot.");
+    print_option(CLI_VERIFIER_HASH_ALGORITHM, CLI_VERIFIER_HASH_ALGORITHM_LONG,
+            "ALGORITHM", "The hash algorithm used to digest the tpm quote.");
 
     charra_print_dtls_psk_help_message();
 
