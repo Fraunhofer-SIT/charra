@@ -44,7 +44,7 @@ typedef struct {
     const uint8_t (*const reference_pcr_selection)[TPM2_MAX_PCRS];
     const uint8_t* const reference_pcr_selection_len;
     const TPMS_ATTEST* const attest_struct;
-    const mbedtls_md_type_t signature_hash_algorithm;
+    const psa_algorithm_t signature_hash_algorithm;
     TPM2_ALG_ID current_hash_algorithm;
     charra_tpm_pcr_bank_index current_pcr_bank_index;
     uint32_t pcr_set_index;
@@ -242,7 +242,7 @@ CHARRA_RC charra_check_pcr_digest_against_reference(const char* const filename,
         const uint8_t (*const reference_pcr_selection)[TPM2_MAX_PCRS],
         const uint8_t* const reference_pcr_selection_len,
         const TPMS_ATTEST* const attest_struct,
-        mbedtls_md_type_t signature_hash_algorithm) {
+        psa_algorithm_t signature_hash_algorithm) {
     CHARRA_RC charra_rc = CHARRA_RC_ERROR;
 
     attest_verification_t attest_verification = {

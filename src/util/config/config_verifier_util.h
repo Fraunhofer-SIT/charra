@@ -25,7 +25,6 @@
 #include <stdint.h>
 
 #include <coap3/coap.h>
-#include <mbedtls/md.h>
 #include <tss2/tss2_tpm2_types.h>
 
 #include "../../common/charra_log.h"
@@ -34,7 +33,7 @@
 #include "cli/cli_options.h"
 
 typedef struct {
-    mbedtls_md_type_t mbedtls_hash_algorithm;
+    psa_algorithm_t psa_hash_algorithm;
     TPM2_ALG_ID tpm2_hash_algorithm;
 } config_verifier_signature_hash_algorithm;
 

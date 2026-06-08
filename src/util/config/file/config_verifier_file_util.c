@@ -437,8 +437,8 @@ static CHARRA_RC verifier_attestation_field_handler(
         }
         charra_config_verifier_hash_algorithm_from_str(
                 string_value, &config->signature_hash_algorithm);
-        if (config->signature_hash_algorithm.mbedtls_hash_algorithm ==
-                        MBEDTLS_MD_NONE ||
+        if (config->signature_hash_algorithm.psa_hash_algorithm ==
+                        PSA_ALG_NONE ||
                 config->signature_hash_algorithm.tpm2_hash_algorithm ==
                         TPM2_ALG_NULL) {
             charra_rc = CHARRA_RC_ERROR;

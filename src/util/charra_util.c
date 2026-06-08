@@ -27,12 +27,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/sha1.h>
-#include <mbedtls/sha256.h>
-#include <mbedtls/sha512.h>
-
 #include <tss2/tss2_esys.h>
 #include <tss2/tss2_mu.h>
 #include <tss2/tss2_tctildr.h>
@@ -44,42 +38,20 @@
 
 #define CHARRA_UNUSED __attribute__((unused))
 
-static const unsigned char mbedtls_personalization[] =
-        "CHARRA_mbedtls_random_personalization";
-static const unsigned char mbedtls_personalization_len =
-        sizeof(mbedtls_personalization);
-
 CHARRA_RC charra_random_bytes(const uint32_t len, uint8_t* const random_bytes) {
-    CHARRA_RC charra_r = CHARRA_RC_SUCCESS;
-    /* initialize contexts */
-    mbedtls_entropy_context entropy = {0};
-    mbedtls_entropy_init(&entropy);
-    mbedtls_ctr_drbg_context ctr_drbg = {0};
-    mbedtls_ctr_drbg_init(&ctr_drbg);
+    psa_status_t status = PSA_SUCCESS;
 
-    /* add seed */
-    if (mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy,
-                mbedtls_personalization, mbedtls_personalization_len) != 0) {
-        charra_r = CHARRA_RC_CRYPTO_ERROR;
-        goto error;
+    status = psa_crypto_init();
+    if (status != PSA_SUCCESS) {
+        return CHARRA_RC_CRYPTO_ERROR;
     }
 
-    /* add prediction resistance */
-    mbedtls_ctr_drbg_set_prediction_resistance(
-            &ctr_drbg, MBEDTLS_CTR_DRBG_PR_ON);
-
-    if (mbedtls_ctr_drbg_random(
-                &ctr_drbg, (unsigned char*)random_bytes, (size_t)len) != 0) {
-        charra_r = CHARRA_RC_CRYPTO_ERROR;
-        goto error;
+    status = psa_generate_random(random_bytes, len);
+    if (status != PSA_SUCCESS) {
+        return CHARRA_RC_CRYPTO_ERROR;
     }
 
-error:
-    /* clean up */
-    mbedtls_ctr_drbg_free(&ctr_drbg);
-    mbedtls_entropy_free(&entropy);
-
-    return charra_r;
+    return CHARRA_RC_SUCCESS;
 }
 
 CHARRA_RC charra_random_bytes_from_tpm(
@@ -255,55 +227,51 @@ bool charra_verify_tpm2_quote_qualifying_data(
 }
 
 CHARRA_RC charra_compute_pcr_composite_digest_from_ptr_pcr_selection(
-        mbedtls_md_type_t hash_algorithm,
+        psa_algorithm_t hash_algorithm,
         const uint8_t* const expected_pcr_values[TPM2_PCR_BANK_COUNT]
                                                 [TPM2_MAX_PCRS],
         const uint32_t* const expected_pcr_values_len,
         uint8_t* const pcr_composite_digest) {
-    CHARRA_RC r = CHARRA_RC_SUCCESS;
-    const mbedtls_md_info_t* info = NULL;
-    mbedtls_md_context_t ctx = {0};
     static size_t element_sizes[TPM2_PCR_BANK_COUNT] = {TPM2_SHA1_DIGEST_SIZE,
             TPM2_SHA256_DIGEST_SIZE, TPM2_SHA384_DIGEST_SIZE,
             TPM2_SHA512_DIGEST_SIZE};
 
-    info = mbedtls_md_info_from_type(hash_algorithm);
-    if (info == NULL) {
+    psa_status_t status = PSA_SUCCESS;
+    psa_hash_operation_t operation = PSA_HASH_OPERATION_INIT;
+    size_t hash_len = 0;
+
+    status = psa_crypto_init();
+    if (status != PSA_SUCCESS) {
         return CHARRA_RC_CRYPTO_ERROR;
     }
 
-    mbedtls_md_init(&ctx);
-
-    /* setup + start */
-    if (mbedtls_md_setup(&ctx, info, 0) != 0) {
-        r = CHARRA_RC_CRYPTO_ERROR;
-        goto cleanup;
-    }
-    if (mbedtls_md_starts(&ctx) != 0) {
-        r = CHARRA_RC_CRYPTO_ERROR;
-        goto cleanup;
+    status = psa_hash_setup(&operation, hash_algorithm);
+    if (status != PSA_SUCCESS) {
+        return CHARRA_RC_CRYPTO_ERROR;
     }
 
     /* update for every PCR value */
     for (uint8_t i = 0; i < TPM2_PCR_BANK_COUNT; i++) {
         for (uint8_t j = 0; j < expected_pcr_values_len[i]; j++) {
-            if (mbedtls_md_update(&ctx, expected_pcr_values[i][j],
-                        element_sizes[i]) != 0) {
-                r = CHARRA_RC_CRYPTO_ERROR;
-                goto cleanup;
+            if (psa_hash_update(&operation, expected_pcr_values[i][j],
+                        element_sizes[i]) != PSA_SUCCESS) {
+                goto error;
             }
         }
     }
 
     /* finish */
-    if (mbedtls_md_finish(&ctx, pcr_composite_digest) != 0) {
-        r = CHARRA_RC_CRYPTO_ERROR;
-        goto cleanup;
+    if (psa_hash_finish(&operation, pcr_composite_digest, PSA_HASH_MAX_SIZE,
+                &hash_len) != PSA_SUCCESS) {
+        goto error;
     }
 
-cleanup:
-    mbedtls_md_free(&ctx);
-    return r;
+    psa_hash_abort(&operation);
+    return CHARRA_RC_SUCCESS;
+
+error:
+    psa_hash_abort(&operation);
+    return CHARRA_RC_CRYPTO_ERROR;
 }
 
 bool charra_verify_tpm2_quote_pcr_composite_digest(

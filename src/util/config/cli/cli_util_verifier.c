@@ -29,7 +29,6 @@
 #include <string.h>
 
 #include <coap3/coap_debug.h>
-#include <mbedtls/md.h>
 
 #include "../../coap_util.h"
 #include "../../io_util.h"
@@ -702,8 +701,7 @@ static bool charra_cli_verifier_pcr_selection(char* arg) {
 static bool charra_cli_verifier_hash_algorithm(const char* const arg) {
     charra_config_verifier_hash_algorithm_from_str(
             arg, &config->signature_hash_algorithm);
-    if (config->signature_hash_algorithm.mbedtls_hash_algorithm ==
-                    MBEDTLS_MD_NONE ||
+    if (config->signature_hash_algorithm.psa_hash_algorithm == PSA_ALG_NONE ||
             config->signature_hash_algorithm.tpm2_hash_algorithm ==
                     TPM2_ALG_NULL) {
         charra_log_error(

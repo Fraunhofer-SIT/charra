@@ -24,7 +24,7 @@
 
 #include <inttypes.h>
 
-#include <mbedtls/md.h>
+#include <psa/crypto_types.h>
 #include <tss2/tss2_esys.h>
 
 #include "../common/charra_error.h"
@@ -64,6 +64,6 @@ CHARRA_RC charra_check_pcr_digest_against_reference(const char* const filename,
         const uint8_t (*const reference_pcr_selection)[TPM2_MAX_PCRS],
         const uint8_t* const reference_pcr_selection_len,
         const TPMS_ATTEST* const attest_struct,
-        mbedtls_md_type_t signature_hash_algorithm);
+        psa_algorithm_t signature_hash_algorithm);
 
 #endif /* CHARRA_RIM_MGR_H */

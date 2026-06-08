@@ -555,20 +555,18 @@ static coap_response_t coap_attest_handler(
         charra_log_info(
                 "[" LOG_NAME
                 "] Converting TPM2 public key to mbedTLS public key ...");
-        mbedtls_pk_context mbedtls_pk_pub_key = {0};
+        psa_key_id_t psa_key_id = 0;
         if ((attestation_rc = charra_crypto_tpm_pub_key_to_mbedtls_pub_key(
-                     &tpm2_public_key, &mbedtls_pk_pub_key)) !=
-                CHARRA_RC_SUCCESS) {
-            charra_log_error("[" LOG_NAME "] mbedTLS PK error");
+                     &tpm2_public_key, &psa_key_id)) != CHARRA_RC_SUCCESS) {
+            charra_log_error("[" LOG_NAME "] mbedTLS PSA key import error");
             goto cleanup;
         }
 
         /* verify attestation signature with mbedTLS */
         charra_log_info("[" LOG_NAME
                         "] Verifying TPM2 Quote signature with mbedTLS ...");
-        if ((attestation_rc = charra_crypto_verify_tpm_signature(
-                     &mbedtls_pk_pub_key,
-                     config.signature_hash_algorithm.mbedtls_hash_algorithm,
+        if ((attestation_rc = charra_crypto_verify_tpm_signature(psa_key_id,
+                     config.signature_hash_algorithm.psa_hash_algorithm,
                      res.tpm2_quote.attestation_data,
                      (size_t)res.tpm2_quote.attestation_data_len, &signature,
                      signature.sigAlg)) == CHARRA_RC_SUCCESS) {
@@ -578,7 +576,7 @@ static coap_response_t coap_attest_handler(
             charra_log_error(
                     "[" LOG_NAME "]     => TPM2 Quote signature is NOT valid!");
         }
-        mbedtls_pk_free(&mbedtls_pk_pub_key);
+        psa_destroy_key(psa_key_id);
     }
 
     /* unmarshal attestation data */
@@ -639,9 +637,9 @@ static coap_response_t coap_attest_handler(
                 false);
         CHARRA_RC pcr_check = charra_check_pcr_digest_against_reference(
                 config.reference_pcr_file_path,
-                (const uint8_t(*const)[TPM2_MAX_PCRS])config.tpm_pcr_selection,
+                (const uint8_t (*const)[TPM2_MAX_PCRS])config.tpm_pcr_selection,
                 config.tpm_pcr_selection_len, &attest_struct,
-                config.signature_hash_algorithm.mbedtls_hash_algorithm);
+                config.signature_hash_algorithm.psa_hash_algorithm);
         if (pcr_check == CHARRA_RC_SUCCESS) {
             charra_log_info(
                     "[" LOG_NAME "]     => PCR composite digest is valid!");
@@ -714,6 +712,8 @@ cleanup:
     if (tcti_ctx != NULL) {
         Tss2_TctiLdr_Finalize(&tcti_ctx);
     }
+
+    mbedtls_psa_crypto_free();
 
     processing_response = false;
     return COAP_RESPONSE_OK;

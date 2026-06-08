@@ -26,9 +26,7 @@
 
 #include <tss2/tss2_tpm2_types.h>
 
-#include <mbedtls/ecdsa.h>
 #include <mbedtls/pk.h>
-#include <mbedtls/rsa.h>
 
 #include "../common/charra_error.h"
 
@@ -62,12 +60,12 @@ charra_tpm_pcr_bank_index charra_tpm_pcr_bank_index_from_str(
 TPM2_ALG_ID charra_tpm_hash_algorithm_from_str(
         const char* const hash_algorithm);
 
-/** * @brief parses the TPM2_ALG_ID hash algorithm to a mbedtls_md_type_t.
+/** * @brief parses the TPM2_ALG_ID hash algorithm to a psa_algorithm_t.
  *
  * @param hash_alg_id the TPM2_ALG_ID hash algorithm.
- * @returns the mbedtls_md_type_t hash algorithm.
+ * @returns the psa hash algorithm.
  */
-mbedtls_md_type_t charra_md_hash_algorithm_from_tpm2_alg_id(
+psa_algorithm_t charra_psa_hash_algorithm_from_tpm2_alg_id(
         TPM2_ALG_ID hash_alg_id);
 
 /**
@@ -79,76 +77,16 @@ mbedtls_md_type_t charra_md_hash_algorithm_from_tpm2_alg_id(
 TPM2_ALG_ID charra_signature_scheme_from_str(
         const char* const signature_scheme);
 
-/* hashing functions */
-
-CHARRA_RC hash_sha1(const size_t data_len, const uint8_t* const data,
-        uint8_t digest[TPM2_SHA1_DIGEST_SIZE]);
-
-CHARRA_RC hash_sha1_array(const size_t count, const uint8_t* const array,
-        uint8_t digest[TPM2_SHA1_DIGEST_SIZE]);
-
-CHARRA_RC hash_sha256(const size_t data_len, const uint8_t* const data,
-        uint8_t digest[TPM2_SHA256_DIGEST_SIZE]);
-
-CHARRA_RC hash_sha256_array(uint8_t* data[TPM2_SHA256_DIGEST_SIZE],
-        const size_t data_len, uint8_t digest[TPM2_SHA256_DIGEST_SIZE]);
-
-CHARRA_RC hash_sha384(const size_t data_len, const uint8_t* const data,
-        uint8_t digest[TPM2_SHA384_DIGEST_SIZE]);
-
-CHARRA_RC hash_sha384_array(const size_t count, const uint8_t* const array,
-        uint8_t digest[TPM2_SHA384_DIGEST_SIZE]);
-
-CHARRA_RC hash_sha512(const size_t data_len, const uint8_t* const data,
-        uint8_t digest[TPM2_SHA512_DIGEST_SIZE]);
-
-CHARRA_RC hash_sha512_array(const size_t count, const uint8_t* const array,
-        uint8_t digest[TPM2_SHA512_DIGEST_SIZE]);
-
-CHARRA_RC hash_sm3_256(const size_t data_len, const uint8_t* const data,
-        uint8_t digest[TPM2_SM3_256_DIGEST_SIZE]);
-
-CHARRA_RC hash_sm3_256_array(const size_t count, const uint8_t* const array,
-        uint8_t digest[TPM2_SM3_256_DIGEST_SIZE]);
-
-CHARRA_RC charra_crypto_hash(mbedtls_md_type_t hash_algo,
+CHARRA_RC charra_crypto_hash(psa_algorithm_t hash_algo,
         const uint8_t* const data, const size_t data_len,
         uint8_t digest[MBEDTLS_MD_MAX_SIZE]);
 
 CHARRA_RC charra_crypto_tpm_pub_key_to_mbedtls_pub_key(
-        const TPM2B_PUBLIC* tpm_pub_key, mbedtls_pk_context* mbedtls_pub_key);
+        const TPM2B_PUBLIC* tpm_pub_key, psa_key_id_t* key_id);
 
-CHARRA_RC charra_crypto_tpm_pub_key_to_mbedtls_rsa_pub_key(
-        const TPM2B_PUBLIC* tpm_rsa_pub_key,
-        mbedtls_rsa_context* mbedtls_rsa_pub_key);
-
-CHARRA_RC charra_crypto_tpm_pub_key_to_mbedtls_ecc_pub_key(
-        const TPM2B_PUBLIC* tpm_pub, mbedtls_ecdsa_context* ecdsa);
-
-CHARRA_RC charra_crypto_verify_tpm_signature(
-        mbedtls_pk_context* mbedtls_pub_key, mbedtls_md_type_t hash_algo,
-        const unsigned char* data, size_t data_len, TPMT_SIGNATURE* signature,
-        TPM2_ALG_ID signature_scheme);
-
-CHARRA_RC charra_crypto_rsa_verify_signature_hashed(
-        mbedtls_rsa_context* mbedtls_rsa_pub_key, mbedtls_md_type_t hash_algo,
-        const unsigned char* data_digest, const unsigned char* signature,
-        TPM2_ALG_ID signature_scheme);
-
-CHARRA_RC charra_crypto_rsa_verify_signature(
-        mbedtls_rsa_context* mbedtls_rsa_pub_key, mbedtls_md_type_t hash_algo,
-        const unsigned char* data, size_t data_len,
-        const unsigned char* signature, TPM2_ALG_ID signature_scheme);
-
-CHARRA_RC charra_crypto_ecc_verify_signature_hashed(
-        mbedtls_ecdsa_context* mbedtls_ecc_pub_key, mbedtls_md_type_t hash_algo,
-        const unsigned char* data_digest, TPMT_SIGNATURE* signature,
-        TPM2_ALG_ID signature_scheme);
-
-CHARRA_RC charra_crypto_ecc_verify_signature(
-        mbedtls_ecdsa_context* mbedtls_ecc_pub_key, mbedtls_md_type_t hash_algo,
-        const unsigned char* data, size_t data_len, TPMT_SIGNATURE* signature,
-        TPM2_ALG_ID signature_scheme);
+CHARRA_RC charra_crypto_verify_tpm_signature(psa_key_id_t pub_key,
+        psa_algorithm_t hash_algo, const unsigned char* data, size_t data_len,
+        const TPMT_SIGNATURE* const signature, TPM2_ALG_ID signature_scheme);
 
 /**
  * @brief Compute PCR composite digest from PCR values and check if it matches
@@ -165,7 +103,6 @@ CHARRA_RC charra_crypto_ecc_verify_signature(
 CHARRA_RC compute_and_check_PCR_digest(
         const uint8_t* const pcr_values[TPM2_PCR_BANK_COUNT][TPM2_MAX_PCRS],
         const uint32_t* const pcr_value_len,
-        const TPMS_ATTEST* const attest_struct,
-        mbedtls_md_type_t hash_algorithm);
+        const TPMS_ATTEST* const attest_struct, psa_algorithm_t hash_algorithm);
 
 #endif /* SITIMA_CRYPTO_H */
