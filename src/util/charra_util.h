@@ -20,6 +20,8 @@
 
 #include <inttypes.h>
 #include <stdbool.h>
+
+#include <psa/crypto_types.h>
 #include <tss2/tss2_esys.h>
 #include <tss2/tss2_mu.h>
 #include <tss2/tss2_tpm2_types.h>
@@ -117,7 +119,7 @@ bool charra_verify_tpm2_quote_pcrs(const TPM2_ALG_ID hash_algo_id,
  * @return CHARRA_RC_SUCCESS on success, CHARRA_RC_ERROR on error.
  */
 CHARRA_RC charra_compute_pcr_composite_digest_from_ptr_pcr_selection(
-        mbedtls_md_type_t hash_algorithm,
+        psa_algorithm_t hash_algorithm,
         const uint8_t* const expected_pcr_values[TPM2_PCR_BANK_COUNT]
                                                 [TPM2_MAX_PCRS],
         const uint32_t* const expected_pcr_values_len,

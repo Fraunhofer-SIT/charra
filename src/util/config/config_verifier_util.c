@@ -74,7 +74,7 @@ static const uint8_t
 
 #define VERIFIER_DEFAULT_SIGNATURE_HASH_ALGORITHM                              \
     (config_verifier_signature_hash_algorithm){                                \
-            .mbedtls_hash_algorithm = MBEDTLS_MD_SHA256,                       \
+            .psa_hash_algorithm = PSA_ALG_SHA_256,                             \
             .tpm2_hash_algorithm = TPM2_ALG_SHA256};
 
 // for DTLS-PSK
@@ -135,8 +135,8 @@ void trace_log_verifier_config(const config_verifier* config) {
     // Attestation settings
     charra_log_trace("Attestation response timeout: %u",
             config->attestation_response_timeout);
-    charra_log_trace("Signature hash algorithm - MbedTLS: %d, TPM2: 0x%x",
-            config->signature_hash_algorithm.mbedtls_hash_algorithm,
+    charra_log_trace("Signature hash algorithm - PSA: %d, TPM2: 0x%x",
+            config->signature_hash_algorithm.psa_hash_algorithm,
             config->signature_hash_algorithm.tpm2_hash_algorithm);
     charra_log_trace("Attestation public key path: %s",
             config->attestation_public_key_path);
@@ -313,9 +313,8 @@ void charra_config_verifier_hash_algorithm_from_str(const char* const hash,
         return;
     }
     hash_algo->tpm2_hash_algorithm = charra_tpm_hash_algorithm_from_str(hash);
-    hash_algo->mbedtls_hash_algorithm =
-            charra_md_hash_algorithm_from_tpm2_alg_id(
-                    hash_algo->tpm2_hash_algorithm);
+    hash_algo->psa_hash_algorithm = charra_psa_hash_algorithm_from_tpm2_alg_id(
+            hash_algo->tpm2_hash_algorithm);
 }
 
 void charra_config_verifier_reference_pcr_file_format_from_str(
