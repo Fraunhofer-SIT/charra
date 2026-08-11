@@ -4,4 +4,4 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-tss-esapi = "7.5.1"
+tss-esapi = "7.6.0"

@@ -1,4 +1,15 @@
-*
-!Dockerfile
-!.dockerignore
-!docker
+# hidden files
+.*
+
+bin
+keys
+logs
+man
+obj
+tpm_keys
+*.md
+*.png
+*.svg
+*.svgz
+*.yml
+Dockerfile*
