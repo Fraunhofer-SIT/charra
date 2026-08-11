@@ -18,239 +18,355 @@
 
 ## --- global arguments --------------------------------------------------------
 
-
-## --- set base image(s) -------------------------------------------------------
-
-FROM ghcr.io/tpm2-software/ubuntu-22.04:latest AS base
-
-## --- metadata ----------------------------------------------------------------
-
-LABEL org.opencontainers.image.authors="michael.eckel@sit.fraunhofer.de"
-
-## --- image specific arguments ------------------------------------------------
-
-## user and group
 ARG user='bob'
 ARG uid=1000
 ARG gid=1000
 
-## software versions (typically Git branches or tags)
-ARG tpm2tss_version='4.1.3'   # https://github.com/tpm2-software/tpm2-tss
-ARG tpm2tools_version='5.7'   # https://github.com/tpm2-software/tpm2-tools
-ARG libcoap_version='release-4.3.5-patches'  # https://github.com/obgm/libcoap
-ARG mbedtls_version='v4.1.0'  # https://github.com/ARMmbed/mbedtls
-ARG qcbor_version='v1.6.1'      # https://github.com/laurencelundblade/QCBOR
-ARG tcose_version='v1.2.0'    # https://github.com/laurencelundblade/t_cose
-ARG pytss_version='2.3.0'     # https://github.com/tpm2-software/tpm2-pytss
-
+ARG tpm2tss_version='4.1.3'                     # https://github.com/tpm2-software/tpm2-tss
+ARG tpm2tools_version='5.7'                     # https://github.com/tpm2-software/tpm2-tools
+ARG libcoap_version='release-4.3.5-patches'     # https://github.com/obgm/libcoap
+ARG mbedtls_version='v4.1.0'                    # https://github.com/ARMmbed/mbedtls
+ARG qcbor_version='v1.6.1'                      # https://github.com/laurencelundblade/QCBOR
+ARG tcose_version='v1.2.0'                      # https://github.com/laurencelundblade/t_cose
+ARG libyaml_version='0.2.5'                     # https://github.com/yaml/libyaml
+ARG pytss_version='2.3.0'                       # https://github.com/tpm2-software/tpm2-pytss
+ARG libtpms_version='v0.10.2'                   # https://github.com/stefanberger/libtpms/
+ARG swtpm_version='v0.10.1'                     # https://github.com/stefanberger/swtpm/
 
 ## -----------------------------------------------------------------------------
-## --- pre-work for interactive environment ------------------------------------
+## --- base image --------------------------------------------------------------
 ## -----------------------------------------------------------------------------
 
-## unminimize Ubuntu container image
-RUN yes | unminimize
+FROM ubuntu:24.04 AS base
 
-## copy configs
-COPY "./docker/dist/etc/default/keyboard" "/etc/default/keyboard"
+## --- metadata ----------------------------------------------------------------
 
-## system reference manuals (manual pages)
-RUN apt-get update \
-    && apt-get install --no-install-recommends -y \
-        man-db \
-        manpages-posix \
-        manpages-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-## Bash command completion
-RUN apt-get update \
-    && apt-get install --no-install-recommends -y \
-        bash-completion \
-    && rm -rf /var/lib/apt/lists/*
-
+LABEL org.opencontainers.image.authors="michael.eckel@sit.fraunhofer.de, markus.horn@sit.fraunhofer.de"
 
 ## -----------------------------------------------------------------------------
 ## --- install dependencies ----------------------------------------------------
 ## -----------------------------------------------------------------------------
 
+## Basic tools + common build dependencies
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    ca-certificates \
+    git \
+    automake \
+    autoconf \
+    libtool \
+    build-essential \
+    libssl-dev \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+
+## -----------------------------------------------------------------------------
+## --- library stage -----------------------------------------------------------
+## -----------------------------------------------------------------------------
+
+FROM base AS libs
+
+## --- metadata ----------------------------------------------------------------
+
+LABEL org.opencontainers.image.authors="michael.eckel@sit.fraunhofer.de, markus.horn@sit.fraunhofer.de"
+
+## --- image specific arguments ------------------------------------------------
+
+ARG tpm2tss_version
+ARG tpm2tools_version
+ARG libcoap_version
+ARG mbedtls_version
+ARG qcbor_version
+ARG tcose_version
+ARG libyaml_version
+
 ENV LD_LIBRARY_PATH="/usr/local/lib"
+
+# install dependencies for building the libraries
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    autoconf-archive \
+    libcmocka0 \
+    libcmocka-dev \
+    procps \
+    iproute2 \
+    uthash-dev \
+    doxygen \
+    libjson-c-dev \
+    libini-config-dev \
+    libcurl4-openssl-dev \
+    uuid-dev \
+    libltdl-dev \
+    libusb-1.0-0-dev \
+    libftdi-dev \
+    cmake \
+    python3-pip \
+    python3-jinja2 \
+    python3-jsonschema \
+    && rm -rf /var/lib/apt/lists/*
+
 
 ## TPM2 TSS
 RUN git clone --depth=1 -b "${tpm2tss_version}" \
-    'https://github.com/tpm2-software/tpm2-tss.git' /tmp/tpm2-tss
-WORKDIR /tmp/tpm2-tss
-RUN git reset --hard \
+    'https://github.com/tpm2-software/tpm2-tss.git' /tmp/tpm2-tss \
+    && cd /tmp/tpm2-tss \
+    && git reset --hard \
     && git clean -xdf \
     && ./bootstrap \
-    && ./configure --enable-integration --disable-doxygen-doc \
+    && ./configure --disable-doxygen-doc \
     && make clean \
     && make -j \
     && make install \
     && ldconfig
-WORKDIR /
-RUN rm -rf /tmp/tpm2-tss
-
-## make TPM simulator the default for TCTI loader
-RUN ln -sf 'libtss2-tcti-mssim.so' '/usr/local/lib/libtss2-tcti-default.so'
 
 ## TPM2 tools
 RUN git clone --depth=1 -b "${tpm2tools_version}" \
-        'https://github.com/tpm2-software/tpm2-tools.git' /tmp/tpm2-tools
-WORKDIR /tmp/tpm2-tools
-RUN ./bootstrap \
+    'https://github.com/tpm2-software/tpm2-tools.git' /tmp/tpm2-tools \
+    && cd /tmp/tpm2-tools \
+    && ./bootstrap \
     && ./configure \
     && make -j \
     && make install
-WORKDIR /
-RUN rm -rfv /tmp/tpm2-tools
 
 ## libcoap
 RUN git clone --recursive -b "${libcoap_version}" \
-        'https://github.com/obgm/libcoap.git' /tmp/libcoap
-WORKDIR /tmp/libcoap
-RUN ./autogen.sh \
+    'https://github.com/obgm/libcoap.git' /tmp/libcoap \
+    && cd /tmp/libcoap \
+    &&./autogen.sh \
     && ./configure --disable-tests --disable-documentation --disable-manpages \
-        --enable-dtls --with-tinydtls --enable-fast-install \
+    --enable-dtls --with-tinydtls --enable-fast-install \
     && make -j \
     && make install
-WORKDIR /
-RUN rm -rfv /tmp/libcoap
 
 ## mbed TLS
-RUN apt-get update \
-    && apt-get install --no-install-recommends -y \
-        python3-jinja2 \
-        python3-jsonschema \
-        cmake \
-    && rm -rf /var/lib/apt/lists/*
 RUN git clone --recursive -b "${mbedtls_version}" \
-        'https://github.com/ARMmbed/mbedtls.git' /tmp/mbedtls
-WORKDIR /tmp/mbedtls
-RUN cmake -DUSE_SHARED_MBEDTLS_LIBRARY=On -DUSE_STATIC_MBEDTLS_LIBRARY=OFF . \
-    && cmake --build .
-WORKDIR /
-RUN rm -rfv /tmp/mbedtls
+    'https://github.com/ARMmbed/mbedtls.git' /tmp/mbedtls \
+    && cd  /tmp/mbedtls \
+    && cmake -DUSE_SHARED_MBEDTLS_LIBRARY=On . \
+    && cmake --build . \
+    && cmake --install .
 
 ## QCBOR
 RUN git clone --depth=1 --recursive -b "${qcbor_version}" \
-        'https://github.com/laurencelundblade/QCBOR.git' /tmp/qcbor
-WORKDIR /tmp/qcbor
-RUN make -j all so \
+    'https://github.com/laurencelundblade/QCBOR.git' /tmp/qcbor \
+    && cd /tmp/qcbor \
+    && make -j all so \
     && make install install_so
-WORKDIR /
-RUN rm -rfv /tmp/qcbor
 
 ## t_cose
 RUN git clone --depth=1 --recursive -b "${tcose_version}" \
-        'https://github.com/laurencelundblade/t_cose.git' /tmp/t_cose
-WORKDIR /tmp/t_cose
-RUN make -j -f Makefile.psa libt_cose.a libt_cose.so \
-    &&  make -f Makefile.psa install install_so
-WORKDIR /
-RUN rm -rfv /tmp/t_cose
+    'https://github.com/laurencelundblade/t_cose.git' /tmp/t_cose \
+    && cd /tmp/t_cose \
+    && make -j -f Makefile.psa libt_cose.a libt_cose.so \
+    && make -f Makefile.psa install install_so
 
+## LibYAML
+RUN git clone --depth=1 -b "${libyaml_version}" \
+    'https://github.com/yaml/libyaml.git' /tmp/libyaml \
+    && cd /tmp/libyaml \
+    && ./bootstrap \
+    && ./configure \
+    && make \
+    && make install
+
+## -----------------------------------------------------------------------------
+## --- swtpm stage -------------------------------------------------------------
+## -----------------------------------------------------------------------------
+
+FROM base AS swtpm
+
+## --- metadata ----------------------------------------------------------------
+
+LABEL org.opencontainers.image.authors="michael.eckel@sit.fraunhofer.de, markus.horn@sit.fraunhofer.de"
+
+## --- image specific arguments ------------------------------------------------
+
+ARG libtpms_version
+ARG swtpm_version
+
+ENV LD_LIBRARY_PATH="/usr/local/lib"
+
+## libtpms
+RUN git clone --depth=1 --recursive -b "${libtpms_version}" \
+    'https://github.com/stefanberger/libtpms.git' \
+    /tmp/libtpms  \
+    && cd /tmp/libtpms \
+    && git reset --hard \
+    && git clean -xdf \
+    && ./autogen.sh --prefix=/usr/local --libdir=/usr/local/lib \
+    --with-openssl --with-tpm2 \
+    && make -j \
+    && make install
+
+# install dependencies for building the swtpm
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    libtasn1-6-dev \
+    libjson-glib-dev \
+    iproute2 \
+    trousers \
+    expect \
+    gawk \
+    socat \
+    libseccomp-dev \
+    gnutls-bin \
+    gnutls-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# swtpm
+RUN git clone --depth=1 --recursive -b "${swtpm_version}" \
+    'https://github.com/stefanberger/swtpm.git' \
+    /tmp/swtpm \
+    && cd /tmp/swtpm \
+    && git reset --hard \
+    && git clean -xdf \
+    && ./autogen.sh --prefix=/usr/local \
+    && make -j \
+    && make install
+
+## -----------------------------------------------------------------------------
+## --- developer stage ---------------------------------------------------------
+## -----------------------------------------------------------------------------
+
+FROM base AS dev
+
+
+## --- metadata ----------------------------------------------------------------
+
+LABEL org.opencontainers.image.authors="michael.eckel@sit.fraunhofer.de, markus.horn@sit.fraunhofer.de"
+
+## --- image specific arguments ------------------------------------------------
+
+ARG user
+ARG uid
+ARG gid
+ARG pytss_version
+
+ENV LD_LIBRARY_PATH="/usr/local/lib"
+
+# copy swtpm binaries and libraries from swtpm stage
+COPY --from=swtpm "/usr/local" "/usr/local"
+# copy compiled libraries an binaries from libs stage
+COPY --from=libs "/usr/local" "/usr/local"
+
+## copy configs
+COPY "./docker/dist/etc/default/keyboard" "/etc/default/keyboard"
+
+# unminimize the image to get man pages and other documentation
+RUN yes | unminimize
+
+## system reference manuals (manual pages)
+## Bash command completion
+## install debugging tools
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y \
+    man-db \
+    manpages-posix \
+    manpages-dev \
+    bash-completion \
+    git \
+    curl \
+    clang \
+    python3-pip \
+    python3-dev \
+    clang-tools \
+    cgdb \
+    gdb \
+    tmux \
+    valgrind \
+    gosu \
+    sudo \
+    jq \
+    adduser \
+    gnutls-bin \
+    libjson-glib-1.0-0 \
+    libjson-c5 \
+    autoconf-archive \
+    libcmocka0 \
+    libcmocka-dev \
+    procps \
+    iproute2 \
+    uthash-dev \
+    doxygen \
+    libjson-c-dev \
+    libini-config-dev \
+    libcurl4-openssl-dev \
+    uuid-dev \
+    libltdl-dev \
+    libusb-1.0-0-dev \
+    libftdi-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+
+## make TPM simulator the default for TCTI loader
+RUN ln -sf 'libtss2-tcti-swtpm.so' '/usr/local/lib/libtss2-tcti-default.so'
 
 ## -----------------------------------------------------------------------------
 ## --- install tpm2-pytss ------------------------------------------------------
 ## -----------------------------------------------------------------------------
 
-## upgrade pip
-RUN python3 -m pip install --upgrade pip
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
 ## install py-tss
 RUN python3 -m pip install \
-        "git+https://github.com/tpm2-software/tpm2-pytss.git@${pytss_version}"
+    "git+https://github.com/tpm2-software/tpm2-pytss.git@${pytss_version}"
 
 
 ## -----------------------------------------------------------------------------
-## --- further configuration ---------------------------------------------------
+## --- configuration -----------------------------------------------------------
 ## -----------------------------------------------------------------------------
 
 ## add 'tss' user and group
 ## see: <https://github.com/tpm2-software/tpm2-tss/blob/master/Makefile.am#L841>
 RUN bash -c ' \
     if test -z "${DESTDIR}"; then \
-        if type -p groupadd > /dev/null; then \
-            id -g tss 2>/dev/null || groupadd --system tss; \
-        else \
-            id -g tss 2>/dev/null || \
-            addgroup --system tss; \
-        fi && \
-        if type -p useradd > /dev/null; then \
-            id -u tss 2>/dev/null || \
-            useradd --system --home-dir / --shell `type -p nologin` \
-                --no-create-home -g tss tss; \
-        else \
-            id -u tss 2>/dev/null || \
-            adduser --system --home / --shell `type -p nologin` \
-                --no-create-home --ingroup tss tss; \
-        fi; \
+    if type -p groupadd > /dev/null; then \
+    id -g tss 2>/dev/null || groupadd --system tss; \
+    else \
+    id -g tss 2>/dev/null || \
+    addgroup --system tss; \
+    fi && \
+    if type -p useradd > /dev/null; then \
+    id -u tss 2>/dev/null || \
+    useradd --system --home-dir / --shell `type -p nologin` \
+    --no-create-home -g tss tss; \
+    else \
+    id -u tss 2>/dev/null || \
+    adduser --system --home / --shell `type -p nologin` \
+    --no-create-home --ingroup tss tss; \
+    fi; \
     fi \
     '
 
 ## create FAPI system folder(s) for
 RUN mkdir -p '/usr/local/var/run/tpm2-tss' \
-    && chown 'root:tss' '/usr/local/var/run/tpm2-tss' \
-    && chmod g+w '/usr/local/var/run/tpm2-tss'
+    && chown -R 'root:tss' '/usr/local/var/run/tpm2-tss' \
+    && chmod -R g+w '/usr/local/var/run/tpm2-tss'
 RUN mkdir -p '/usr/local/var/lib/tpm2-tss' \
-    && chown 'root:tss' '/usr/local/var/lib/tpm2-tss' \
-    && chmod g+w '/usr/local/var/lib/tpm2-tss'
-
-## install jq tool for JSON manipulation
-RUN apt-get update \
-    && apt-get install --no-install-recommends -y \
-        jq \
-    && rm -rf /var/lib/apt/lists/*
+    && chown -R 'root:tss' '/usr/local/var/lib/tpm2-tss' \
+    && chmod -R g+w '/usr/local/var/lib/tpm2-tss'
 
 ## configure TSS FAPI to not check EK certificates since we use a TPM simulator
 RUN jq --argjson ekCertLess '{"ek_cert_less":"yes"}' '. += $ekCertLess' \
-        '/usr/local/etc/tpm2-tss/fapi-config.json' \
-            > '/tmp/fapi-config.json' \
+    '/usr/local/etc/tpm2-tss/fapi-config.json' \
+    > '/tmp/fapi-config.json' \
     && cat '/tmp/fapi-config.json' \
-            > '/usr/local/etc/tpm2-tss/fapi-config.json' \
+    > '/usr/local/etc/tpm2-tss/fapi-config.json' \
     && rm -f '/tmp/fapi-config.json'
 
-
-## -----------------------------------------------------------------------------
-## --- install tools -----------------------------------------------------------
-## -----------------------------------------------------------------------------
-
-## install debugging tools
-RUN apt-get update \
-    && apt-get install --no-install-recommends -y \
-        clang \
-        clang-tools \
-        cgdb \
-        gdb \
-        tmux \
-        valgrind \
-    && rm -rf /var/lib/apt/lists/*
-
-
-## -----------------------------------------------------------------------------
-## --- setup user --------------------------------------------------------------
-## -----------------------------------------------------------------------------
-
-## install sudo and gosu
-RUN apt-get update \
-    && apt-get install --no-install-recommends -y \
-        gosu \
-        sudo \
-    && rm -rf /var/lib/apt/lists/*
-
-## create non-root user and grant sudo permission
-RUN export user="${user}" uid="${uid}" gid="${gid}" \
+## delete default user and create non-root user and grant sudo permission
+RUN deluser=$(getent passwd 1000 | cut -d: -f1) \
+    && [ -n "$deluser" ] \
+    && userdel -r "$deluser" || true \
+    && export user="${user}" uid="${uid}" gid="${gid}" \
     && addgroup --gid "${gid}" "${user}" \
     && adduser --home /home/"${user}" --uid "${uid}" --gid "${gid}" \
-        --disabled-password --gecos '' "${user}" \
+    --disabled-password --gecos '' "${user}" \
     && mkdir -vp /etc/sudoers.d/ \
     && echo "${user}     ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/"${user}" \
     && chmod 0440 /etc/sudoers.d/"${user}" \
     && chown "${uid}:${gid}" -R /home/"${user}"
 
-
 ## -----------------------------------------------------------------------------
-## --- configuration -----------------------------------------------------------
+## --- further configuration ---------------------------------------------------
 ## -----------------------------------------------------------------------------
 
 ## configure Bash
@@ -263,7 +379,7 @@ ENV TSS2_LOG=all+none
 #ENV TSS2_LOGFILE=none
 
 ## set TPM2 tools environment variables
-ENV TPM2TOOLS_TCTI=mssim
+ENV TPM2TOOLS_TCTI=swtpm
 ENV TPM2TOOLS_TCTI_NAME=socket
 ENV TPM2TOOLS_SOCKET_ADDRESS=127.0.0.1
 ENV TPM2TOOLS_SOCKET_PORT=2321
@@ -274,8 +390,8 @@ COPY "./docker/dist/usr/local/bin/compile-tss" "/usr/local/bin/"
 
 ## add tpm2-tss code examples and test script
 COPY "./docker/dist/home/user/code-examples/" "/home/${user}/code-examples/"
-RUN chown -R "${user}:${user}" "/home/${user}/code-examples/"
 COPY "./docker/dist/home/user/test-charra-and-tpm2-tss.sh" "/home/${user}/"
+RUN chown -R "${user}:${user}" "/home/${user}"
 
 ## Docker entrypoint
 COPY "./docker/dist/usr/local/bin/docker-entrypoint.sh" "/usr/local/bin/"
@@ -292,17 +408,8 @@ WORKDIR /home/"${user}"
 ## -----------------------------------------------------------------------------
 
 ## install Rust toolchain for user
-RUN apt remove --purge -y \
-        rustc \
-        cargo \
-    || true
-RUN sudo chown -R "${user}:${user}" /home/"${user}"
 RUN sudo -u "${user}" curl --proto '=https' --tlsv1.2 -sSf \
-        'https://sh.rustup.rs' | sh -s -- -y
-
-## install Rust crates for code examples
-RUN cd "/home/${user}/code-examples/tpm2-rstss/" \
-        && sudo -u "${user}" "/home/${user}/.cargo/bin/cargo" build
+    'https://sh.rustup.rs' | sh -s -- -y
 
 ## -----------------------------------------------------------------------------
 ## --- postamble ---------------------------------------------------------------

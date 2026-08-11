@@ -1,41 +1,100 @@
----
 services:
-  charra-dev-env:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        user: bob
-        uid: 1000
-        gid: 1000
-    image: fraunhofer-sit/charra-dev-env:2.7.0
-    container_name: charra-dev-env
-    restart: unless-stopped
-    volumes:
-      - ".:/home/bob/charra"
-    #ports:
-    #  - "127.0.0.1:8080:8080"
-    #command: >
-    #  /bin/bash
-#  charra-attester:
-#    build:
-#      context: .
-#      dockerfile: Dockerfile.app
-#    image: fraunhofer-sit/charra:1.5.1
-#    container_name: charra-attester
-#    restart: unless-stopped
-#    ports:
-#      - "127.0.0.1:5683:5683"
-#    command: >
-#      /home/bob/charra/bin/attester
-#  charra-verifier:
-#    build:
-#      context: .
-#      dockerfile: Dockerfile.app
-#    image: fraunhofer-sit/charra:1.5.1
-#    container_name: charra-verifier
-#    restart: unless-stopped
-#    ports:
-#      - "127.0.0.1:5683:5683"
-#    command: >
-#      /home/bob/charra/bin/verifier
+    charra-dev-env:
+        build:
+            context: .
+            dockerfile: Dockerfile
+            args:
+                user: bob
+                uid: 1000
+                gid: 1000
+        image: fraunhofer-sit/charra-dev-env:2.7.0
+        group_add:
+            - tss
+        container_name: charra-dev-env
+        hostname: charra-dev-env
+        restart: unless-stopped
+        volumes:
+            - ".:/home/bob/charra"
+        networks:
+            - charra-dev-network
+        #ports:
+        #  - "127.0.0.1:8080:8080"
+        #command: >
+        #  /bin/bash
+
+    charra-attestation-key-generator:
+        build:
+            context: .
+            dockerfile: Dockerfile.app
+        image: fraunhofer-sit/charra:2.7.0
+        container_name: charra-key-generator
+        restart: no
+        networks:
+            charra-attestation-network:
+                ipv4_address: 172.20.0.2
+        devices:
+            - /dev/tpm0:/dev/tpm0
+            - /dev/tpmrm0:/dev/tpmrm0
+        volumes:
+            - ./tpm_keys:/charra/tpm_keys
+            # uncomment this for a custom key generations script
+            # - ./generate-ak.sh:/usr/local/bin/generate-ak.sh
+        command: >
+            generate-ak.sh
+
+    charra-attester:
+        build:
+            context: .
+            dockerfile: Dockerfile.app
+        image: fraunhofer-sit/charra:2.7.0
+        container_name: charra-attester
+        hostname: charra-attester
+        restart: unless-stopped
+        networks:
+            charra-attestation-network:
+                ipv4_address: 172.20.0.4
+        # ports:
+        #     - "127.0.0.1:5683:5683"
+        devices:
+            - /dev/tpm0:/dev/tpm0
+            - /dev/tpmrm0:/dev/tpmrm0
+        volumes:
+            - ./keys:/charra/keys:ro
+            - ./logs:/charra/logs:ro
+            - ./tpm_keys:/charra/tpm_keys:ro
+            - ./charra-attester-config.yml:/charra/charra-attester-config.yml:ro
+        command: >
+            attester --config charra-attester-config.yml
+
+    charra-verifier:
+        build:
+            context: .
+            dockerfile: Dockerfile.app
+        image: fraunhofer-sit/charra:2.7.0
+        container_name: charra-verifier
+        hostname: charra-verifier
+        restart: no
+        networks:
+            charra-attestation-network:
+                ipv4_address: 172.20.0.3
+        devices:
+            - /dev/tpm0:/dev/tpm0
+            - /dev/tpmrm0:/dev/tpmrm0
+        volumes:
+            - ./keys:/charra/keys:ro
+            - ./tpm_keys:/charra/tpm_keys:ro
+            - ./reference-pcrs.yml:/charra/reference-pcrs.yml:ro
+            - ./charra-verifier-config.yml:/charra/charra-verifier-config.yml:ro
+        command: >
+            verifier --config charra-verifier-config.yml -i 172.20.0.4
+        depends_on:
+            - charra-attester
+
+networks:
+    charra-dev-network:
+        driver: bridge
+    charra-attestation-network:
+        driver: bridge
+        ipam:
+            config:
+                - subnet: 172.20.0.0/24

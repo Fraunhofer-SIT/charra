@@ -1,25 +1,36 @@
 #!/bin/sh
 cd /tmp
 
-## kill TPM simulator
-/usr/bin/pkill tpm_server
+## kill TPM2 simulator
+sudo pkill -9 swtpm
 
-## remove state file of TPM simulator
-/bin/rm -f NVChip
+## remove TPM2 simulator state
+if [ -e '/tmp/swtpm20' ]; then sudo rm -r /tmp/swtpm20; fi
 
-## start TPM simulator in background
-(/usr/local/bin/tpm_server > /dev/null &)
+## create TPM2 simulator state, including EK Cert and Platform Cert
+sudo mkdir -p /tmp/swtpm20 \
+&& sudo chown tss:root /tmp/swtpm20 \
+&& sudo swtpm_setup --tpmstate /tmp/swtpm20 \
+    --create-ek-cert --create-platform-cert --tpm2 --overwrite \
+    > /dev/null
+
+## start TPM2 simulator in background
+sudo swtpm socket --tpm2 \
+    --tpmstate dir=/tmp/swtpm20 \
+    --server port=2321 \
+    --ctrl type=tcp,port=2322 \
+    --log file=/tmp/swtpm20.log \
+    --flags not-need-init \
+    --daemon \
+    > /dev/null
+sudo chmod a+r /tmp/swtpm20.log
 
 ## wait for TPM simulator to start
-while ! pidof tpm_server >> /dev/null ; do
-    sleep 1
+while ! pidof swtpm >> /dev/null ; do
+    sleep 0.1
 done
-## additional sleep to compensate for the starting time of the TPM simulator
-sleep 1 
+## additional sleep to compensate for the starting time of the TPM2 simulator
+sleep 1
 
-## execute TPM startup
-/usr/bin/env TPM2TOOLS_TCTI_NAME=socket \
-    TPM2TOOLS_SOCKET_ADDRESS=127.0.0.1 \
-    TPM2TOOLS_SOCKET_PORT=2321 \
-    /usr/local/bin/tpm2_startup --clear
-
+## execute TPM2 startup
+tpm2_startup --clear --tcti='swtpm:host=localhost,port=2321'
