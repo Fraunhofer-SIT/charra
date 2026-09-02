@@ -16,9 +16,7 @@
 ## --- preamble ----------------------------------------------------------------
 ## -----------------------------------------------------------------------------
 
-## -----------------------------------------------------------------------------
 ## --- global arguments --------------------------------------------------------
-## -----------------------------------------------------------------------------
 
 ARG user='bob'
 ARG uid=1000
@@ -49,6 +47,7 @@ LABEL org.opencontainers.image.authors="michael.eckel@sit.fraunhofer.de, markus.
 ## --- install dependencies ----------------------------------------------------
 ## -----------------------------------------------------------------------------
 
+## Basic tools + common build dependencies
 RUN apk add --update --no-cache \
     bash \
     git \
@@ -59,6 +58,7 @@ RUN apk add --update --no-cache \
     openssl-dev \
     pkgconf \
     && rm -rf /var/cache/apk/*
+
 
 ## -----------------------------------------------------------------------------
 ## --- library stage -----------------------------------------------------------
@@ -99,65 +99,70 @@ RUN apk add --update --no-cache \
 
 
 ## TPM2 TSS
-RUN git clone --depth=1 -b "${tpm2tss_version}" \
-    https://github.com/tpm2-software/tpm2-tss.git /tmp/tpm2-tss \
+RUN git clone --depth=1 --recursive -b "${tpm2tss_version}" \
+    'https://github.com/tpm2-software/tpm2-tss.git' /tmp/tpm2-tss \
     && cd /tmp/tpm2-tss \
+    && git reset --hard \
+    && git clean -xdf \
     && ./bootstrap \
     && ./configure --disable-doxygen-doc \
-    && make -j$(nproc) \
-    && make install
+    && make clean \
+    && make -j \
+    && make install \
+    && ldconfig
 
 ## TPM2 tools
-RUN git clone --depth=1 -b "${tpm2tools_version}" \
-    https://github.com/tpm2-software/tpm2-tools.git /tmp/tpm2-tools \
+RUN git clone --depth=1 --recursive -b "${tpm2tools_version}" \
+    'https://github.com/tpm2-software/tpm2-tools.git' /tmp/tpm2-tools \
     && cd /tmp/tpm2-tools \
     && ./bootstrap \
     && ./configure \
-    && make -j$(nproc) \
+    && make -j \
     && make install
 
 ## libcoap
-RUN git clone --recursive -b "${libcoap_version}" \
-    https://github.com/obgm/libcoap.git /tmp/libcoap \
+RUN git clone --depth=1 --recursive -b "${libcoap_version}" \
+    'https://github.com/obgm/libcoap.git' /tmp/libcoap \
     && cd /tmp/libcoap \
     && ./autogen.sh \
     && ./configure \
-    CFLAGS="-Du_int32_t=uint32_t -Du_int64_t=uint64_t -Du_int8_t=uint8_t" \
-    --disable-tests --disable-documentation --disable-manpages \
-    --enable-dtls --with-tinydtls --enable-fast-install \
-    && make -j$(nproc) \
+        CFLAGS="-Du_int32_t=uint32_t -Du_int64_t=uint64_t -Du_int8_t=uint8_t" \
+        --disable-tests --disable-documentation --disable-manpages \
+        --enable-dtls --with-tinydtls --enable-fast-install \
+    && make -j \
     && make install
 
-## mbedtls
-RUN git clone --recursive -b "${mbedtls_version}" \
-    https://github.com/ARMmbed/mbedtls.git /tmp/mbedtls \
+## Mbed TLS
+RUN git clone --depth=1 --recursive -b "${mbedtls_version}" \
+    'https://github.com/ARMmbed/mbedtls.git' /tmp/mbedtls \
     && cd /tmp/mbedtls \
     && cmake -DUSE_SHARED_MBEDTLS_LIBRARY=On . \
     && cmake --build . \
     && cmake --install .
 
-##  QCBOR
-RUN git clone --depth=1 -b "${qcbor_version}" \
-    https://github.com/laurencelundblade/QCBOR.git /tmp/qcbor \
+## QCBOR
+RUN git clone --depth=1 --recursive -b "${qcbor_version}" \
+    'https://github.com/laurencelundblade/QCBOR.git' /tmp/qcbor \
     && cd /tmp/qcbor \
     && make -j all so \
     && make install install_so
 
 ## t_cose
-RUN git clone --depth=1 -b "${tcose_version}" \
-    https://github.com/laurencelundblade/t_cose.git /tmp/t_cose \
+RUN git clone --depth=1 --recursive -b "${tcose_version}" \
+    'https://github.com/laurencelundblade/t_cose.git' /tmp/t_cose \
     && cd /tmp/t_cose \
     && make -j -f Makefile.psa libt_cose.a libt_cose.so \
     && make -f Makefile.psa install install_so
 
 ## LibYAML
-RUN git clone --depth=1 -b "${libyaml_version}" \
-    https://github.com/yaml/libyaml.git /tmp/libyaml \
+RUN git clone --depth=1 --recursive -b "${libyaml_version}" \
+    'https://github.com/yaml/libyaml.git' /tmp/libyaml \
     && cd /tmp/libyaml \
     && ./bootstrap \
     && ./configure \
-    && make -j$(nproc) \
+    && make -j \
     && make install
+
 
 ## -----------------------------------------------------------------------------
 ## --- swtpm stage -------------------------------------------------------------
@@ -178,8 +183,7 @@ ENV LD_LIBRARY_PATH="/usr/local/lib"
 
 ## libtpms
 RUN git clone --depth=1 --recursive -b "${libtpms_version}" \
-    'https://github.com/stefanberger/libtpms.git' \
-    /tmp/libtpms \
+    'https://github.com/stefanberger/libtpms.git' /tmp/libtpms \
     && cd /tmp/libtpms \
     && git reset --hard \
     && git clean -xdf \
@@ -188,7 +192,7 @@ RUN git clone --depth=1 --recursive -b "${libtpms_version}" \
     && make -j \
     && make install
 
-## swtpm
+# install swtpm dependencies
 RUN apk add --update --no-cache \
     libtasn1-dev \
     json-glib-dev \
@@ -199,10 +203,12 @@ RUN apk add --update --no-cache \
     gnutls-utils \
     gnutls-dev \
     && rm -rf /var/cache/apk/*
+
+# swtpm
 RUN git clone --depth=1 --recursive -b "${swtpm_version}" \
     'https://github.com/stefanberger/swtpm.git' \
     /tmp/swtpm \
-    && cd  /tmp/swtpm \
+    && cd /tmp/swtpm \
     && git reset --hard \
     && git clean -xdf \
     && ./autogen.sh --prefix=/usr/local --libdir=/usr/local/lib \
@@ -230,13 +236,21 @@ ARG gid
 ARG pytss_version
 
 ENV LD_LIBRARY_PATH="/usr/local/lib"
+ENV PKG_CONFIG_PATH="/usr/local/lib/pkgconfig"
+ENV RUSTFLAGS="-C target-feature=-crt-static"
 
 # copy swtpm binaries and libraries from swtpm stage
 COPY --from=swtpm "/usr/local" "/usr/local"
 # copy compiled libraries an binaries from libs stage
 COPY --from=libs "/usr/local" "/usr/local"
 
+## copy configs
+COPY "./docker/dist/etc/default/keyboard" "/etc/default/keyboard"
+
+
+## install useful tools (man pages, Bash, debug tools, etc.)
 RUN apk add --update --no-cache \
+    man-db \
     bash \
     bash-doc \
     bash-completion \
@@ -270,11 +284,12 @@ RUN apk add --update --no-cache \
     && rm -rf /var/cache/apk/*
 
 ## -----------------------------------------------------------------------------
-## --- python tpm2-pytss ------------------------------------------------------
+## --- install tpm2-pytss ------------------------------------------------------
 ## -----------------------------------------------------------------------------
 
 ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
+## install tpm2-pytss
 RUN python3 -m pip install --no-cache-dir \
     "git+https://github.com/tpm2-software/tpm2-pytss.git@${pytss_version}"
 
