@@ -22,16 +22,16 @@ ARG user='bob'
 ARG uid=1000
 ARG gid=1000
 
-ARG tpm2tss_version='4.1.3'                     # https://github.com/tpm2-software/tpm2-tss
-ARG tpm2tools_version='5.7'                     # https://github.com/tpm2-software/tpm2-tools
+ARG tpm2tss_version='4.2.0'                     # https://github.com/tpm2-software/tpm2-tss
+ARG tpm2tools_version='5.8'                     # https://github.com/tpm2-software/tpm2-tools
 ARG libcoap_version='release-4.3.5-patches'     # https://github.com/obgm/libcoap
-ARG mbedtls_version='v4.1.0'                    # https://github.com/ARMmbed/mbedtls
+ARG mbedtls_version='v4.2.0'                    # https://github.com/ARMmbed/mbedtls
 ARG qcbor_version='v1.6.1'                      # https://github.com/laurencelundblade/QCBOR
 ARG tcose_version='v1.2.0'                      # https://github.com/laurencelundblade/t_cose
 ARG libyaml_version='0.2.5'                     # https://github.com/yaml/libyaml
-ARG pytss_version='2.3.0'                       # https://github.com/tpm2-software/tpm2-pytss
+ARG pytss_version='3.0.0'                       # https://github.com/tpm2-software/tpm2-pytss
 ARG libtpms_version='v0.10.2'                   # https://github.com/stefanberger/libtpms/
-ARG swtpm_version='v0.10.1'                     # https://github.com/stefanberger/swtpm/
+ARG swtpm_version='v0.10.2'                     # https://github.com/stefanberger/swtpm/
 
 ## -----------------------------------------------------------------------------
 ## --- base image --------------------------------------------------------------
@@ -49,6 +49,7 @@ LABEL org.opencontainers.image.authors="michael.eckel@sit.fraunhofer.de, markus.
 
 ## Basic tools + common build dependencies
 RUN apt-get update && apt-get install --no-install-recommends -y \
+    bash \
     ca-certificates \
     git \
     automake \
@@ -106,7 +107,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 
 
 ## TPM2 TSS
-RUN git clone --depth=1 -b "${tpm2tss_version}" \
+RUN git clone --depth=1 --recursive -b "${tpm2tss_version}" \
     'https://github.com/tpm2-software/tpm2-tss.git' /tmp/tpm2-tss \
     && cd /tmp/tpm2-tss \
     && git reset --hard \
@@ -119,7 +120,7 @@ RUN git clone --depth=1 -b "${tpm2tss_version}" \
     && ldconfig
 
 ## TPM2 tools
-RUN git clone --depth=1 -b "${tpm2tools_version}" \
+RUN git clone --depth=1 --recursive -b "${tpm2tools_version}" \
     'https://github.com/tpm2-software/tpm2-tools.git' /tmp/tpm2-tools \
     && cd /tmp/tpm2-tools \
     && ./bootstrap \
@@ -128,19 +129,21 @@ RUN git clone --depth=1 -b "${tpm2tools_version}" \
     && make install
 
 ## libcoap
-RUN git clone --recursive -b "${libcoap_version}" \
+RUN git clone --depth=1 --recursive -b "${libcoap_version}" \
     'https://github.com/obgm/libcoap.git' /tmp/libcoap \
     && cd /tmp/libcoap \
-    &&./autogen.sh \
-    && ./configure --disable-tests --disable-documentation --disable-manpages \
-    --enable-dtls --with-tinydtls --enable-fast-install \
+    && ./autogen.sh \
+    && ./configure \
+        CFLAGS="-Du_int32_t=uint32_t -Du_int64_t=uint64_t -Du_int8_t=uint8_t" \
+        --disable-tests --disable-documentation --disable-manpages \
+        --enable-dtls --with-tinydtls --enable-fast-install \
     && make -j \
     && make install
 
-## mbed TLS
-RUN git clone --recursive -b "${mbedtls_version}" \
+## Mbed TLS
+RUN git clone --depth=1 --recursive -b "${mbedtls_version}" \
     'https://github.com/ARMmbed/mbedtls.git' /tmp/mbedtls \
-    && cd  /tmp/mbedtls \
+    && cd /tmp/mbedtls \
     && cmake -DUSE_SHARED_MBEDTLS_LIBRARY=On . \
     && cmake --build . \
     && cmake --install .
@@ -160,13 +163,14 @@ RUN git clone --depth=1 --recursive -b "${tcose_version}" \
     && make -f Makefile.psa install install_so
 
 ## LibYAML
-RUN git clone --depth=1 -b "${libyaml_version}" \
+RUN git clone --depth=1 --recursive -b "${libyaml_version}" \
     'https://github.com/yaml/libyaml.git' /tmp/libyaml \
     && cd /tmp/libyaml \
     && ./bootstrap \
     && ./configure \
-    && make \
+    && make -j \
     && make install
+
 
 ## -----------------------------------------------------------------------------
 ## --- swtpm stage -------------------------------------------------------------
@@ -187,8 +191,7 @@ ENV LD_LIBRARY_PATH="/usr/local/lib"
 
 ## libtpms
 RUN git clone --depth=1 --recursive -b "${libtpms_version}" \
-    'https://github.com/stefanberger/libtpms.git' \
-    /tmp/libtpms  \
+    'https://github.com/stefanberger/libtpms.git' /tmp/libtpms \
     && cd /tmp/libtpms \
     && git reset --hard \
     && git clean -xdf \
@@ -197,7 +200,7 @@ RUN git clone --depth=1 --recursive -b "${libtpms_version}" \
     && make -j \
     && make install
 
-# install dependencies for building the swtpm
+# install swtpm dependencies
 RUN apt-get update && apt-get install --no-install-recommends -y \
     libtasn1-6-dev \
     libjson-glib-dev \
@@ -218,9 +221,12 @@ RUN git clone --depth=1 --recursive -b "${swtpm_version}" \
     && cd /tmp/swtpm \
     && git reset --hard \
     && git clean -xdf \
-    && ./autogen.sh --prefix=/usr/local \
+    && ./autogen.sh --prefix=/usr/local --libdir=/usr/local/lib \
+    --with-openssl --with-tpm2 \
+    --with-tss-user='tss' --with-tss-group='tss' \
     && make -j \
     && make install
+
 
 ## -----------------------------------------------------------------------------
 ## --- developer stage ---------------------------------------------------------
@@ -241,6 +247,8 @@ ARG gid
 ARG pytss_version
 
 ENV LD_LIBRARY_PATH="/usr/local/lib"
+ENV PKG_CONFIG_PATH="/usr/local/lib/pkgconfig"
+ENV RUSTFLAGS="-C target-feature=-crt-static"
 
 # copy swtpm binaries and libraries from swtpm stage
 COPY --from=swtpm "/usr/local" "/usr/local"
@@ -253,15 +261,14 @@ COPY "./docker/dist/etc/default/keyboard" "/etc/default/keyboard"
 # unminimize the image to get man pages and other documentation
 RUN yes | unminimize
 
-## system reference manuals (manual pages)
-## Bash command completion
-## install debugging tools
-RUN apt-get update \
-    && apt-get install --no-install-recommends -y \
+## install useful tools (man pages, Bash, debug tools, etc.)
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    bash \
+    bash-doc \
+    bash-completion \
     man-db \
     manpages-posix \
     manpages-dev \
-    bash-completion \
     git \
     curl \
     clang \
@@ -296,23 +303,23 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 
-## make TPM simulator the default for TCTI loader
-RUN ln -sf 'libtss2-tcti-swtpm.so' '/usr/local/lib/libtss2-tcti-default.so'
-
 ## -----------------------------------------------------------------------------
 ## --- install tpm2-pytss ------------------------------------------------------
 ## -----------------------------------------------------------------------------
 
 ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
-## install py-tss
-RUN python3 -m pip install \
+## install tpm2-pytss
+RUN python3 -m pip install --no-cache-dir \
     "git+https://github.com/tpm2-software/tpm2-pytss.git@${pytss_version}"
 
 
 ## -----------------------------------------------------------------------------
 ## --- configuration -----------------------------------------------------------
 ## -----------------------------------------------------------------------------
+
+## make TPM simulator the default for TCTI loader
+RUN ln -sf 'libtss2-tcti-swtpm.so' '/usr/local/lib/libtss2-tcti-default.so'
 
 ## add 'tss' user and group
 ## see: <https://github.com/tpm2-software/tpm2-tss/blob/master/Makefile.am#L841>
