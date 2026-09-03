@@ -250,7 +250,6 @@ COPY "./docker/dist/etc/default/keyboard" "/etc/default/keyboard"
 
 ## install useful tools (man pages, Bash, debug tools, etc.)
 RUN apk add --update --no-cache \
-    man-db \
     bash \
     bash-doc \
     bash-completion \
