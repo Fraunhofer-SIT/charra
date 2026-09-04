@@ -259,6 +259,9 @@ COPY --from=libs "/usr/local" "/usr/local"
 COPY "./docker/dist/etc/default/keyboard" "/etc/default/keyboard"
 
 # unminimize the image to get man pages and other documentation
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    unminimize \
+    && rm -rf /var/lib/apt/lists/*
 RUN yes | unminimize
 
 ## install useful tools (man pages, Bash, debug tools, etc.)

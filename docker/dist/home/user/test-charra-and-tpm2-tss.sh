@@ -3,7 +3,7 @@
 # Test CHARRA and code examples for the tpm2-tss and tpm2-pytss.               #
 # ---------------------------------------------------------------------------- #
 # Author:        Michael Eckel <michael.eckel@sit.fraunhofer.de>               #
-# Date Modified: 2023-11-30T13:37:42+02:00                                     #
+# Date Modified: 2026-09-04T12-51-19+02:00                                     #
 # Date Created:  2023-11-30T13:37:42+02:00                                     #
 ################################################################################
 
@@ -34,6 +34,8 @@ main() {
 	test_tpm2_tss
 	echo
 	test_tpm2_pytss
+	echo
+	test_tpm2_rstss
 }
 
 
@@ -48,13 +50,14 @@ test_charra() {
 	## compile
 
 	## compile
-	cd ~/charra/
+	cd "${HOME}/charra/"
 	make clean
 	make -j
+	./generate-ak.sh
 	echo
 
 	## run tests
-	(bin/attester &); sleep .2 ; bin/verifier ; sleep 1 ; pkill -SIGINT attester
+	(bin/attester --config charra-attester-config.yml &); sleep .2 ; bin/verifier --config charra-verifier-config.yml ; sleep 1 ; pkill -SIGINT attester
 
 	## clean up
 	make clean
@@ -164,6 +167,24 @@ test_tpm2_pytss() {
 	echo
 	log_info 'Test 5: 2048'
 	./fapi-getrandom.py 2048
+	echo
+
+    ## change back
+	cd - > /dev/null
+}
+
+test_tpm2_rstss() {
+	log_info '--- Testing tpm2-rstss --------------------------------------------------'
+
+	## compile
+	log_info 'Changing folder and compiling ...'
+	cd "${HOME}/code-examples/tpm2-rstss/"
+	cargo build
+	echo
+
+	## test ESAPI
+	log_info '--- Testing ESAPI ...'
+	cargo run
 	echo
 
     ## change back
