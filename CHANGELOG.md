@@ -13,6 +13,50 @@
 
 The following lists the changes that CHARRA received over time.
 
+## Changelog 2026-09-04
+
+* Added an Alpine-based CHARRA container image `Dockerfile.alpine`.
+
+* Updated Dockerfile dependencies to newer versions.
+
+* Refactored `Dockerfile` and `Dockerfile.app`.
+
+* Updated and fixed the test script.
+
+* Updated `.dockerignore`.
+
+* Reduced the Docker image size:
+
+* Replaced the IBM TPM Simulator with `swtpm`.
+
+* Added a multi-stage Docker build.
+
+* Updated the Docker Compose configuration.
+
+* Improved CHARRA-CLI
+
+## Changelog 2026-05-07
+
+* Added cryptographic agility:
+
+  * Added support for multiple hash algorithms.
+
+  * Added support for multiple signature schemes.
+
+## Changelog 2026-05-06
+
+* Introduced YAML-based configuration for `attester` and `verifier`.
+
+* Separated `attester` and `verifier` configuration.
+
+* Added man page documentation for the new configuration options.
+
+## Changelog 2025-04-05
+
+* Improved parsing of PCR reference files:
+
+  * PCR reference files can now be parsed if optional YAML document start and end tokens are missing.
+
 ## Changelog 2024-10-15
 
 * Added Rust toolchain for the container user (adjustments to `Dockerfile`)
