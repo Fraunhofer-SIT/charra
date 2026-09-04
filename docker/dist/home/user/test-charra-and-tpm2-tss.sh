@@ -101,7 +101,7 @@ test_tpm2_tss() {
 	log_info 'Test 1: <none>'
 	./fapi-getrandom
 	echo
-	eclog_infoho 'Test 2: 64'
+	log_info 'Test 2: 64'
 	./fapi-getrandom 64
 	echo
 	log_info 'Test 3: 100'
@@ -156,7 +156,7 @@ test_tpm2_pytss() {
 	log_info 'Test 1: <none>'
 	./fapi-getrandom.py
 	echo
-	eclog_infoho 'Test 2: 64'
+	log_info 'Test 2: 64'
 	./fapi-getrandom.py 64
 	echo
 	log_info 'Test 3: 100'
