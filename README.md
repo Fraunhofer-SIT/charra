@@ -4,7 +4,7 @@
 # All rights reserved.                                                         #
 # ---------------------------------------------------------------------------- #
 # Author:        Michael Eckel <michael.eckel@sit.fraunhofer.de>               #
-# Date Modified: 2023-05-20T13:37:42+02:00                                     #
+# Date Modified: 2026-09-07T13-37-42+02:00                                     #
 # Date Created:  2019-06-26T09:23:15+02:00                                     #
 ################################################################################
 -->
@@ -25,20 +25,53 @@ All commands are to be executed in [Bash](https://www.gnu.org/software/bash/).
 
 For Docker, build the image and run the container with:
 
-    ./docker/build.sh
-    ./docker/run.sh
+```sh
+./docker/build.sh
+./docker/run.sh
+```
 
 With Docker Compose do:
 
     docker-compose build --build-arg uid="${UID}" --build-arg gid="${UID}"
     docker-compose run --rm charra-dev-env
 
-Inside the container, change to the `~/charra/` folder, build it, and run it:
+Inside the container, change to the `~/charra/` folder, build it, and run it (you can use your arrow keys to navigate the Bash history; it is already populated with all the commands):
 
-    cd ~/charra/
-    make -j
-    ./generate-ak.sh
-    (bin/attester --config charra-attester-config.yml &); sleep .2 ; bin/verifier --config charra-verifier-config.yml ; sleep 1 ; pkill -SIGINT attester
+```sh
+cd ~/charra/
+make -j
+./generate-ak.sh
+(bin/attester --config charra-attester-config.yml &); sleep .2 ; bin/verifier --config charra-verifier-config.yml ; sleep 1 ; pkill -SIGINT attester
+```
+
+## Using the Quicktest Script
+
+Inside the container, you can test compilation and execution of CHARRA as well as all code examples by running:
+
+```sh
+./test-charra-and-tpm2-tss.sh
+```
+
+## CHARRA Container Flavors
+
+Besides the default `Dockerfile`, there are some more container flavors available:
+
+- `Dockerfile`:
+    - Development environment based on Ubuntu with, e.g., man pages, debug tools, etc.
+    - Build it with: `./docker/build.sh`
+    - Run it with: `./docker/run.sh`
+- `Dockerfile.app`:
+    - Runtime environment based on Ubuntu with only necessary dependencies
+    - Build it with: `./docker/build.sh app`
+    - Run it with: `./docker/run.sh app`
+- `Dockerfile.alpine`:
+    - Development environment based on Alpine with, e.g., man pages, debug tools, etc.
+    - Build it with: `./docker/build.sh alpine`
+    - Run it with: `./docker/run.sh alpine`
+- `Dockerfile.alpine.app`:
+    - Runtime environment based on Alpine with only necessary dependencies
+    - Build it with: `./docker/build.sh alpine.app`
+    - Run it with: `./docker/run.sh alpine.app`
 
 ## How it Works: Protocol Flow
 
@@ -65,12 +98,12 @@ You find the changelog in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Next Steps
 
-* Allow verifier to perform periodic attestations, e.g., perform attestation every 10 seconds.
-* Refactor and implement forward-declared (but not yet implemented) functions.
-* Use non-zero reference PCRs.
-* "Extended" *TPM Quote* using TPM audit session(s) and *TPM PCR Read* operations.
-* Make CHARRA a library (`libcharra`) and make *attester* and *verifier* example code in `example` folder.
-* Add `*_free()` functions for all data transfer objects (DTOs).
-* Introduce semantic versioning as CHARRA develops along the way to become stable.
+- Allow verifier to perform periodic attestations, e.g., perform attestation every 10 seconds.
+- Refactor and implement forward-declared (but not yet implemented) functions.
+- Use non-zero reference PCRs.
+- "Extended" *TPM Quote* using TPM audit session(s) and *TPM PCR Read* operations.
+- Make CHARRA a library (`libcharra`) and make *attester* and *verifier* example code in `example` folder.
+- Add `*_free()` functions for all data transfer objects (DTOs).
+- Introduce semantic versioning as CHARRA develops along the way to become stable.
 
 *The order of the list is entirely arbitrary and does not reflect any priorities.*
