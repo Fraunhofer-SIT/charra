@@ -7,7 +7,7 @@ services:
                 user: bob
                 uid: 1000
                 gid: 1000
-        image: fraunhofer-sit/charra-dev-env:2.7.1
+        image: fraunhofer-sit/charra-dev-env:2.7.2
         group_add:
             - tss
         container_name: charra-dev-env
@@ -26,7 +26,7 @@ services:
         build:
             context: .
             dockerfile: Dockerfile.app
-        image: fraunhofer-sit/charra:2.7.1
+        image: fraunhofer-sit/charra:2.7.2
         container_name: charra-key-generator
         restart: no
         networks:
@@ -46,7 +46,7 @@ services:
         build:
             context: .
             dockerfile: Dockerfile.app
-        image: fraunhofer-sit/charra:2.7.1
+        image: fraunhofer-sit/charra:2.7.2
         container_name: charra-attester
         hostname: charra-attester
         restart: unless-stopped
@@ -70,7 +70,7 @@ services:
         build:
             context: .
             dockerfile: Dockerfile.app
-        image: fraunhofer-sit/charra:2.7.1
+        image: fraunhofer-sit/charra:2.7.2
         container_name: charra-verifier
         hostname: charra-verifier
         restart: no
