@@ -5,7 +5,7 @@
 # Main Dockerfile for CHARRA.                                                  #
 # ---------------------------------------------------------------------------- #
 # Author:        Michael Eckel <michael.eckel@sit.fraunhofer.de>               #
-# Date Modified: 2023-11-30T13:37:42+02:00                                     #
+# Date Modified: 2026-10-01T17-36-27+02:00                                     #
 # Date Created:  2019-06-26T09:23:15+02:00                                     #
 # ---------------------------------------------------------------------------- #
 # Hint: Check your Dockerfile at https://www.fromlatest.io/                    #
@@ -32,6 +32,7 @@ ARG libyaml_version='0.2.5'                     # https://github.com/yaml/libyam
 ARG pytss_version='3.0.0'                       # https://github.com/tpm2-software/tpm2-pytss
 ARG libtpms_version='v0.10.2'                   # https://github.com/stefanberger/libtpms/
 ARG swtpm_version='v0.10.2'                     # https://github.com/stefanberger/swtpm/
+ARG rust_version='stable'
 
 ## -----------------------------------------------------------------------------
 ## --- base image --------------------------------------------------------------
@@ -245,6 +246,7 @@ ARG user
 ARG uid
 ARG gid
 ARG pytss_version
+ARG rust_version
 
 ENV LD_LIBRARY_PATH="/usr/local/lib"
 ENV PKG_CONFIG_PATH="/usr/local/lib/pkgconfig"
@@ -315,6 +317,16 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1
 ## install tpm2-pytss
 RUN python3 -m pip install --no-cache-dir \
     "git+https://github.com/tpm2-software/tpm2-pytss.git@${pytss_version}"
+
+
+## -----------------------------------------------------------------------------
+## --- install rustup ----------------------------------------------------------
+## -----------------------------------------------------------------------------
+
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    rustup \
+    && rm -rf /var/lib/apt/lists/*
+#RUN rustup toolchain install "${rust_version}"
 
 
 ## -----------------------------------------------------------------------------
@@ -418,8 +430,8 @@ WORKDIR /home/"${user}"
 ## -----------------------------------------------------------------------------
 
 ## install Rust toolchain for user
-RUN sudo -u "${user}" curl --proto '=https' --tlsv1.2 -sSf \
-    'https://sh.rustup.rs' | sh -s -- -y
+RUN sudo -u "${user}" rustup toolchain install "${rust_version}"
+
 
 ## -----------------------------------------------------------------------------
 ## --- postamble ---------------------------------------------------------------
