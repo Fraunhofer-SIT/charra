@@ -1,0 +1,54 @@
+## Use a software TPM (swtpm) instead of the hardware TPM (/dev/tpm*).
+## All CHARRA containers share the same swtpm instance. Usage:
+##
+##   docker compose -f docker-compose.yml -f docker-compose.swtpm.yml up \
+##       charra-attester charra-verifier
+##
+## Startup order: charra-swtpm -> charra-attestation-key-generator
+##                -> charra-attester -> charra-verifier
+
+services:
+    charra-swtpm:
+        build:
+            context: .
+            dockerfile: Dockerfile.app
+        image: fraunhofer-sit/charra:2.7.2
+        container_name: charra-swtpm
+        hostname: charra-swtpm
+        restart: unless-stopped
+        networks:
+            charra-attestation-network:
+                ipv4_address: 172.20.0.5
+        healthcheck:
+            test: ["CMD", "swtpm_ioctl", "--tcp", "127.0.0.1:2322", "-c"]
+            interval: 1s
+        command: >
+            swtpm socket --tpm2
+            --tpmstate dir=/tmp
+            --server type=tcp,port=2321,bindaddr=0.0.0.0
+            --ctrl type=tcp,port=2322,bindaddr=0.0.0.0
+            --flags not-need-init,startup-clear
+
+    charra-attestation-key-generator:
+        devices: !reset []
+        environment:
+            TPM2TOOLS_TCTI: "swtpm:host=172.20.0.5,port=2321"
+        depends_on:
+            charra-swtpm:
+                condition: service_healthy
+
+    charra-attester:
+        devices: !reset []
+        environment:
+            CHARRA_TCTI: "swtpm:host=172.20.0.5,port=2321"
+        depends_on:
+            charra-attestation-key-generator:
+                condition: service_completed_successfully
+
+    charra-verifier:
+        devices: !reset []
+        environment:
+            CHARRA_TCTI: "swtpm:host=172.20.0.5,port=2321"
+        depends_on:
+            charra-swtpm:
+                condition: service_healthy
