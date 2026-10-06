@@ -78,22 +78,30 @@ Besides the default `Dockerfile`, there are some more container flavors availabl
 By default, the `Dockerfile.app` runtime image uses the hardware TPM (`/dev/tpmrm0`).
 It also contains the [swtpm](https://github.com/stefanberger/swtpm) software TPM, which can be used instead, e.g., during development.
 
-The TPM backend is selected via [TCTI](https://tpm2-tss.readthedocs.io/en/latest/group__tcti.html) environment variables:
+The TPM backend is selected via [TCTI](https://tpm2-tools.readthedocs.io/en/latest/man/common/tcti/) environment variables:
 
 - `TPM2TOOLS_TCTI`: used by the TPM2 tools, i.e., by `generate-ak.sh`
 - `CHARRA_TCTI`: used by the CHARRA `attester` and `verifier`; if unset, the default TCTI (device TPM) is used
 
 Key generation and CHARRA must use the *same* TPM instance, since the attestation key (`tpm_keys/rsa_ak.ctx`) is only valid on the TPM it was created on.
 swtpm listens on port `2321` for TPM commands and on port `2322` for its control channel.
-Its state is not persisted, so the attestation key has to be generated again after swtpm restarts.
+swtpm keeps its state inside the container only, so it is lost when the container is removed (e.g., `docker compose down`) and the attestation key has to be generated again.
+To switch back to the hardware TPM, omit the override file or unset both variables.
 
-With Docker Compose, use the `docker-compose.swtpm.yml` override, which starts swtpm in its own container and points all CHARRA containers to it (startup order: swtpm, `generate-ak.sh`, attester, verifier):
+With **Docker Compose**, use the `docker-compose.swtpm.yml` override, which starts swtpm in its own container and points all CHARRA containers to it (startup order: swtpm, `generate-ak.sh`, attester, verifier).
+This requires Docker Compose v2.24 or newer (`docker compose`, not the legacy `docker-compose`):
 
 ```sh
 docker compose -f docker-compose.yml -f docker-compose.swtpm.yml up charra-attester charra-verifier
 ```
 
-Within a single container, start swtpm in the background first and then point both variables to it:
+Within a single container, mount the CHARRA folder (configuration files, reference PCRs, logs) as working directory:
+
+```sh
+docker run --rm -it -v "${PWD}:/charra" fraunhofer-sit/charra:2.7.2
+```
+
+Inside the container, start swtpm in the background first and then point both variables to it:
 
 ```sh
 swtpm socket --tpm2 --tpmstate dir=/tmp --server type=tcp,port=2321 \
