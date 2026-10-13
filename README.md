@@ -73,9 +73,9 @@ Besides the default `Dockerfile`, there are some more container flavors availabl
     - Build it with: `./docker/build.sh alpine.app`
     - Run it with: `./docker/run.sh alpine.app`
 
-## Using a Software TPM with the Runtime Image
+## Using a Software TPM with the Application Image
 
-By default, the `Dockerfile.app` runtime image uses the hardware TPM (`/dev/tpmrm0`).
+By default, the `Dockerfile.app` application image uses the hardware TPM (`/dev/tpmrm0`).
 It also contains the [swtpm](https://github.com/stefanberger/swtpm) software TPM, which can be used instead, e.g., during development.
 
 The TPM backend is selected via [TCTI](https://tpm2-tools.readthedocs.io/en/latest/man/common/tcti/) environment variables:
@@ -89,7 +89,6 @@ swtpm keeps its state inside the container only, so it is lost when the containe
 To switch back to the hardware TPM, omit the override file or unset both variables.
 
 With **Docker Compose**, use the `docker-compose.swtpm.yml` override, which starts swtpm in its own container and points all CHARRA containers to it (startup order: swtpm, `generate-ak.sh`, attester, verifier).
-This requires Docker Compose v2.24 or newer (`docker compose`, not the legacy `docker-compose`):
 
 ```sh
 docker compose -f docker-compose.yml -f docker-compose.swtpm.yml up charra-attester charra-verifier
