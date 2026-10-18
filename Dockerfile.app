@@ -143,6 +143,63 @@ RUN git clone --depth=1 --recursive -b "${libyaml_version}" \
     && make install
 
 ## -----------------------------------------------------------------------------
+## --- swtpm image -------------------------------------------------------------
+## -----------------------------------------------------------------------------
+
+FROM ubuntu:24.04 AS swtpm
+
+## --- metadata ----------------------------------------------------------------
+
+LABEL org.opencontainers.image.authors="michael.eckel@sit.fraunhofer.de, markus.horn@sit.fraunhofer.de"
+
+## --- image specific arguments ------------------------------------------------
+
+ARG libtpms_version
+ARG swtpm_version
+
+ENV LD_LIBRARY_PATH="/usr/local/lib"
+
+# install dependencies for building libtpms and swtpm
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    ca-certificates \
+    git \
+    automake \
+    autoconf \
+    libtool \
+    build-essential \
+    libssl-dev \
+    pkg-config \
+    libtasn1-6-dev \
+    libjson-glib-dev \
+    iproute2 \
+    trousers \
+    expect \
+    gawk \
+    socat \
+    libseccomp-dev \
+    gnutls-bin \
+    gnutls-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+## libtpms
+RUN git clone --depth=1 --recursive -b "${libtpms_version}" \
+    'https://github.com/stefanberger/libtpms.git' /tmp/libtpms \
+    && cd /tmp/libtpms \
+    && ./autogen.sh --prefix=/usr/local --libdir=/usr/local/lib \
+    --with-openssl --with-tpm2 \
+    && make -j \
+    && make install
+
+## swtpm
+RUN git clone --depth=1 --recursive -b "${swtpm_version}" \
+    'https://github.com/stefanberger/swtpm.git' /tmp/swtpm \
+    && cd /tmp/swtpm \
+    && ./autogen.sh --prefix=/usr/local --libdir=/usr/local/lib \
+    --with-openssl --with-tpm2 \
+    && make -j \
+    && make install
+
+## -----------------------------------------------------------------------------
 ## --- charra-build image ------------------------------------------------------
 ## -----------------------------------------------------------------------------
 
@@ -176,9 +233,13 @@ LABEL org.opencontainers.image.authors="michael.eckel@sit.fraunhofer.de, markus.
 ENV LD_LIBRARY_PATH="/usr/local/lib"
 ENV TPM2TOOLS_TCTI="device:/dev/tpmrm0"
 
-# install necessary runtime libraries
+# install necessary runtime libraries (incl. those for swtpm)
 RUN apt-get update && apt-get install --no-install-recommends -y \
     libcurl4t64 \
+    libjson-glib-1.0-0 \
+    libtasn1-6 \
+    libseccomp2 \
+    libgnutls30t64 \
     && rm -rf /var/lib/apt/lists/*
 
 # make device TPM the default for TCTI loader
@@ -186,6 +247,8 @@ RUN ln -sf 'libtss2-tcti-device.so' '/usr/local/lib/libtss2-tcti-default.so'
 
 # copy libraries
 COPY --from=dependencies "usr/local/" "/usr/local/"
+# copy swtpm (software TPM) binaries and libraries
+COPY --from=swtpm "/usr/local/" "/usr/local/"
 # copy CHARRA binaries
 COPY --from=charra-build --chmod=555 "/charra/bin/attester" "/usr/local/bin/attester"
 COPY --from=charra-build --chmod=555 "/charra/bin/verifier" "/usr/local/bin/verifier"
