@@ -13,6 +13,10 @@
 
 The following lists the changes that CHARRA received over time.
 
+## Changelog 2026-11-13
+
+* Fixing (potential) memory leaks in CBOR handling.
+
 ## Changelog 2026-09-04
 
 * Added an Alpine-based CHARRA container image `Dockerfile.alpine`.
