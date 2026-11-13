@@ -214,18 +214,37 @@ CHARRA_RC charra_tap_unmarshal_attestation_request(
 
     /* parse "key-id" (bytes) */
     QCBORDecode_GetByteString(&dc, &item_str_buf);
+    if (item_str_buf.len > sizeof(req.sig_key_id)) {
+        charra_log_error("CBOR parser: key-id is too long (%zu bytes).",
+                item_str_buf.len);
+        goto cbor_parse_error;
+    }
     req.sig_key_id_len = item_str_buf.len;
-    memcpy(&(req.sig_key_id), item_str_buf.ptr, req.sig_key_id_len);
+    if (req.sig_key_id_len > 0) {
+        memcpy(&(req.sig_key_id), item_str_buf.ptr, req.sig_key_id_len);
+    }
 
     /* parse "nonce" (bytes) */
     QCBORDecode_GetByteString(&dc, &item_str_buf);
+    if (item_str_buf.len > sizeof(req.nonce)) {
+        charra_log_error("CBOR parser: nonce is too long (%zu bytes).",
+                item_str_buf.len);
+        goto cbor_parse_error;
+    }
     req.nonce_len = item_str_buf.len;
-    memcpy(&(req.nonce), item_str_buf.ptr, req.nonce_len);
+    if (req.nonce_len > 0) {
+        memcpy(&(req.nonce), item_str_buf.ptr, req.nonce_len);
+    }
 
     /* parse array "pcr-selections" */
     QCBORDecode_EnterArray(&dc, &item);
 
     /* initialize array and array length */
+    if (item.val.uCount > TPM2_NUM_PCR_BANKS) {
+        charra_log_error("CBOR parser: pcr-selections count exceeds limit (%u).",
+                TPM2_NUM_PCR_BANKS);
+        goto cbor_parse_error;
+    }
     req.pcr_selections_len = (uint32_t)item.val.uCount;
 
     /* go through all elements */
@@ -236,17 +255,32 @@ CHARRA_RC charra_tap_unmarshal_attestation_request(
         /* parse "tcg-hash-alg-id" (UINT16) */
         int64_t int_val = 0;
         QCBORDecode_GetInt64(&dc, &int_val);
+        if (int_val < 0 || int_val > UINT16_MAX) {
+            charra_log_error("CBOR parser: invalid hash algorithm id %lld.",
+                    int_val);
+            goto cbor_parse_error;
+        }
         req.pcr_selections[i].tcg_hash_alg_id = (uint16_t)int_val;
 
         /* parse array "pcrs" */
         QCBORDecode_EnterArray(&dc, &item);
 
         /* initialize array and array length */
+        if (item.val.uCount > TPM2_MAX_PCRS) {
+            charra_log_error("CBOR parser: pcr-selection count exceeds limit (%u).",
+                    TPM2_MAX_PCRS);
+            goto cbor_parse_error;
+        }
         req.pcr_selections[i].pcrs_len = (uint32_t)item.val.uCount;
 
         /* go through all elements */
         for (uint32_t j = 0; j < req.pcr_selections[i].pcrs_len; ++j) {
             QCBORDecode_GetInt64(&dc, &int_val);
+            if (int_val < 0 || int_val > UINT8_MAX) {
+                charra_log_error("CBOR parser: invalid PCR index %lld.",
+                        int_val);
+                goto cbor_parse_error;
+            }
             req.pcr_selections[i].pcrs[j] = (uint8_t)int_val;
         }
 
@@ -262,9 +296,19 @@ CHARRA_RC charra_tap_unmarshal_attestation_request(
 
     /* parse pcr-log requests */
     QCBORDecode_EnterArray(&dc, &item);
+    if (item.val.uCount > SUPPORTED_PCR_LOGS_COUNT) {
+        charra_log_error("CBOR parser: pcr-log request count exceeds limit (%u).",
+                SUPPORTED_PCR_LOGS_COUNT);
+        goto cbor_parse_error;
+    }
     uint32_t pcr_log_count = (uint32_t)item.val.uCount;
     req.pcr_log_len = pcr_log_count;
-    req.pcr_logs = calloc(pcr_log_count, sizeof(pcr_log_dto));
+    if (pcr_log_count > 0) {
+        req.pcr_logs = calloc(pcr_log_count, sizeof(pcr_log_dto));
+        if (req.pcr_logs == NULL) {
+            goto cbor_parse_error;
+        }
+    }
 
     for (uint32_t i = 0; i < pcr_log_count; ++i) {
         /* parse array "pcr-log" */
@@ -290,6 +334,7 @@ CHARRA_RC charra_tap_unmarshal_attestation_request(
             goto cbor_parse_error;
         }
         memcpy(req.pcr_logs[i].identifier, item_str_buf.ptr, item_str_buf.len);
+        req.pcr_logs[i].identifier[item_str_buf.len] = '\0';
         req.pcr_logs[i].start = start;
         req.pcr_logs[i].count = count;
     }
@@ -503,23 +548,47 @@ CHARRA_RC charra_tap_unmarshal_attestation_response(
 
     /* parse "attestation-data" (bytes) */
     QCBORDecode_GetByteString(&dc, &item_str_buf);
+    if (item_str_buf.len > sizeof(res.tpm2_quote.attestation_data)) {
+        charra_log_error("CBOR parser: attestation data is too long (%zu bytes).",
+                item_str_buf.len);
+        goto cbor_parse_error;
+    }
     res.tpm2_quote.attestation_data_len = item_str_buf.len;
-    memcpy(&(res.tpm2_quote.attestation_data), item_str_buf.ptr,
-            res.tpm2_quote.attestation_data_len);
+    if (res.tpm2_quote.attestation_data_len > 0) {
+        memcpy(&(res.tpm2_quote.attestation_data), item_str_buf.ptr,
+                res.tpm2_quote.attestation_data_len);
+    }
 
     /* parse "tpm2-signature" (bytes) */
     QCBORDecode_GetByteString(&dc, &item_str_buf);
+    if (item_str_buf.len > sizeof(res.tpm2_quote.tpm2_signature)) {
+        charra_log_error("CBOR parser: TPM2 signature is too long (%zu bytes).",
+                item_str_buf.len);
+        goto cbor_parse_error;
+    }
     res.tpm2_quote.tpm2_signature_len = item_str_buf.len;
-    memcpy(&(res.tpm2_quote.tpm2_signature), item_str_buf.ptr,
-            res.tpm2_quote.tpm2_signature_len);
+    if (res.tpm2_quote.tpm2_signature_len > 0) {
+        memcpy(&(res.tpm2_quote.tpm2_signature), item_str_buf.ptr,
+                res.tpm2_quote.tpm2_signature_len);
+    }
 
     /* exit tpm2_quote array */
     QCBORDecode_ExitArray(&dc);
 
     /* parse array pcr-logs */
     QCBORDecode_EnterArray(&dc, &item);
-    res.pcr_log_len = item.val.uCount;
-    res.pcr_logs = calloc(res.pcr_log_len, sizeof(pcr_log_response_dto));
+    if (item.val.uCount > SUPPORTED_PCR_LOGS_COUNT) {
+        charra_log_error("CBOR parser: pcr-log response count exceeds limit (%u).",
+                SUPPORTED_PCR_LOGS_COUNT);
+        goto cbor_parse_error;
+    }
+    res.pcr_log_len = (uint32_t)item.val.uCount;
+    if (res.pcr_log_len > 0) {
+        res.pcr_logs = calloc(res.pcr_log_len, sizeof(pcr_log_response_dto));
+        if (res.pcr_logs == NULL) {
+            goto cbor_parse_error;
+        }
+    }
     for (uint32_t i = 0; i < res.pcr_log_len; ++i) {
         /* parse array pcr-log */
         QCBORDecode_EnterArray(&dc, &item);
@@ -537,6 +606,7 @@ CHARRA_RC charra_tap_unmarshal_attestation_response(
             goto cbor_parse_error;
         }
         memcpy(res.pcr_logs[i].identifier, item_str_buf.ptr, item_str_buf.len);
+        res.pcr_logs[i].identifier[item_str_buf.len] = '\0';
 
         /* parse start */
         QCBORDecode_GetUInt64(&dc, &(res.pcr_logs[i].start));
